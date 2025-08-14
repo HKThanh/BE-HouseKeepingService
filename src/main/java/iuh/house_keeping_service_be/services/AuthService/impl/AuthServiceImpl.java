@@ -1,14 +1,20 @@
 package iuh.house_keeping_service_be.services.AuthService.impl;
 
 import iuh.house_keeping_service_be.config.JwtUtil;
+import iuh.house_keeping_service_be.dtos.Authentication.TokenPair;
+import iuh.house_keeping_service_be.enums.AccountStatus;
 import iuh.house_keeping_service_be.enums.Role;
 import iuh.house_keeping_service_be.models.Account;
+import iuh.house_keeping_service_be.models.AdminProfile;
 import iuh.house_keeping_service_be.models.Customer;
 import iuh.house_keeping_service_be.models.Employee;
-import iuh.house_keeping_service_be.models.User;
 import iuh.house_keeping_service_be.repositories.AccountRepository;
+import iuh.house_keeping_service_be.repositories.AdminProfileRepository;
+import iuh.house_keeping_service_be.repositories.CustomerRepository;
+import iuh.house_keeping_service_be.repositories.EmployeeRepository;
 import iuh.house_keeping_service_be.services.AuthService.AuthService;
 import lombok.extern.slf4j.Slf4j;
+import org.antlr.v4.runtime.Token;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -17,6 +23,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -39,8 +48,17 @@ public class AuthServiceImpl implements AuthService {
     @Autowired
     private RedisTemplate<String, String> redisTemplate;
 
+    @Autowired
+    private CustomerRepository customerRepository;
+
+    @Autowired
+    private EmployeeRepository employeeRepository;
+
+    @Autowired
+    private AdminProfileRepository adminProfileRepository;
+
     @Override
-    public String login(String username, String password, String role) {
+    public TokenPair login(String username, String password, String role) {
         log.info("Login attempt for username: {}, role: {}", username, role);
 
         try {
@@ -74,25 +92,32 @@ public class AuthServiceImpl implements AuthService {
                 throw new IllegalArgumentException("Invalid role provided: " + role);
             }
 
-            if (!account.getRoles().equals(requestedRole)) {
+            if (!account.getRole().equals(requestedRole)) {
                 log.warn("Role mismatch for user {}: requested={}, actual={}",
-                        username, requestedRole, account.getRoles());
+                        username, requestedRole, account.getRole());
                 throw new RuntimeException("Role mismatch");
             }
 
-            // Generate token with role information
-            String token = jwtUtil.generateToken(username.trim());
+            // Generate token pair
+            TokenPair tokenPair = jwtUtil.generateTokenPair(username.trim());
 
-            // Store token in Redis with user info
+            // Store access token in Redis
             redisTemplate.opsForValue().set(
-                "token:" + token,
-                username.trim() + ":" + account.getRoles().name(),
-                jwtUtil.getExpiration() / 1000,
-                TimeUnit.SECONDS
+                    "access_token:" + tokenPair.accessToken(),
+                    username.trim() + ":" + account.getRole(),
+                    jwtUtil.getAccessExpiration() / 1000,
+                    TimeUnit.SECONDS
             );
 
-            log.info("Successful login for user: {}", username);
-            return token;
+            // Store refresh token in Redis with longer expiration
+            redisTemplate.opsForValue().set(
+                    "refresh_token:" + tokenPair.refreshToken(),
+                    username.trim() + ":" + account.getRole(),
+                    jwtUtil.getRefreshExpiration() / 1000,
+                    TimeUnit.SECONDS
+            );
+
+            return tokenPair;
 
         } catch (Exception e) {
             log.error("Login failed for username: {}, error: {}", username, e.getMessage());
@@ -113,23 +138,62 @@ public class AuthServiceImpl implements AuthService {
                 throw new IllegalArgumentException("Username already exists");
             }
 
-            // Validate role
+            // Validate and convert role string to enum
             Role accountRole;
             try {
                 accountRole = Role.valueOf(role.toUpperCase().trim());
             } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException("Invalid role: " + role);
+                throw new IllegalArgumentException("Invalid role: " + role + ". Must be CUSTOMER, EMPLOYEE, or ADMIN");
             }
 
-            // Hash the password
-            String hashedPassword = passwordEncoder.encode(password);
+            // Generate UUID for account
+            String accountId = UUID.randomUUID().toString();
+
+            // Create account with basic information
+            Account account = new Account();
+            account.setAccountId(accountId);
+            account.setUsername(username.trim());
+            account.setPassword(passwordEncoder.encode(password));
+            account.setRole(accountRole.name());
+            account.setStatus(AccountStatus.ACTIVE);
+            account.setCreatedAt(Instant.now());
+            account.setUpdatedAt(Instant.now());
 
             // Create specific user type based on role
-            User user = createUserByRole(accountRole, email.trim(), fullName.trim());
-
-            // Create Account
-            Account account = new Account(username.trim(), hashedPassword, accountRole, "ACTIVE");
-            account.setUser(user);
+            switch (accountRole) {
+                case CUSTOMER -> {
+                    Customer customer = new Customer();
+                    customer.setCustomerId(UUID.randomUUID().toString());
+                    customer.setAccount(account);
+                    customer.setFullname(fullName.trim());
+                    customer.setEmail(email.trim());
+                    customer.setCreatedAt(Instant.now());
+                    customer.setUpdatedAt(Instant.now());
+                    customerRepository.save(customer);
+                }
+                case EMPLOYEE -> {
+                    Employee employee = new Employee();
+                    employee.setEmployeeId(UUID.randomUUID().toString());
+                    employee.setAccount(account);
+                    employee.setFullname(fullName.trim());
+                    employee.setEmail(email.trim());
+                    employee.setHiredDate(LocalDate.now());
+                    employee.setCreatedAt(Instant.now());
+                    employee.setUpdatedAt(Instant.now());
+                    employeeRepository.save(employee);
+                }
+                case ADMIN -> {
+                    AdminProfile admin = new AdminProfile();
+                    admin.setAdminProfileId(UUID.randomUUID().toString());
+                    admin.setAccount(account);
+                    admin.setContactInfo(email.trim());
+                    admin.setHireDate(LocalDate.now());
+                    admin.setCreatedAt(Instant.now());
+                    admin.setUpdatedAt(Instant.now());
+                    adminProfileRepository.save(admin);
+                }
+                default -> throw new IllegalArgumentException("Unsupported role: " + accountRole);
+            }
 
             // Save account
             Account savedAccount = accountRepository.save(account);
@@ -137,9 +201,12 @@ public class AuthServiceImpl implements AuthService {
 
             return savedAccount;
 
+        } catch (IllegalArgumentException e) {
+            log.error("Registration validation error for username: {}, error: {}", username, e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.error("Registration failed for username: {}, error: {}", username, e.getMessage());
-            throw new RuntimeException("Registration failed: " + e.getMessage());
+            throw new RuntimeException("Registration failed: " + e.getMessage(), e);
         }
     }
 
@@ -180,82 +247,54 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public String refreshToken(String token) {
-        try {
-            if (token == null || token.trim().isEmpty()) {
-                throw new IllegalArgumentException("Token is required");
-            }
-
-            // Validate current token first
-            if (!validateToken(token.trim())) {
-                throw new RuntimeException("Invalid token for refresh");
-            }
-
-            // Extract username from current token
-            String username = jwtUtil.extractUsername(token.trim());
-
-            // Get user info from Redis
-            String tokenKey = "token:" + token.trim();
-            String userInfo = redisTemplate.opsForValue().get(tokenKey);
-
-            if (userInfo == null) {
-                throw new RuntimeException("Token not found in Redis");
-            }
-
-            // Extract role from stored user info
-            String[] parts = userInfo.split(":");
-            if (parts.length != 2) {
-                throw new RuntimeException("Invalid token data format");
-            }
-
-            String role = parts[1];
-
-            // Generate new token
-            String newToken = jwtUtil.generateToken(username);
-
-            // Remove old token from Redis
-            redisTemplate.delete(tokenKey);
-
-            // Store new token in Redis
-            redisTemplate.opsForValue().set(
-                "token:" + newToken,
-                username + ":" + role,
-                jwtUtil.getExpiration() / 1000,
-                TimeUnit.SECONDS
-            );
-
-            log.info("Token refreshed for user: {}", username);
-            return newToken;
-
-        } catch (Exception e) {
-            log.error("Token refresh failed: {}", e.getMessage());
-            throw new RuntimeException("Failed to refresh token: " + e.getMessage());
+    public TokenPair refreshToken(String refreshToken) {
+        if (refreshToken == null || refreshToken.trim().isEmpty()) {
+            throw new IllegalArgumentException("Refresh token is required");
         }
+
+        // Validate refresh token
+        String refreshTokenKey = "refresh_token:" + refreshToken.trim();
+        String userInfo = redisTemplate.opsForValue().get(refreshTokenKey);
+
+        if (userInfo == null) {
+            throw new RuntimeException("Invalid refresh token");
+        }
+
+        String[] parts = userInfo.split(":");
+        String username = parts[0];
+        String role = parts[1];
+
+        // Generate new token pair
+        TokenPair newTokenPair = jwtUtil.generateTokenPair(username);
+
+        // Delete old refresh token
+        redisTemplate.delete(refreshTokenKey);
+
+        // Store new tokens in Redis
+        redisTemplate.opsForValue().set(
+                "access_token:" + newTokenPair.accessToken(),
+                username + ":" + role,
+                jwtUtil.getAccessExpiration() / 1000,
+                TimeUnit.SECONDS
+        );
+
+        redisTemplate.opsForValue().set(
+                "refresh_token:" + newTokenPair.refreshToken(),
+                username + ":" + role,
+                jwtUtil.getRefreshExpiration() / 1000,
+                TimeUnit.SECONDS
+        );
+
+        return newTokenPair;
     }
 
     @Override
     public String logout(String token) {
-        try {
-            if (token == null || token.trim().isEmpty()) {
-                throw new IllegalArgumentException("Token is required");
-            }
+        // Remove both access and potential refresh tokens
+        redisTemplate.delete("access_token:" + token.trim());
+        redisTemplate.delete("refresh_token:" + token.trim());
 
-            // Validate token before logout
-            if (!validateToken(token.trim())) {
-                throw new RuntimeException("Invalid token for logout");
-            }
-
-            // Remove token from Redis
-            String tokenKey = "token:" + token.trim();
-            redisTemplate.delete(tokenKey);
-
-            log.info("User logged out successfully, token: {}", token);
-            return "Logout successful";
-
-        } catch (Exception e) {
-            log.error("Logout failed: {}", e.getMessage());
-            throw new RuntimeException("Logout failed: " + e.getMessage());
-        }
+        return "Logout successful";
     }
 
     // Helper methods
@@ -275,25 +314,5 @@ public class AuthServiceImpl implements AuthService {
         if (fullName == null || fullName.trim().isEmpty()) {
             throw new IllegalArgumentException("Full name is required");
         }
-    }
-
-    private User createUserByRole(Role accountRole, String email, String fullName) {
-        User user;
-        if (accountRole == Role.CUSTOMER) {
-            Customer customer = new Customer();
-            customer.setEmail(email);
-            customer.setFullName(fullName);
-            user = customer;
-        } else if (accountRole == Role.EMPLOYEE) {
-            Employee employee = new Employee();
-            employee.setEmail(email);
-            employee.setFullName(fullName);
-            user = employee;
-        } else {
-            user = new User();
-            user.setEmail(email);
-            user.setFullName(fullName);
-        }
-        return user;
     }
 }
