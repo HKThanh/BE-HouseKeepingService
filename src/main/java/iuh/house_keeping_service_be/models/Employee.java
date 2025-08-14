@@ -1,38 +1,65 @@
 package iuh.house_keeping_service_be.models;
 
-import iuh.house_keeping_service_be.enums.Gender;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
+import java.time.Instant;
+import java.time.LocalDate;
 
+@Getter
+@Setter
 @Entity
-@Table(name = "employees")
-@NoArgsConstructor
-@AllArgsConstructor
-@Data
-public class Employee extends User{
+@Table(name = "employee")
+public class Employee {
     @Id
-    @Column(name = "employee_id", updatable = false, nullable = false, columnDefinition = "uuid")
-    private UUID employeeId;
+    @Size(max = 36)
+    @Column(name = "employee_id", nullable = false, length = 36)
+    private String employeeId;
 
-    @Enumerated(EnumType.STRING)
+    @OneToOne(fetch = FetchType.LAZY)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    @JoinColumn(name = "account_id")
+    private Account account;
+
+    @Size(max = 255)
+    @Column(name = "avatar")
+    private String avatar;
+
+    @Size(max = 100)
+    @NotNull
+    @Column(name = "fullname", nullable = false, length = 100)
+    private String fullname;
+
     @Column(name = "is_male")
-    private Gender gender;
+    private Boolean isMale;
 
-    @Column(name = "address")
-    private String address;
+    @Size(max = 100)
+    @NotNull
+    @Column(name = "email", nullable = false, length = 100)
+    private String email;
 
-    @CreationTimestamp
-    @Column(name = "create_at", nullable = false, updatable = false)
-    private LocalDateTime createAt;
+    @Size(max = 20)
+    @Column(name = "phone_number", length = 20)
+    private String phoneNumber;
 
-    @UpdateTimestamp
-    @Column(name = "update_at", nullable = false)
-    private LocalDateTime updateAt;
+    @Column(name = "hired_date")
+    private LocalDate hiredDate;
+
+    @Column(name = "skills", length = Integer.MAX_VALUE)
+    private String skills;
+
+    @ColumnDefault("CURRENT_TIMESTAMP")
+    @Column(name = "created_at")
+    private Instant createdAt;
+
+    @ColumnDefault("CURRENT_TIMESTAMP")
+    @Column(name = "updated_at")
+    private Instant updatedAt;
+
 }
