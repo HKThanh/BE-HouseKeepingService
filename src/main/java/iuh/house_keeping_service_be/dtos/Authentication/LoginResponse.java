@@ -1,10 +1,10 @@
 package iuh.house_keeping_service_be.dtos.Authentication;
 
 public record LoginResponse (
-    String access_token,
-    String refresh_token,
-    String username,
-    String email,
-    String role
+        String access_Token,
+        String refresh_Token,
+        int expire_In,
+        String role,
+        DataLoginResponse data
 ) {
 }
