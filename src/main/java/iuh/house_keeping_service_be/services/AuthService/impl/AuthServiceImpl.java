@@ -16,11 +16,13 @@ import iuh.house_keeping_service_be.services.AuthService.AuthService;
 import lombok.extern.slf4j.Slf4j;
 import org.antlr.v4.runtime.Token;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -46,7 +48,7 @@ public class AuthServiceImpl implements AuthService {
     private AuthenticationManager authenticationManager;
 
     @Autowired
-    private RedisTemplate<String, String> redisTemplate;
+    private RedisTemplate<Object, Object> redisTemplate;
 
     @Autowired
     private CustomerRepository customerRepository;
@@ -78,8 +80,14 @@ public class AuthServiceImpl implements AuthService {
             Account account = accountRepository.findByUsername(username.trim())
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
+            // Explicitly verify password
+            if (!passwordEncoder.matches(password, account.getPassword())) {
+                log.warn("Invalid password for user: {}", username);
+                throw new RuntimeException("Invalid credentials");
+            }
+
             // Check if account is active
-            if (!"ACTIVE".equals(account.getStatus())) {
+            if (!account.getStatus().equals(AccountStatus.ACTIVE)) {
                 log.warn("Login attempt with inactive account: {}", username);
                 throw new RuntimeException("Account is not active");
             }
@@ -154,7 +162,7 @@ public class AuthServiceImpl implements AuthService {
             account.setAccountId(accountId);
             account.setUsername(username.trim());
             account.setPassword(passwordEncoder.encode(password));
-            account.setRole(accountRole.name());
+            account.setRole(accountRole);
             account.setStatus(AccountStatus.ACTIVE);
             account.setCreatedAt(Instant.now());
             account.setUpdatedAt(Instant.now());
@@ -165,7 +173,7 @@ public class AuthServiceImpl implements AuthService {
                     Customer customer = new Customer();
                     customer.setCustomerId(UUID.randomUUID().toString());
                     customer.setAccount(account);
-                    customer.setFullname(fullName.trim());
+                    customer.setFullName(fullName.trim());
                     customer.setEmail(email.trim());
                     customer.setCreatedAt(Instant.now());
                     customer.setUpdatedAt(Instant.now());
@@ -175,7 +183,7 @@ public class AuthServiceImpl implements AuthService {
                     Employee employee = new Employee();
                     employee.setEmployeeId(UUID.randomUUID().toString());
                     employee.setAccount(account);
-                    employee.setFullname(fullName.trim());
+                    employee.setFullName(fullName.trim());
                     employee.setEmail(email.trim());
                     employee.setHiredDate(LocalDate.now());
                     employee.setCreatedAt(Instant.now());
@@ -219,12 +227,15 @@ public class AuthServiceImpl implements AuthService {
 
             // Check if token exists in Redis
             String tokenKey = "token:" + token.trim();
-            String userInfo = redisTemplate.opsForValue().get(tokenKey);
+            Object userInfoObj = redisTemplate.opsForValue().get(tokenKey);
 
-            if (userInfo == null) {
+            // Check if token exists
+            if (userInfoObj == null) {
                 log.debug("Token not found in Redis: {}", token);
                 return false;
             }
+
+            String userInfo = userInfoObj.toString();
 
             // Extract username from token
             String username = jwtUtil.extractUsername(token.trim());
@@ -254,11 +265,13 @@ public class AuthServiceImpl implements AuthService {
 
         // Validate refresh token
         String refreshTokenKey = "refresh_token:" + refreshToken.trim();
-        String userInfo = redisTemplate.opsForValue().get(refreshTokenKey);
+        Object userInfoObj = redisTemplate.opsForValue().get(refreshTokenKey);
 
-        if (userInfo == null) {
+        if (userInfoObj == null) {
             throw new RuntimeException("Invalid refresh token");
         }
+
+        String userInfo = userInfoObj.toString();
 
         String[] parts = userInfo.split(":");
         String username = parts[0];
@@ -314,5 +327,16 @@ public class AuthServiceImpl implements AuthService {
         if (fullName == null || fullName.trim().isEmpty()) {
             throw new IllegalArgumentException("Full name is required");
         }
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void updateLastLoginTime(Account account) {
+        // Fetch a fresh managed entity to avoid detached entity issues
+        Account managedAccount = accountRepository.findById(account.getAccountId().toString())
+                .orElseThrow(() -> new RuntimeException("Account not found"));
+
+        managedAccount.setLastLogin(Instant.now());
+        accountRepository.saveAndFlush(managedAccount);
     }
 }

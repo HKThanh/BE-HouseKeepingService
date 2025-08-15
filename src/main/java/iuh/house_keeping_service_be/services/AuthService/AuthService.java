@@ -13,4 +13,6 @@ public interface AuthService {
     TokenPair refreshToken(String token);
 
     String logout(String token);
+
+    void updateLastLoginTime(Account account);
 }

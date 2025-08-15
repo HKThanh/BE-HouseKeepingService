@@ -10,6 +10,7 @@ import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 
 import java.time.Instant;
+import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -32,8 +33,8 @@ public class Customer {
 
     @Size(max = 100)
     @NotNull
-    @Column(name = "fullname", nullable = false, length = 100)
-    private String fullname;
+    @Column(name = "full_name", nullable = false, length = 100)
+    private String fullName;
 
     @Column(name = "is_male")
     private Boolean isMale;
@@ -46,6 +47,13 @@ public class Customer {
     @Size(max = 20)
     @Column(name = "phone_number", length = 20)
     private String phoneNumber;
+
+    @Size(max = 255)
+    @Column(name = "address", length = 255)
+    private String address;
+
+    @Column(name = "birthdate")
+    private LocalDate birthDate;
 
     @ColumnDefault("CURRENT_TIMESTAMP")
     @Column(name = "created_at")

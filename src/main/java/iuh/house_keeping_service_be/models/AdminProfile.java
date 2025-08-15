@@ -27,8 +27,15 @@ public class AdminProfile {
     private Account account;
 
     @Size(max = 100)
-    @Column(name = "office_location", length = 100)
-    private String officeLocation;
+    @Column(name = "full_name", length = 100)
+    private String fullName;
+
+    @Column(name = "is_male")
+    private Boolean isMale;
+
+    @Size(max = 100)
+    @Column(name = "address", length = 100)
+    private String address;
 
     @Size(max = 50)
     @Column(name = "department", length = 50)
@@ -37,6 +44,9 @@ public class AdminProfile {
     @Size(max = 255)
     @Column(name = "contact_info")
     private String contactInfo;
+
+    @Column(name = "birthdate")
+    private LocalDate birthDate;
 
     @Column(name = "hire_date")
     private LocalDate hireDate;

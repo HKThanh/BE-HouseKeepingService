@@ -1,10 +1,8 @@
 package iuh.house_keeping_service_be.models;
 
 import iuh.house_keeping_service_be.enums.AccountStatus;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import iuh.house_keeping_service_be.enums.Role;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
@@ -33,21 +31,17 @@ public class Account {
     @Column(name = "password", nullable = false)
     private String password;
 
-    @Size(max = 20)
+    @Enumerated(EnumType.STRING)
     @Column(name = "role", length = 20)
-    private String role;
+    private Role role;
 
-    @Size(max = 20)
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", length = 20)
     private AccountStatus status;
 
     @ColumnDefault("false")
     @Column(name = "is_admin")
     private Boolean isAdmin;
-
-    @ColumnDefault("0")
-    @Column(name = "admin_level")
-    private Integer adminLevel;
 
     @ColumnDefault("CURRENT_TIMESTAMP")
     @Column(name = "created_at")

@@ -33,8 +33,8 @@ public class Employee {
 
     @Size(max = 100)
     @NotNull
-    @Column(name = "fullname", nullable = false, length = 100)
-    private String fullname;
+    @Column(name = "full_name", nullable = false, length = 100)
+    private String fullName;
 
     @Column(name = "is_male")
     private Boolean isMale;
@@ -48,11 +48,18 @@ public class Employee {
     @Column(name = "phone_number", length = 20)
     private String phoneNumber;
 
+    @Column(name = "birthdate")
+    private LocalDate birthDate;
+
     @Column(name = "hired_date")
     private LocalDate hiredDate;
 
     @Column(name = "skills", length = Integer.MAX_VALUE)
     private String skills;
+
+    @Size(max = 255)
+    @Column(name = "address", length = 255)
+    private String address;
 
     @ColumnDefault("CURRENT_TIMESTAMP")
     @Column(name = "created_at")
