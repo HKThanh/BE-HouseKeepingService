@@ -1,0 +1,55 @@
+services:
+  app:
+    build: .
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/house_keeping
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=123456
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_JPA_SHOW_SQL=false
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - JWT_SECRET=81474ce734be3de9043102e50fa88519a6f3bc67d75e7efded4602f33062fb40
+      - JWT_ACCESS_EXPIRATION=3600000
+      - JWT_REFRESH_EXPIRATION=86400000
+    networks:
+      - house_keeping_network
+
+  postgres:
+    image: postgres:15
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=house_keeping
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=123456
+    volumes:
+      - ./postgres_data/data:/var/lib/postgresql/data
+      - ./postgres_data/housekeeping_service_v4.sql:/docker-entrypoint-initdb.d/housekeeping_service_v4.sql
+    networks:
+      - house_keeping_network
+
+  redis:
+    image: redis:7
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - house_keeping_network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  house_keeping_network:
+    driver: bridge
