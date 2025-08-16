@@ -11,4 +11,6 @@ public interface AdminProfileRepository extends CrudRepository<AdminProfile, Str
     Optional<AdminProfile> findByAccount_AccountId(String accountId);
 
     Optional<AdminProfile> findByContactInfoAndAccount_Role(@Size(max = 255) String contactInfo, Role account_role);
+
+    boolean existsByContactInfo(String contactInfo);
 }

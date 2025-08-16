@@ -130,16 +130,16 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public Account register(String username, String password, String email, String role, String fullName, String phoneNumber) {
+    public Account register(String username, String password, String email, String phoneNumber, String role, String fullName) {
         log.info("Registration attempt for username: {}, email: {}, role: {}", username, email, role);
 
         try {
             // Input validation
-            validateRegistrationInput(username, password, email, role, fullName);
+            validateRegistrationInput(username, password, email, role, fullName, phoneNumber);
 
             // Check if username already exists
             if (accountRepository.findByUsername(username.trim()).isPresent()) {
-                throw new IllegalArgumentException("Username already exists");
+                throw new IllegalArgumentException("Tên đăng nhập đã được sử dụng");
             }
 
             // Validate and convert role string to enum
@@ -147,8 +147,11 @@ public class AuthServiceImpl implements AuthService {
             try {
                 accountRole = Role.valueOf(role.toUpperCase().trim());
             } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException("Invalid role: " + role + ". Must be CUSTOMER, EMPLOYEE, or ADMIN");
+                throw new IllegalArgumentException("Role không hợp lệ");
             }
+
+            // Check email uniqueness based on role
+            checkEmailUniqueness(email.trim(), accountRole);
 
             // Generate UUID for account
             String accountId = UUID.randomUUID().toString();
@@ -163,12 +166,15 @@ public class AuthServiceImpl implements AuthService {
             account.setCreatedAt(Instant.now());
             account.setUpdatedAt(Instant.now());
 
+            // Save account first
+            Account savedAccount = accountRepository.save(account);
+
             // Create specific user type based on role
             switch (accountRole) {
                 case CUSTOMER -> {
                     Customer customer = new Customer();
                     customer.setCustomerId(UUID.randomUUID().toString());
-                    customer.setAccount(account);
+                    customer.setAccount(savedAccount);
                     customer.setFullName(fullName.trim());
                     customer.setEmail(email.trim());
                     customer.setPhoneNumber(phoneNumber != null ? phoneNumber.trim() : null);
@@ -179,7 +185,7 @@ public class AuthServiceImpl implements AuthService {
                 case EMPLOYEE -> {
                     Employee employee = new Employee();
                     employee.setEmployeeId(UUID.randomUUID().toString());
-                    employee.setAccount(account);
+                    employee.setAccount(savedAccount);
                     employee.setFullName(fullName.trim());
                     employee.setEmail(email.trim());
                     employee.setPhoneNumber(phoneNumber != null ? phoneNumber.trim() : null);
@@ -191,7 +197,8 @@ public class AuthServiceImpl implements AuthService {
                 case ADMIN -> {
                     AdminProfile admin = new AdminProfile();
                     admin.setAdminProfileId(UUID.randomUUID().toString());
-                    admin.setAccount(account);
+                    admin.setAccount(savedAccount);
+                    admin.setFullName(fullName.trim()); // Added full name
                     admin.setContactInfo(email.trim());
                     admin.setHireDate(LocalDate.now());
                     admin.setCreatedAt(Instant.now());
@@ -201,10 +208,7 @@ public class AuthServiceImpl implements AuthService {
                 default -> throw new IllegalArgumentException("Unsupported role: " + accountRole);
             }
 
-            // Save account
-            Account savedAccount = accountRepository.save(account);
             log.info("Successfully registered user: {}", username);
-
             return savedAccount;
 
         } catch (IllegalArgumentException e) {
@@ -213,6 +217,88 @@ public class AuthServiceImpl implements AuthService {
         } catch (Exception e) {
             log.error("Registration failed for username: {}, error: {}", username, e.getMessage());
             throw new RuntimeException("Registration failed: " + e.getMessage(), e);
+        }
+    }
+
+    private void checkEmailUniqueness(String email, Role role) {
+        switch (role) {
+            case CUSTOMER -> {
+                if (customerRepository.existsByEmail(email)) {
+                    throw new IllegalArgumentException("Đã có khách hàng dùng email này");
+                }
+            }
+            case EMPLOYEE -> {
+                if (employeeRepository.existsByEmail(email)) {
+                    throw new IllegalArgumentException("Đã có nhân viên dùng email này");
+                }
+            }
+            case ADMIN -> {
+                if (adminProfileRepository.existsByContactInfo(email)) {
+                    throw new IllegalArgumentException("Đã có admin dùng email này");
+                }
+            }
+        }
+    }
+
+    private void validateRegistrationInput(String username, String password, String email, String role, String fullName, String phoneNumber) {
+        // Username validation
+        if (username == null || username.trim().isEmpty()) {
+            throw new IllegalArgumentException("Tên đăng nhập không được thiếu");
+        }
+        if (username.trim().length() < 3 || username.trim().length() > 50) {
+            throw new IllegalArgumentException("Tên đăng nhập phải có từ 3 đến 50 ký tự");
+        }
+        if (!username.trim().matches("^[a-zA-Z0-9_]+$")) {
+            throw new IllegalArgumentException("Tên đăng nhập chỉ được chứa chữ cái, số và dấu gạch dưới");
+        }
+
+        // Password validation
+        if (password == null || password.isEmpty()) {
+            throw new IllegalArgumentException("Mật khẩu không được thiếu");
+        }
+        if (password.length() < 6) {
+            throw new IllegalArgumentException("Mật khẩu phải có ít nhất 6 ký tự");
+        }
+        if (password.length() > 100) {
+            throw new IllegalArgumentException("Mật khẩu không được vượt quá 100 ký tự");
+        }
+
+        // Email validation
+        if (email == null || email.trim().isEmpty()) {
+            throw new IllegalArgumentException("Email không được thiếu");
+        }
+        if (!email.trim().matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")) {
+            throw new IllegalArgumentException("Định dạng email không hợp lệ");
+        }
+        if (email.trim().length() > 255) {
+            throw new IllegalArgumentException("Email không được vượt quá 255 ký tự");
+        }
+
+        // Role validation
+        if (role == null || role.trim().isEmpty()) {
+            throw new IllegalArgumentException("Vai trò không được thiếu");
+        }
+        if (!role.trim().matches("^(CUSTOMER|EMPLOYEE|ADMIN)$")) {
+            throw new IllegalArgumentException("Vai trò phải là CUSTOMER, EMPLOYEE hoặc ADMIN");
+        }
+
+        // Full name validation
+        if (fullName == null || fullName.trim().isEmpty()) {
+            throw new IllegalArgumentException("Họ và tên không được thiếu");
+        }
+        if (fullName.trim().length() > 100) {
+            throw new IllegalArgumentException("Họ và tên không được vượt quá 100 ký tự");
+        }
+        if (!fullName.trim().matches("^[a-zA-ZÀ-ỹ\\s]+$")) {
+            throw new IllegalArgumentException("Họ và tên chỉ được chứa chữ cái và khoảng trắng");
+        }
+
+        // Phone number validation
+        if (phoneNumber == null || phoneNumber.trim().isEmpty()) {
+            throw new IllegalArgumentException("Số điện thoại không được thiếu");
+        }
+        if (!phoneNumber.trim().matches("^\\+?[0-9]{10,15}$")) {
+            throw new IllegalArgumentException("Định dạng số điện thoại không hợp lệ");
         }
     }
 
@@ -375,23 +461,23 @@ public class AuthServiceImpl implements AuthService {
     }
 
     // Helper methods
-    private void validateRegistrationInput(String username, String password, String email, String role, String fullName) {
-        if (username == null || username.trim().isEmpty()) {
-            throw new IllegalArgumentException("Username is required");
-        }
-        if (password == null || password.length() < 6) {
-            throw new IllegalArgumentException("Password must be at least 6 characters");
-        }
-        if (email == null || !email.contains("@")) {
-            throw new IllegalArgumentException("Valid email is required");
-        }
-        if (role == null || role.trim().isEmpty()) {
-            throw new IllegalArgumentException("Role is required");
-        }
-        if (fullName == null || fullName.trim().isEmpty()) {
-            throw new IllegalArgumentException("Full name is required");
-        }
-    }
+//    private void validateRegistrationInput(String username, String password, String email, String role, String fullName) {
+//        if (username == null || username.trim().isEmpty()) {
+//            throw new IllegalArgumentException("Username is required");
+//        }
+//        if (password == null || password.length() < 6) {
+//            throw new IllegalArgumentException("Password must be at least 6 characters");
+//        }
+//        if (email == null || !email.contains("@")) {
+//            throw new IllegalArgumentException("Valid email is required");
+//        }
+//        if (role == null || role.trim().isEmpty()) {
+//            throw new IllegalArgumentException("Role is required");
+//        }
+//        if (fullName == null || fullName.trim().isEmpty()) {
+//            throw new IllegalArgumentException("Full name is required");
+//        }
+//    }
 
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)

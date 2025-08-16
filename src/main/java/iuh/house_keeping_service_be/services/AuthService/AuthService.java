@@ -6,7 +6,7 @@ import iuh.house_keeping_service_be.models.Account;
 public interface AuthService {
     TokenPair login(String username, String password, String role, String deviceType);
 
-    Account register(String username, String password, String email, String role, String fullName, String phoneNumber);
+    Account register(String username, String password, String email, String phoneNumber, String role, String fullName);
 
     boolean validateToken(String token);
 

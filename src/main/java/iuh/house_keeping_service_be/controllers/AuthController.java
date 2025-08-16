@@ -340,27 +340,44 @@ public class AuthController {
             RegisterResponse response = new RegisterResponse(
                     account.getUsername(),
                     registerRequest.email(),
-                    registerRequest.fullName()
+                    registerRequest.role()
             );
 
             return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                     "success", true,
-                    "message", "Registration successful",
+                    "message", "Đăng ký thành công",
                     "data", response
             ));
 
         } catch (IllegalArgumentException e) {
+            // Parse the error message to determine the field
+            String field = extractFieldFromErrorMessage(e.getMessage());
             return ResponseEntity.badRequest().body(Map.of(
                     "success", false,
-                    "message", e.getMessage()
+                    "message", e.getMessage(),
+                    "field", field
             ));
         } catch (Exception e) {
             log.error("Registration error: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                     "success", false,
-                    "message", "Registration failed"
+                    "message", "Đã xảy ra lỗi khi đăng ký tài khoản"
             ));
         }
+    }
+
+    private String extractFieldFromErrorMessage(String message) {
+        String lowerMessage = message.toLowerCase();
+
+        // Check for Vietnamese terms
+        if (lowerMessage.contains("tên đăng nhập") || lowerMessage.contains("username")) return "username";
+        if (lowerMessage.contains("email")) return "email";
+        if (lowerMessage.contains("số điện thoại") || lowerMessage.contains("phone")) return "phoneNumber";
+        if (lowerMessage.contains("vai trò") || lowerMessage.contains("role")) return "role";
+        if (lowerMessage.contains("mật khẩu") || lowerMessage.contains("password")) return "password";
+        if (lowerMessage.contains("họ và tên") || lowerMessage.contains("full name")) return "fullName";
+
+        return "general";
     }
 
     @PostMapping("/refresh-token")

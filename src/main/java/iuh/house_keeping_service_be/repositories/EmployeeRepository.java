@@ -12,4 +12,6 @@ public interface EmployeeRepository extends CrudRepository<Employee, String> {
     Optional<Employee> findByEmail(String email);
 
     Optional<Employee> findByPhoneNumber(String phoneNumber);
+
+    boolean existsByEmail(String email);
 }
