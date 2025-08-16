@@ -507,7 +507,7 @@ Each test case includes:
   ```json
   {
     "success": false,
-    "message": "Failed to get active sessions" // or appropriate error message
+    "message": "Failed to get active sessions"
   }
   ```
 - **Status Code**: `500 Internal Server Error`
