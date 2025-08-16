@@ -5,6 +5,6 @@ public record LoginResponse (
         String refresh_Token,
         int expire_In,
         String role,
-        DataLoginResponse data
+        EmployeeLoginResponse data
 ) {
 }

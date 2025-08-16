@@ -1,12 +1,13 @@
 package iuh.house_keeping_service_be.dtos.Authentication;
 
 public record AdminLoginResponse(
+        String adminId,
         String username,
-        String full_name,
-        boolean is_male,
+        String fullName,
+        boolean isMale,
         String address,
         String department,
-        String contact_info,
-        String hire_date
+        String contactInfo,
+        String hireDate
 ) {
 }

@@ -1,6 +1,7 @@
 package iuh.house_keeping_service_be.dtos.Authentication;
 
-public record DataLoginResponse(
+public record CustomerLoginResponse(
+        String customerId,
         String username,
         String avatar,
         String fullName,

@@ -18,6 +18,9 @@ public record RegisterRequest(
     @Email(message = "Email should be valid")
     String email,
 
+    @NotBlank(message = "Phone number is required")
+    String phoneNumber,
+
     @NotBlank(message = "Role is required")
     @Pattern(regexp = "CUSTOMER|EMPLOYEE|ADMIN", message = "Role must be CUSTOMER, EMPLOYEE, or ADMIN")
     String role,
@@ -26,21 +29,4 @@ public record RegisterRequest(
     @Size(max = 100, message = "Full name cannot exceed 100 characters")
     String fullName
 ) {
-    public RegisterRequest {
-        if (username == null || username.isBlank()) {
-            throw new IllegalArgumentException("Username cannot be null or blank");
-        }
-        if (password == null || password.isBlank()) {
-            throw new IllegalArgumentException("Password cannot be null or blank");
-        }
-        if (email == null || email.isBlank()) {
-            throw new IllegalArgumentException("Email cannot be null or blank");
-        }
-        if (role == null || role.isBlank()) {
-            throw new IllegalArgumentException("Role cannot be null or blank");
-        }
-        if (fullName == null || fullName.isBlank()) {
-            throw new IllegalArgumentException("Full name cannot be null or blank");
-        }
-    }
 }

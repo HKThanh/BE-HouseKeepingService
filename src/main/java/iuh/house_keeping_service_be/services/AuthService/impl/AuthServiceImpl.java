@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -60,38 +61,33 @@ public class AuthServiceImpl implements AuthService {
     private AdminProfileRepository adminProfileRepository;
 
     @Override
-    public TokenPair login(String username, String password, String role) {
-        log.info("Login attempt for username: {}, role: {}", username, role);
-
+    public TokenPair login(String username, String password, String role, String deviceType) {
+        log.info("Login attempt for username: {}, role: {}, device: {}", username, role, deviceType);
+    
         try {
             // Input validation
             if (username == null || username.trim().isEmpty() ||
-                password == null || password.trim().isEmpty() ||
-                role == null || role.trim().isEmpty()) {
-                throw new IllegalArgumentException("Username, password, and role are required");
+                    password == null || password.trim().isEmpty() ||
+                    role == null || role.trim().isEmpty() ||
+                    deviceType == null || deviceType.trim().isEmpty()) {
+                throw new IllegalArgumentException("Username, password, role, and device type are required");
             }
-
+    
             // Authenticate user credentials
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(username.trim(), password)
             );
-
+    
             // Find account and validate role
             Account account = accountRepository.findByUsername(username.trim())
                     .orElseThrow(() -> new RuntimeException("User not found"));
-
+    
             // Explicitly verify password
             if (!passwordEncoder.matches(password, account.getPassword())) {
                 log.warn("Invalid password for user: {}", username);
                 throw new RuntimeException("Invalid credentials");
             }
-
-            // Check if account is active
-            if (!account.getStatus().equals(AccountStatus.ACTIVE)) {
-                log.warn("Login attempt with inactive account: {}", username);
-                throw new RuntimeException("Account is not active");
-            }
-
+    
             // Validate role matches account role
             Role requestedRole;
             try {
@@ -99,34 +95,34 @@ public class AuthServiceImpl implements AuthService {
             } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException("Invalid role provided: " + role);
             }
-
+    
             if (!account.getRole().equals(requestedRole)) {
                 log.warn("Role mismatch for user {}: requested={}, actual={}",
                         username, requestedRole, account.getRole());
                 throw new RuntimeException("Role mismatch");
             }
-
+    
             // Generate token pair
             TokenPair tokenPair = jwtUtil.generateTokenPair(username.trim());
-
-            // Store access token in Redis
+    
+            // Store access token in Redis with device-specific key
             redisTemplate.opsForValue().set(
                     "access_token:" + tokenPair.accessToken(),
-                    username.trim() + ":" + account.getRole(),
+                    username.trim() + ":" + account.getRole() + ":" + deviceType,
                     jwtUtil.getAccessExpiration() / 1000,
                     TimeUnit.SECONDS
             );
-
-            // Store refresh token in Redis with longer expiration
+    
+            // Store refresh token in Redis with device-specific key
             redisTemplate.opsForValue().set(
                     "refresh_token:" + tokenPair.refreshToken(),
-                    username.trim() + ":" + account.getRole(),
+                    username.trim() + ":" + account.getRole() + ":" + deviceType,
                     jwtUtil.getRefreshExpiration() / 1000,
                     TimeUnit.SECONDS
             );
-
+    
             return tokenPair;
-
+    
         } catch (Exception e) {
             log.error("Login failed for username: {}, error: {}", username, e.getMessage());
             throw new RuntimeException("Login failed: " + e.getMessage());
@@ -134,7 +130,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public Account register(String username, String password, String email, String role, String fullName) {
+    public Account register(String username, String password, String email, String role, String fullName, String phoneNumber) {
         log.info("Registration attempt for username: {}, email: {}, role: {}", username, email, role);
 
         try {
@@ -175,6 +171,7 @@ public class AuthServiceImpl implements AuthService {
                     customer.setAccount(account);
                     customer.setFullName(fullName.trim());
                     customer.setEmail(email.trim());
+                    customer.setPhoneNumber(phoneNumber != null ? phoneNumber.trim() : null);
                     customer.setCreatedAt(Instant.now());
                     customer.setUpdatedAt(Instant.now());
                     customerRepository.save(customer);
@@ -185,6 +182,7 @@ public class AuthServiceImpl implements AuthService {
                     employee.setAccount(account);
                     employee.setFullName(fullName.trim());
                     employee.setEmail(email.trim());
+                    employee.setPhoneNumber(phoneNumber != null ? phoneNumber.trim() : null);
                     employee.setHiredDate(LocalDate.now());
                     employee.setCreatedAt(Instant.now());
                     employee.setUpdatedAt(Instant.now());
@@ -303,11 +301,77 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public String logout(String token) {
-        // Remove both access and potential refresh tokens
-        redisTemplate.delete("access_token:" + token.trim());
-        redisTemplate.delete("refresh_token:" + token.trim());
+        try {
+            // Get token info
+            String tokenKey = "access_token:" + token;
+            Object tokenInfoObj = redisTemplate.opsForValue().get(tokenKey);
 
-        return "Logout successful";
+            if (tokenInfoObj != null) {
+                String tokenInfo = tokenInfoObj.toString();
+                String[] parts = tokenInfo.split(":");
+                String username = parts[0];
+                String deviceType = parts.length > 2 ? parts[2] : "UNKNOWN";
+
+                // Remove user session for this device
+                String userSessionKey = "user_session:" + username + ":" + deviceType;
+                redisTemplate.delete(userSessionKey);
+
+                // Find and remove corresponding refresh token
+                Set<String> refreshTokenKeys = (Set<String>) (Set<?>) redisTemplate.keys("refresh_token:*");
+                if (refreshTokenKeys != null) {
+                    for (String refreshKey : refreshTokenKeys) {
+                        Object refreshTokenInfo = redisTemplate.opsForValue().get(refreshKey);
+                        if (refreshTokenInfo != null && refreshTokenInfo.toString().equals(tokenInfo)) {
+                            redisTemplate.delete(refreshKey);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Remove access token
+            redisTemplate.delete(tokenKey);
+
+            return "Logout successful";
+        } catch (Exception e) {
+            log.error("Logout error: {}", e.getMessage());
+            throw new RuntimeException("Logout failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public String logoutAllDevices(String username) {
+        try {
+            // Get all user sessions
+            Set<String> userSessions = (Set<String>) (Set<?>) redisTemplate.keys("user_session:" + username + ":*");
+            if (userSessions != null) {
+                for (String sessionKey : userSessions) {
+                    Object sessionToken = redisTemplate.opsForValue().get(sessionKey);
+                    if (sessionToken != null) {
+                        // Delete corresponding access and refresh tokens
+                        redisTemplate.delete("access_token:" + sessionToken.toString());
+
+                        // Find and delete refresh token
+                        Set<String> refreshTokenKeys = (Set<String>) (Set<?>) redisTemplate.keys("refresh_token:*");
+                        if (refreshTokenKeys != null) {
+                            for (String refreshKey : refreshTokenKeys) {
+                                Object refreshTokenInfo = redisTemplate.opsForValue().get(refreshKey);
+                                if (refreshTokenInfo != null && refreshTokenInfo.toString().startsWith(username + ":")) {
+                                    redisTemplate.delete(refreshKey);
+                                }
+                            }
+                        }
+                    }
+                    // Delete session key
+                    redisTemplate.delete(sessionKey);
+                }
+            }
+
+            return "Logged out from all devices successfully";
+        } catch (Exception e) {
+            log.error("Logout all devices error: {}", e.getMessage());
+            throw new RuntimeException("Logout from all devices failed: " + e.getMessage());
+        }
     }
 
     // Helper methods
