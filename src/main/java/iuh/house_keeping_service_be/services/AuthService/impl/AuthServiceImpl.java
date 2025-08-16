@@ -309,8 +309,8 @@ public class AuthServiceImpl implements AuthService {
                 return false;
             }
 
-            // Check if token exists in Redis
-            String tokenKey = "token:" + token.trim();
+            // Check if token exists in Redis with correct key pattern
+            String tokenKey = "access_token:" + token.trim();
             Object userInfoObj = redisTemplate.opsForValue().get(tokenKey);
 
             // Check if token exists
@@ -320,9 +320,8 @@ public class AuthServiceImpl implements AuthService {
             }
 
             String userInfo = userInfoObj.toString();
-
-            // Extract username from token
-            String username = jwtUtil.extractUsername(token.trim());
+            String[] parts = userInfo.split(":");
+            String username = parts[0];
 
             // Validate token using JWT utility
             boolean isValid = jwtUtil.validateToken(token.trim(), username);
@@ -344,7 +343,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public TokenPair refreshToken(String refreshToken) {
         if (refreshToken == null || refreshToken.trim().isEmpty()) {
-            throw new IllegalArgumentException("Refresh token is required");
+            throw new IllegalArgumentException("Refresh token là bắt buộc");
         }
 
         // Validate refresh token
@@ -352,14 +351,14 @@ public class AuthServiceImpl implements AuthService {
         Object userInfoObj = redisTemplate.opsForValue().get(refreshTokenKey);
 
         if (userInfoObj == null) {
-            throw new RuntimeException("Invalid refresh token");
+            throw new RuntimeException("Refresh token không hợp lệ");
         }
 
         String userInfo = userInfoObj.toString();
-
         String[] parts = userInfo.split(":");
         String username = parts[0];
         String role = parts[1];
+        String deviceType = parts.length > 2 ? parts[2] : "UNKNOWN";
 
         // Generate new token pair
         TokenPair newTokenPair = jwtUtil.generateTokenPair(username);
@@ -367,17 +366,17 @@ public class AuthServiceImpl implements AuthService {
         // Delete old refresh token
         redisTemplate.delete(refreshTokenKey);
 
-        // Store new tokens in Redis
+        // Store new tokens in Redis with device info
         redisTemplate.opsForValue().set(
                 "access_token:" + newTokenPair.accessToken(),
-                username + ":" + role,
+                username + ":" + role + ":" + deviceType,
                 jwtUtil.getAccessExpiration() / 1000,
                 TimeUnit.SECONDS
         );
 
         redisTemplate.opsForValue().set(
                 "refresh_token:" + newTokenPair.refreshToken(),
-                username + ":" + role,
+                username + ":" + role + ":" + deviceType,
                 jwtUtil.getRefreshExpiration() / 1000,
                 TimeUnit.SECONDS
         );

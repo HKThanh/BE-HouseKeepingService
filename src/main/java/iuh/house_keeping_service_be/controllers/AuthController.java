@@ -446,7 +446,7 @@ public class AuthController {
 
             return ResponseEntity.ok(Map.of(
                     "success", true,
-                    "message", "Token refreshed successfully",
+                    "message", "Làm mới token thành công",
                     "data", Map.of(
                             "accessToken", newTokenPair.accessToken(),
                             "refreshToken", newTokenPair.refreshToken(),
@@ -548,7 +548,7 @@ public class AuthController {
                     log.info("User {} logged out from device: {}", username, currentDeviceType);
                     return ResponseEntity.ok(Map.of(
                             "success", true,
-                            "message", "Logout successful",
+                            "message", "Đăng xuất thành công",
                             "deviceType", currentDeviceType
                     ));
                 }
@@ -585,13 +585,13 @@ public class AuthController {
             if (isValid) {
                 return ResponseEntity.ok(Map.of(
                         "success", true,
-                        "message", "Token is valid",
+                        "message", "Token hợp lệ",
                         "valid", true
                 ));
             } else {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
                         "success", false,
-                        "message", "Token is invalid",
+                        "message", "Token không hợp lệ",
                         "valid", false
                 ));
             }
