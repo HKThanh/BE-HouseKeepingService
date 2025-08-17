@@ -17,4 +17,6 @@ public interface AuthService {
     String logoutAllDevices(String username);
 
     void updateLastLoginTime(Account account);
+
+    void changePassword(String username, String currentPassword, String newPassword);
 }

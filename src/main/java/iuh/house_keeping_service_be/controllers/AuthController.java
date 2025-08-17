@@ -605,4 +605,104 @@ public class AuthController {
             ));
         }
     }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(@Valid @RequestBody ChangePasswordRequest request,
+                                          @RequestHeader("Authorization") String authHeader) {
+        try {
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "Authorization header is required"
+                ));
+            }
+
+            String token = authHeader.substring(7);
+
+            // Validate token first
+            if (!authService.validateToken(token)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                        "success", false,
+                        "message", "Token không hợp lệ"
+                ));
+            }
+
+            // Extract username from token
+            String username = jwtUtil.extractUsername(token);
+
+            // Validate password confirmation
+            if (!request.newPassword().equals(request.confirmPassword())) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "Mật khẩu xác nhận không khớp",
+                        "field", "confirmPassword"
+                ));
+            }
+
+            // Change password
+            authService.changePassword(username, request.currentPassword(), request.newPassword());
+
+            // logout all devices after password change for security
+            Set<Object> userSessionsObj = redisTemplate.keys("user_session:" + username + ":*");
+            Set<String> userSessions = userSessionsObj != null ?
+                userSessionsObj.stream().map(Object::toString).collect(Collectors.toSet()) :
+                Collections.emptySet();
+
+            if (userSessions != null) {
+                for (String sessionKey : userSessions) {
+                    Object sessionToken = redisTemplate.opsForValue().get(sessionKey);
+                    if (sessionToken != null) {
+                        redisTemplate.delete("access_token:" + sessionToken.toString());
+                        Set<Object> refreshTokenKeysObj = redisTemplate.keys("refresh_token:*");
+                        Set<String> refreshTokenKeys = refreshTokenKeysObj != null ?
+                            refreshTokenKeysObj.stream().map(Object::toString).collect(Collectors.toSet()) :
+                            Collections.emptySet();
+                        if (refreshTokenKeys != null) {
+                            for (String refreshKey : refreshTokenKeys) {
+                                Object refreshInfo = redisTemplate.opsForValue().get(refreshKey);
+                                if (refreshInfo != null && refreshInfo.toString().startsWith(username + ":")) {
+                                    redisTemplate.delete(refreshKey);
+                                }
+                            }
+                        }
+                    }
+                    redisTemplate.delete(sessionKey);
+                }
+            }
+
+            log.info("Password changed successfully for user: {}", username);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Đổi mật khẩu thành công"
+            ));
+
+        } catch (IllegalArgumentException e) {
+            String field = extractFieldFromPasswordError(e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", e.getMessage(),
+                    "field", field
+            ));
+        } catch (Exception e) {
+            log.error("Change password error: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "success", false,
+                    "message", "Đã xảy ra lỗi khi đổi mật khẩu"
+            ));
+        }
+    }
+
+    private String extractFieldFromPasswordError(String message) {
+        String lowerMessage = message.toLowerCase();
+
+        if (lowerMessage.contains("mật khẩu hiện tại")) return "currentPassword";
+        if (lowerMessage.contains("mật khẩu mới")) return "newPassword";
+        if (lowerMessage.contains("xác nhận")) return "confirmPassword";
+        if (lowerMessage.contains("tên đăng nhập")) return "username";
+        if (lowerMessage.contains("ký tự không hợp lệ")) return "newPassword";
+        if (lowerMessage.contains("khoảng trắng")) return "newPassword";
+
+        return "general";
+    }
 }

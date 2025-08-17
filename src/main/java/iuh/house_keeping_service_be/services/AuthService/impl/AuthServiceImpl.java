@@ -488,4 +488,51 @@ public class AuthServiceImpl implements AuthService {
         managedAccount.setLastLogin(Instant.now());
         accountRepository.saveAndFlush(managedAccount);
     }
+
+    @Override
+    public void changePassword(String username, String currentPassword, String newPassword) {
+        // Validate input
+        if (username == null || username.trim().isEmpty()) {
+            throw new IllegalArgumentException("Tên đăng nhập không được thiếu");
+        }
+        if (currentPassword == null || currentPassword.trim().isEmpty()) {
+            throw new IllegalArgumentException("Mật khẩu hiện tại không được thiếu");
+        }
+        if (newPassword == null || newPassword.trim().isEmpty()) {
+            throw new IllegalArgumentException("Mật khẩu mới không được thiếu");
+        }
+        if (newPassword.length() < 6) {
+            throw new IllegalArgumentException("Mật khẩu mới phải có ít nhất 6 ký tự");
+        }
+        if (newPassword.length() > 50) {
+            throw new IllegalArgumentException("Mật khẩu mới không được vượt quá 50 ký tự");
+        }
+        if (currentPassword.equals(newPassword)) {
+            throw new IllegalArgumentException("Mật khẩu mới phải khác mật khẩu hiện tại");
+        }
+
+        if (!newPassword.matches("^[\\x20-\\x7E]*$")) {
+            throw new IllegalArgumentException("Mật khẩu mới chứa ký tự không hợp lệ");
+        }
+
+        // Password strength validation (optional)
+        if (!newPassword.matches(".*[a-zA-Z].*")) {
+            throw new IllegalArgumentException("Mật khẩu mới phải chứa ít nhất một chữ cái");
+        }
+
+        // Find account
+        Account account = accountRepository.findByUsername(username.trim())
+                .orElseThrow(() -> new IllegalArgumentException("Tài khoản không tồn tại"));
+
+        // Verify current password
+        if (!passwordEncoder.matches(currentPassword, account.getPassword())) {
+            throw new IllegalArgumentException("Mật khẩu hiện tại không đúng");
+        }
+
+        // Update password
+        account.setPassword(passwordEncoder.encode(newPassword));
+        accountRepository.save(account);
+
+        log.info("Password changed successfully for user: {}", username);
+    }
 }
