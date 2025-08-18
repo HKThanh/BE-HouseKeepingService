@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Collections;
 
 @Component
 @Slf4j
@@ -56,13 +58,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 String token = authHeader.substring(7);
                 String username = jwtUtil.extractUsername(token);
+                String role = jwtUtil.extractRole(token);
 
                 if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     UserDetails userDetails = userDetailsService.loadUserByUsername(username);
                     if (jwtUtil.validateToken(token, userDetails.getUsername()) &&
                             authService.validateToken(token)) {
+
+                        // Create authorities based on role from JWT
+                        var authorities = Collections.singletonList(
+                            new SimpleGrantedAuthority("ROLE_" + role)
+                        );
+
                         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                                userDetails, null, userDetails.getAuthorities());
+                                userDetails, null, authorities);
                         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                         SecurityContextHolder.getContext().setAuthentication(authentication);
                     }
@@ -84,7 +93,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             log.error("JWT filter error for URI: {}, error: {}", requestURI, e.getMessage());
             // For non-sessions endpoints, let Spring Security handle authentication failures
             if (!isSessionsEndpoint) {
-                // Continue with filter chain - Spring Security will handle the response
+                // Clear any partial authentication context to prevent security issues
+                SecurityContextHolder.clearContext();
+                log.warn("Cleared security context due to JWT processing error for URI: {}", requestURI);
             }
         }
 
