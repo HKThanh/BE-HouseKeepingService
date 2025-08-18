@@ -15,9 +15,15 @@ public class CorsConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Allow specific origins (update with your frontend URL)
+        // Use allowedOriginPatterns instead of allowedOrigins when credentials are true
+        configuration.setAllowedOriginPatterns(Arrays.asList(
+            "http://localhost:*"    // All localhost ports
+        ));
+
         configuration.setAllowedOrigins(Arrays.asList(
-                "*"
+            "http://localhost:3000",  // React dev server
+            "http://localhost:5173",  // Vite dev server
+            "http://localhost:8080"  // Local development
         ));
 
         // Allow all HTTP methods
