@@ -27,9 +27,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 
 import java.time.Instant;
-import java.util.Collections;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -725,8 +723,9 @@ public class AuthController {
             }
 
             // Find account by username
-            Account account = accountRepository.findByUsername(username.trim())
-                    .orElse(null);
+            List<Account> accounts = accountRepository.findAccountsByUsername(username.trim());
+
+            Account account = accounts.get(0);
 
             if (account == null) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
@@ -735,11 +734,11 @@ public class AuthController {
                 ));
             }
 
-            String roles = "";
+            Map<String, String> data;
 
             // Verify password
             try {
-                roles = authService.getRole(username, password);
+                data = authService.getRole(username, password);
             } catch (Exception e) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
                         "success", false,
@@ -747,10 +746,13 @@ public class AuthController {
                 ));
             }
 
+            int roleNumbers = data.size();
+
             return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "message", "Lấy vai trò thành công",
-                    "data", roles
+                        "success", true,
+                        "message", "Lấy vai trò thành công",
+                        "data", data,
+                        "roleNumbers", roleNumbers
                     )
             );
 

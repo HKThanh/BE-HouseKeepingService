@@ -14,9 +14,7 @@ import iuh.house_keeping_service_be.repositories.CustomerRepository;
 import iuh.house_keeping_service_be.repositories.EmployeeRepository;
 import iuh.house_keeping_service_be.services.AuthService.AuthService;
 import lombok.extern.slf4j.Slf4j;
-import org.antlr.v4.runtime.Token;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -28,9 +26,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -538,7 +538,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public String getRole(String username, String password) {
+    public Map<String, String> getRole(String username, String password) {
         try {
             // Validate input
             if (username == null || username.trim().isEmpty() || password == null || password.trim().isEmpty()) {
@@ -560,14 +560,14 @@ public class AuthServiceImpl implements AuthService {
 
             log.info("Found {} roles for user: {}", accounts.size(), username);
 
-            // Return all roles connected by ','
-            return accounts.stream()
-                    .map(Account::getRole)
-                    .map(Role::name)
-                    .distinct() // Remove duplicates if any
-                    .reduce((role1, role2) -> role1 + "," + role2)
-                    .orElse("");
+            // Map roles to a string representation
 
+            return accounts.stream()
+                    .collect(Collectors.toMap(
+                            account -> account.getRole().name(),
+                            account -> account.getStatus().name(),
+                            (existing, replacement) -> existing // Handle duplicates by keeping the first
+                    ));
         } catch (Exception e) {
             log.error("Error getting role for user {}: {}", username, e.getMessage());
             throw new RuntimeException("Xác thực thất bại: " + e.getMessage());

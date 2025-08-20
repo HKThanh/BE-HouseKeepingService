@@ -3,6 +3,8 @@ package iuh.house_keeping_service_be.services.AuthService;
 import iuh.house_keeping_service_be.dtos.Authentication.TokenPair;
 import iuh.house_keeping_service_be.models.Account;
 
+import java.util.Map;
+
 public interface AuthService {
     TokenPair login(String username, String password, String role, String deviceType);
 
@@ -20,5 +22,5 @@ public interface AuthService {
 
     void changePassword(String username, String currentPassword, String newPassword);
 
-    String getRole(String username, String password);
+    Map<String, String> getRole(String username, String password);
 }
