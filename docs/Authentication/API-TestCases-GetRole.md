@@ -1,191 +1,299 @@
-# API-TestCases-GetRole.md
+# API Test Cases - Get Role Endpoint
 
-## Overview
-This document describes the test cases for the **Get Role** endpoint of the Authentication API.  
-The endpoint retrieves the role(s) associated with a user account based on provided username and password.  
-**Base URL**: `/api/v1/auth`  
-**Endpoint**: `POST /get-role`
+## Base URL: `/api/v1/auth/get-role`
+## Method: `POST`
+## Content-Type: `application/json`
 
 ---
 
-## Test Case Structure
-Each test case includes:
-- **Test Case ID**: Unique identifier for the test case.
-- **Description**: Purpose of the test.
-- **Preconditions**: Requirements before executing the test.
-- **Input**: Request data.
-- **Expected Output**: Expected response based on the API specification.
-- **Status Code**: HTTP status code expected.
-
----
-
-## Test Cases
-
-### Test Case 1: Successful Get Role (Single Role)
-- **Test Case ID**: TC_GETROLE_001
-- **Description**: Verify that the endpoint returns the correct role for a user with valid credentials and a single role.
-- **Preconditions**:
-    - Account with username `john_doe` exists in the `accounts` table with password `123456789` and role `CUSTOMER`.
-- **Input**:
-  ```json
-  {
-    "username": "john_doe",
+## Test Case 1: Valid credentials with single role
+**Objective:** Verify successful role retrieval for user with one role
+**Method:** POST
+**Request Body:**
+```json
+{
+    "username": "admin_1",
     "password": "123456789"
-  }
-  ```
-- **Expected Output**:
-  ```json
-  {
+}
+```
+**Expected Response:** 200 OK
+```json
+{
     "success": true,
     "message": "Lấy vai trò thành công",
-    "data": "CUSTOMER"
-  }
-  ```
-- **Status Code**: 200 OK
+    "data": {
+        "ADMIN": "ACTIVE"
+    },
+    "roleNumbers": 1
+}
+```
 
 ---
 
-### Test Case 2: Successful Get Role (Multiple Roles)
-- **Test Case ID**: TC_GETROLE_002
-- **Description**: Verify that the endpoint returns multiple roles separated by commas for a user with multiple accounts/roles.
-- **Preconditions**:
-    - Multiple accounts exist with username `multi_role_user` and password `123456789`, having roles `CUSTOMER` and `EMPLOYEE`.
-- **Input**:
-  ```json
-  {
+## Test Case 2: Valid credentials with multiple roles
+**Objective:** Verify successful role retrieval for user with multiple roles
+**Method:** POST
+**Request Body:**
+```json
+{
     "username": "jane_smith",
     "password": "123456789"
-  }
-  ```
-- **Expected Output**:
-  ```json
-  {
+}
+```
+**Expected Response:** 200 OK
+```json
+{
     "success": true,
     "message": "Lấy vai trò thành công",
-    "data": "CUSTOMER,EMPLOYEE"
-  }
-  ```
-- **Status Code**: 200 OK
+    "data": {
+        "CUSTOMER": "ACTIVE",
+        "EMPLOYEE": "ACTIVE"
+    },
+    "roleNumbers": 2
+}
+```
 
 ---
 
-### Test Case 3: Missing Username
-- **Test Case ID**: TC_GETROLE_003
-- **Description**: Verify that the endpoint fails when username is missing or blank.
-- **Preconditions**:
-    - None.
-- **Input**:
-  ```json
-  {
+## Test Case 3: Valid credentials with customer role
+**Objective:** Verify successful role retrieval for customer
+**Method:** POST
+**Request Body:**
+```json
+{
+    "username": "john_doe",
+    "password": "123456789"
+}
+```
+**Expected Response:** 200 OK
+```json
+{
+    "success": true,
+    "message": "Lấy vai trò thành công",
+    "data": {
+        "CUSTOMER": "ACTIVE"
+    },
+    "roleNumbers": 1
+}
+```
+
+---
+
+## Test Case 4: Valid credentials with employee role
+**Objective:** Verify successful role retrieval for employee
+**Method:** POST
+**Request Body:**
+```json
+{
+    "username": "jane_smith",
+    "password": "123456789"
+}
+```
+**Expected Response:** 200 OK
+```json
+{
+    "success": true,
+    "message": "Lấy vai trò thành công",
+    "data": {
+        "EMPLOYEE": "ACTIVE",
+        "CUSTOMER": "INACTIVE"
+    },
+    "roleNumbers": 2
+}
+```
+
+---
+
+## Test Case 5: Empty username
+**Objective:** Verify validation error for empty username
+**Method:** POST
+**Request Body:**
+```json
+{
     "username": "",
     "password": "123456789"
-  }
-  ```
-- **Expected Output**:
-  ```json
-  {
+}
+```
+**Expected Response:** 400 Bad Request
+```json
+{
     "success": false,
     "message": "Tên đăng nhập không được để trống"
-  }
-  ```
-- **Status Code**: 400 Bad Request
+}
+```
 
 ---
 
-### Test Case 4: Missing Password
-- **Test Case ID**: TC_GETROLE_004
-- **Description**: Verify that the endpoint fails when password is missing or blank.
-- **Preconditions**:
-    - None.
-- **Input**:
-  ```json
-  {
-    "username": "john_doe",
+## Test Case 6: Null username
+**Objective:** Verify validation error for null username
+**Method:** POST
+**Request Body:**
+```json
+{
+    "username": null,
+    "password": "123456789"
+}
+```
+**Expected Response:** 400 Bad Request
+```json
+{
+    "success": false,
+    "message": "Tên đăng nhập không được để trống"
+}
+```
+
+---
+
+## Test Case 7: Whitespace-only username
+**Objective:** Verify validation error for whitespace username
+**Method:** POST
+**Request Body:**
+```json
+{
+    "username": "   ",
+    "password": "123456789"
+}
+```
+**Expected Response:** 400 Bad Request
+```json
+{
+    "success": false,
+    "message": "Tên đăng nhập không được để trống"
+}
+```
+
+---
+
+## Test Case 8: Empty password
+**Objective:** Verify validation error for empty password
+**Method:** POST
+**Request Body:**
+```json
+{
+    "username": "valid_user",
     "password": ""
-  }
-  ```
-- **Expected Output**:
-  ```json
-  {
+}
+```
+**Expected Response:** 400 Bad Request
+```json
+{
     "success": false,
     "message": "Mật khẩu không được để trống"
-  }
-  ```
-- **Status Code**: 400 Bad Request
+}
+```
 
 ---
 
-### Test Case 5: Account Not Found
-- **Test Case ID**: TC_GETROLE_005
-- **Description**: Verify that the endpoint fails when the account does not exist.
-- **Preconditions**:
-    - No account with username `non_existent_user` exists in the `accounts` table.
-- **Input**:
-  ```json
-  {
-    "username": "non_existent_user",
-    "password": "123456789"
-  }
-  ```
-- **Expected Output**:
-  ```json
-  {
+## Test Case 9: Null password
+**Objective:** Verify validation error for null password
+**Method:** POST
+**Request Body:**
+```json
+{
+    "username": "valid_user",
+    "password": null
+}
+```
+**Expected Response:** 400 Bad Request
+```json
+{
+    "success": false,
+    "message": "Mật khẩu không được để trống"
+}
+```
+
+---
+
+## Test Case 10: Whitespace-only password
+**Objective:** Verify validation error for whitespace password
+**Method:** POST
+**Request Body:**
+```json
+{
+    "username": "valid_user",
+    "password": "   "
+}
+```
+**Expected Response:** 400 Bad Request
+```json
+{
+    "success": false,
+    "message": "Mật khẩu không được để trống"
+}
+```
+
+---
+
+## Test Case 11: Non-existent username
+**Objective:** Verify error for username that doesn't exist
+**Method:** POST
+**Request Body:**
+```json
+{
+    "username": "nonexistent_user",
+    "password": "any_password"
+}
+```
+**Expected Response:** 401 Unauthorized
+```json
+{
     "success": false,
     "message": "Tài khoản không tồn tại"
-  }
-  ```
-- **Status Code**: 401 Unauthorized
+}
+```
 
 ---
 
-### Test Case 6: Invalid Password
-- **Test Case ID**: TC_GETROLE_006
-- **Description**: Verify that the endpoint fails when the provided password is incorrect.
-- **Preconditions**:
-    - Account with username `john_doe` exists but with a different password.
-- **Input**:
-  ```json
-  {
+## Test Case 12: Incorrect password
+**Objective:** Verify error for wrong password
+**Method:** POST
+**Request Body:**
+```json
+{
     "username": "john_doe",
-    "password": "WrongPassword!"
-  }
-  ```
-- **Expected Output**:
-  ```json
-  {
+    "password": "wrong_password"
+}
+```
+**Expected Response:** 401 Unauthorized
+```json
+{
     "success": false,
     "message": "Mật khẩu không chính xác"
-  }
-  ```
-- **Status Code**: 401 Unauthorized
+}
+```
 
 ---
 
-### Test Case 7: Internal Server Error
-- **Test Case ID**: TC_GETROLE_007
-- **Description**: Verify that the endpoint fails with an internal server error when an unexpected issue occurs (e.g., database failure).
-- **Preconditions**:
-    - Account with username `john_doe` exists.
-    - The database or service throws an unexpected exception during role retrieval.
-- **Input**:
-  ```json
-  {
-    "username": "john_doe",
+## Test Case 13: Username with leading/trailing spaces
+**Objective:** Verify trimming of username spaces
+**Method:** POST
+**Request Body:**
+```json
+{
+    "username": "  john_doe  ",
     "password": "123456789"
-  }
-  ```
-- **Expected Output**:
-  ```json
-  {
-    "success": false,
-    "message": "Đã xảy ra lỗi khi lấy vai trò"
-  }
-  ```
-- **Status Code**: 500 Internal Server Error
+}
+```
+**Expected Response:** 200 OK
+```json
+{
+    "success": true,
+    "message": "Lấy vai trò thành công",
+    "data": {
+        "CUSTOMER": "ACTIVE"
+    },
+    "roleNumbers": 1
+}
+```
 
 ---
 
-## Notes
-- **Test Environment**: Ensure the database is properly configured with test data before running tests.
-- **Mocking**: Use mocking for `AuthService` and `AccountRepository` to isolate the controller logic.
-- **Edge Cases**: Additional test cases may be added for scenarios like duplicate roles or special characters in credentials in future iterations.
+## Notes:
+1. All responses include Vietnamese error messages as per system requirements
+2. The endpoint does not require authentication (no Authorization header needed)
+3. Username trimming is performed server-side
+4. Password verification uses BCrypt encoding
+5. Multiple roles are returned as a map with role name as key and status as value
+6. The roleNumbers field indicates the count of roles returned
+7. Database exceptions are caught and return generic error messages
+8. Input validation is performed before database queries
