@@ -411,7 +411,7 @@ public class AuthController {
             String deviceType = parts.length > 2 ? parts[2] : "UNKNOWN";
 
             // Generate new token pair
-            TokenPair newTokenPair = jwtUtil.generateTokenPair(username);
+            TokenPair newTokenPair = jwtUtil.generateTokenPair(username, role);
 
             // Delete old tokens
             redisTemplate.delete(refreshTokenKey);
@@ -704,5 +704,62 @@ public class AuthController {
         if (lowerMessage.contains("khoảng trắng")) return "newPassword";
 
         return "general";
+    }
+
+    @PostMapping("/get-role")
+    public ResponseEntity<?> getRole(@Valid @RequestBody GetRoleRequest request) {
+        try {
+            String username = request.username(); String password = request.password();
+            if (username == null || username.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "Tên đăng nhập không được để trống"
+                ));
+            }
+
+            if (password == null || password.isBlank()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "Mật khẩu không được để trống"
+                ));
+            }
+
+            // Find account by username
+            Account account = accountRepository.findByUsername(username.trim())
+                    .orElse(null);
+
+            if (account == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                        "success", false,
+                        "message", "Tài khoản không tồn tại"
+                ));
+            }
+
+            String roles = "";
+
+            // Verify password
+            try {
+                roles = authService.getRole(username, password);
+            } catch (Exception e) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                        "success", false,
+                        "message", "Mật khẩu không chính xác"
+                ));
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Lấy vai trò thành công",
+                    "data", roles
+                    )
+            );
+
+        } catch (Exception e) {
+            log.error("Get role error: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "success", false,
+                    "message", "Đã xảy ra lỗi khi lấy vai trò"
+            ));
+        }
     }
 }

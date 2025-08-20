@@ -19,4 +19,6 @@ public interface AuthService {
     void updateLastLoginTime(Account account);
 
     void changePassword(String username, String currentPassword, String newPassword);
+
+    String getRole(String username, String password);
 }

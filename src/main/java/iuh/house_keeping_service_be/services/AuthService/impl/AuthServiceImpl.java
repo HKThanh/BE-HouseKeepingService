@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -103,7 +104,7 @@ public class AuthServiceImpl implements AuthService {
             }
     
             // Generate token pair
-            TokenPair tokenPair = jwtUtil.generateTokenPair(username.trim());
+            TokenPair tokenPair = jwtUtil.generateTokenPair(username.trim(), account.getRole().name());
     
             // Store access token in Redis with device-specific key
             redisTemplate.opsForValue().set(
@@ -361,7 +362,7 @@ public class AuthServiceImpl implements AuthService {
         String deviceType = parts.length > 2 ? parts[2] : "UNKNOWN";
 
         // Generate new token pair
-        TokenPair newTokenPair = jwtUtil.generateTokenPair(username);
+        TokenPair newTokenPair = jwtUtil.generateTokenPair(username, role);
 
         // Delete old refresh token
         redisTemplate.delete(refreshTokenKey);
@@ -534,5 +535,42 @@ public class AuthServiceImpl implements AuthService {
         accountRepository.save(account);
 
         log.info("Password changed successfully for user: {}", username);
+    }
+
+    @Override
+    public String getRole(String username, String password) {
+        try {
+            // Validate input
+            if (username == null || username.trim().isEmpty() || password == null || password.trim().isEmpty()) {
+                throw new IllegalArgumentException("Phải nhập tài khoản và mật khẩu");
+            }
+
+            // Find all accounts with the same username
+            List<Account> accounts = accountRepository.findAccountsByUsername(username.trim());
+
+            if (accounts.isEmpty()) {
+                throw new IllegalArgumentException("Tài khoản không tồn tại");
+            }
+
+            // Verify password against the first account (since all should have same password)
+            Account firstAccount = accounts.get(0);
+            if (!passwordEncoder.matches(password, firstAccount.getPassword())) {
+                throw new IllegalArgumentException("Mật khẩu không đúng");
+            }
+
+            log.info("Found {} roles for user: {}", accounts.size(), username);
+
+            // Return all roles connected by ','
+            return accounts.stream()
+                    .map(Account::getRole)
+                    .map(Role::name)
+                    .distinct() // Remove duplicates if any
+                    .reduce((role1, role2) -> role1 + "," + role2)
+                    .orElse("");
+
+        } catch (Exception e) {
+            log.error("Error getting role for user {}: {}", username, e.getMessage());
+            throw new RuntimeException("Xác thực thất bại: " + e.getMessage());
+        }
     }
 }

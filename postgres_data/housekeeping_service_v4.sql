@@ -1,22 +1,25 @@
 CREATE EXTENSION "uuid-ossp";
 
 CREATE TABLE account (
-    account_id VARCHAR(36) PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
+    account_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4(),
+    username VARCHAR(50) NOT NULL,
     password VARCHAR(255) NOT NULL,
     role VARCHAR(20) CHECK (role IN ('ADMIN', 'EMPLOYEE', 'CUSTOMER')),
     status VARCHAR(20) CHECK (status IN ('ACTIVE', 'INACTIVE')),
     is_admin BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_login TIMESTAMP
+    last_login TIMESTAMP,
+    CONSTRAINT unique_username_password_role UNIQUE (username, password, role)
 );
 
 INSERT INTO account (account_id, username, password, role, status, is_admin, created_at, updated_at, last_login) VALUES
-(uuid_generate_v4(), 'john_doe', '$2a$12$0JhaMQk.SRQjO68x17OL9OaKpNuvOD9HxqbkDuRgF1HBxajcF2XW2', 'CUSTOMER', 'ACTIVE', FALSE, '2025-08-14 19:57:00', '2025-08-14 19:57:00', '2025-08-14 18:00:00'),
-(uuid_generate_v4(), 'jane_smith', '$2a$12$0JhaMQk.SRQjO68x17OL9OaKpNuvOD9HxqbkDuRgF1HBxajcF2XW2', 'EMPLOYEE', 'ACTIVE', FALSE, '2025-08-14 19:57:00', '2025-08-14 19:57:00', '2025-08-14 17:30:00'),
-(uuid_generate_v4(), 'admin_1', '$2a$12$0JhaMQk.SRQjO68x17OL9OaKpNuvOD9HxqbkDuRgF1HBxajcF2XW2', 'ADMIN', 'ACTIVE', TRUE, '2025-08-14 19:57:00', '2025-08-14 19:57:00', '2025-08-14 16:45:00'),
-(uuid_generate_v4(), 'mary_jones', '$2a$12$0JhaMQk.SRQjO68x17OL9OaKpNuvOD9HxqbkDuRgF1HBxajcF2XW2', 'CUSTOMER', 'INACTIVE', FALSE, '2025-08-14 19:57:00', '2025-08-14 19:57:00', NULL);
+(uuid_generate_v4(), 'john_doe', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', 'CUSTOMER', 'ACTIVE', FALSE, '2025-08-14 19:57:00', '2025-08-14 19:57:00', '2025-08-14 18:00:00'),
+(uuid_generate_v4(), 'jane_smith', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', 'EMPLOYEE', 'ACTIVE', FALSE, '2025-08-14 19:57:00', '2025-08-14 19:57:00', '2025-08-14 17:30:00'),
+(uuid_generate_v4(), 'admin_1', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', 'ADMIN', 'ACTIVE', TRUE, '2025-08-14 19:57:00', '2025-08-14 19:57:00', '2025-08-14 16:45:00'),
+(uuid_generate_v4(), 'mary_jones', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', 'CUSTOMER', 'INACTIVE', FALSE, '2025-08-14 19:57:00', '2025-08-14 19:57:00', NULL),
+(uuid_generate_v4(), 'jane_smith', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', 'CUSTOMER', 'ACTIVE', FALSE, '2025-08-14 19:57:00', '2025-08-14 19:57:00', '2025-08-14 17:30:00');
+
 
 
 CREATE TABLE customer (
@@ -34,8 +37,8 @@ CREATE TABLE customer (
 );
 
 INSERT INTO customer (customer_id, account_id, avatar, full_name, is_male, email, phone_number, birthdate, address, created_at, updated_at) VALUES
-(uuid_generate_v4(), (SELECT account_id FROM account WHERE username = 'john_doe'), 'https://example.com/avatars/john.jpg', 'John Doe', TRUE, 'john.doe@example.com', '0901234567', '2003-09-10', '123 Nguyen Van Cu, Hanoi', '2025-08-14 19:57:00', '2025-08-14 19:57:00'),
-(uuid_generate_v4(), (SELECT account_id FROM account WHERE username = 'mary_jones'), 'https://example.com/avatars/mary.jpg', 'Mary Jones', FALSE, 'mary.jones@example.com', '0909876543', '2003-01-19', '456 Le Loi, Ho Chi Minh City', '2025-08-14 19:57:00', '2025-08-14 19:57:00');
+(uuid_generate_v4(), (SELECT account_id FROM account WHERE username = 'john_doe'), 'https://picsum.photos/200', 'John Doe', TRUE, 'john.doe@example.com', '0901234567', '2003-09-10', '123 Nguyen Van Cu, Hanoi', '2025-08-14 19:57:00', '2025-08-14 19:57:00'),
+(uuid_generate_v4(), (SELECT account_id FROM account WHERE username = 'mary_jones'), 'https://picsum.photos/200', 'Mary Jones', FALSE, 'mary.jones@example.com', '0909876543', '2003-01-19', '456 Le Loi, Ho Chi Minh City', '2025-08-14 19:57:00', '2025-08-14 19:57:00');
 
 
 CREATE TABLE employee (
@@ -56,8 +59,8 @@ CREATE TABLE employee (
 );
 
 INSERT INTO employee (employee_id, account_id, avatar, full_name, is_male, email, phone_number, birthdate, hired_date, skills, address, created_at, updated_at) VALUES
-(uuid_generate_v4(), (SELECT account_id FROM account WHERE username = 'jane_smith'), 'https://example.com/avatars/jane.jpg', 'Jane Smith', FALSE, 'jane.smith@example.com', '0912345678', '2003-04-14', '2024-01-15', 'Cleaning, Organizing', '789 Tran Hung Dao, Hanoi', '2025-08-14 19:57:00', '2025-08-14 19:57:00'),
-(uuid_generate_v4(), NULL, 'https://example.com/avatars/bob.jpg', 'Bob Wilson', TRUE, 'bob.wilson@examplefieldset.com', '0923456789', '2003-08-10', '2023-06-20', 'Deep Cleaning, Laundry', '101 Pham Van Dong, Da Nang', '2025-08-14 19:57:00', '2025-08-14 19:57:00');
+(uuid_generate_v4(), (SELECT account_id FROM account WHERE username = 'jane_smith'), 'https://picsum.photos/200', 'Jane Smith', FALSE, 'jane.smith@example.com', '0912345678', '2003-04-14', '2024-01-15', 'Cleaning, Organizing', '789 Tran Hung Dao, Hanoi', '2025-08-14 19:57:00', '2025-08-14 19:57:00'),
+(uuid_generate_v4(), NULL, 'https://picsum.photos/200', 'Bob Wilson', TRUE, 'bob.wilson@examplefieldset.com', '0923456789', '2003-08-10', '2023-06-20', 'Deep Cleaning, Laundry', '101 Pham Van Dong, Da Nang', '2025-08-14 19:57:00', '2025-08-14 19:57:00');
 
 
 CREATE TABLE admin_profile (

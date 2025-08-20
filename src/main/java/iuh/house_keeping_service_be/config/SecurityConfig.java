@@ -28,7 +28,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/login"
                                 , "/api/v1/auth/logout"
                                 , "/api/v1/auth/refresh-token"
-                                , "/api/v1/auth/change-password").permitAll()
+                                , "/api/v1/auth/change-password"
+                                , "/api/v1/auth/get-role").permitAll()
 
                         // Register endpoints - only EMPLOYEE and CUSTOMER can register
                         .requestMatchers("/api/v1/auth/register").hasAnyRole("EMPLOYEE", "CUSTOMER")

@@ -25,13 +25,13 @@ Each test case includes:
 - **Test Case ID**: TC_LOGIN_001
 - **Description**: Verify that a customer can log in with valid credentials and receive tokens and user data.
 - **Preconditions**:
-  - A customer account exists in the `account` table with username `john_doe`, password `123456`, and role `CUSTOMER`.
+  - A customer account exists in the `account` table with username `john_doe`, password `123456789`, and role `CUSTOMER`.
   - Account is not locked in Redis (`login:locked:john_doe` does not exist).
 - **Input**:
   ```json
   {
     "username": "john_doe",
-    "password": "123456",
+    "password": "123456789",
     "role": "CUSTOMER",
     "deviceType": "WEB"
   }
