@@ -10,7 +10,7 @@ CREATE TABLE account (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_login TIMESTAMP,
-    CONSTRAINT unique_username_password_role UNIQUE (username, password, role)
+    CONSTRAINT unique_username_role UNIQUE (username, role)
 );
 
 INSERT INTO account (account_id, username, password, role, status, is_admin, created_at, updated_at, last_login) VALUES
@@ -19,7 +19,6 @@ INSERT INTO account (account_id, username, password, role, status, is_admin, cre
 (uuid_generate_v4(), 'admin_1', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', 'ADMIN', 'ACTIVE', TRUE, '2025-08-14 19:57:00', '2025-08-14 19:57:00', '2025-08-14 16:45:00'),
 (uuid_generate_v4(), 'mary_jones', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', 'CUSTOMER', 'INACTIVE', FALSE, '2025-08-14 19:57:00', '2025-08-14 19:57:00', NULL),
 (uuid_generate_v4(), 'jane_smith', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', 'CUSTOMER', 'ACTIVE', FALSE, '2025-08-14 19:57:00', '2025-08-14 19:57:00', '2025-08-14 17:30:00');
-
 
 
 CREATE TABLE customer (
@@ -37,9 +36,9 @@ CREATE TABLE customer (
 );
 
 INSERT INTO customer (customer_id, account_id, avatar, full_name, is_male, email, phone_number, birthdate, address, created_at, updated_at) VALUES
-(uuid_generate_v4(), (SELECT account_id FROM account WHERE username = 'john_doe'), 'https://picsum.photos/200', 'John Doe', TRUE, 'john.doe@example.com', '0901234567', '2003-09-10', '123 Nguyen Van Cu, Hanoi', '2025-08-14 19:57:00', '2025-08-14 19:57:00'),
-(uuid_generate_v4(), (SELECT account_id FROM account WHERE username = 'mary_jones'), 'https://picsum.photos/200', 'Mary Jones', FALSE, 'mary.jones@example.com', '0909876543', '2003-01-19', '456 Le Loi, Ho Chi Minh City', '2025-08-14 19:57:00', '2025-08-14 19:57:00');
-
+(uuid_generate_v4(), (SELECT account_id FROM account WHERE username = 'john_doe' AND role = 'CUSTOMER'), 'https://picsum.photos/200', 'John Doe', TRUE, 'john.doe@example.com', '0901234567', '2003-09-10', '123 Nguyen Van Cu, Hanoi', '2025-08-14 19:57:00', '2025-08-14 19:57:00'),
+(uuid_generate_v4(), (SELECT account_id FROM account WHERE username = 'mary_jones' AND role = 'CUSTOMER'), 'https://picsum.photos/200', 'Mary Jones', FALSE, 'mary.jones@example.com', '0909876543', '2003-01-19', '456 Le Loi, Ho Chi Minh City', '2025-08-14 19:57:00', '2025-08-14 19:57:00'),
+(uuid_generate_v4(), (SELECT account_id FROM account WHERE username = 'jane_smith' AND role = 'CUSTOMER'), 'https://picsum.photos/200', 'Jane Smith Customer', FALSE, 'jane.smith.customer@example.com', '0987654321', '2003-04-14', '321 Main Street, Hanoi', '2025-08-14 19:57:00', '2025-08-14 19:57:00');
 
 CREATE TABLE employee (
     employee_id VARCHAR(36) PRIMARY KEY,
@@ -59,9 +58,8 @@ CREATE TABLE employee (
 );
 
 INSERT INTO employee (employee_id, account_id, avatar, full_name, is_male, email, phone_number, birthdate, hired_date, skills, address, created_at, updated_at) VALUES
-(uuid_generate_v4(), (SELECT account_id FROM account WHERE username = 'jane_smith'), 'https://picsum.photos/200', 'Jane Smith', FALSE, 'jane.smith@example.com', '0912345678', '2003-04-14', '2024-01-15', 'Cleaning, Organizing', '789 Tran Hung Dao, Hanoi', '2025-08-14 19:57:00', '2025-08-14 19:57:00'),
+(uuid_generate_v4(), (SELECT account_id FROM account WHERE username = 'jane_smith' AND role = 'EMPLOYEE'), 'https://picsum.photos/200', 'Jane Smith', FALSE, 'jane.smith@example.com', '0912345678', '2003-04-14', '2024-01-15', 'Cleaning, Organizing', '789 Tran Hung Dao, Hanoi', '2025-08-14 19:57:00', '2025-08-14 19:57:00'),
 (uuid_generate_v4(), NULL, 'https://picsum.photos/200', 'Bob Wilson', TRUE, 'bob.wilson@examplefieldset.com', '0923456789', '2003-08-10', '2023-06-20', 'Deep Cleaning, Laundry', '101 Pham Van Dong, Da Nang', '2025-08-14 19:57:00', '2025-08-14 19:57:00');
-
 
 CREATE TABLE admin_profile (
     admin_profile_id VARCHAR(36) PRIMARY KEY,
@@ -79,7 +77,7 @@ CREATE TABLE admin_profile (
 );
 
 INSERT INTO admin_profile (admin_profile_id, account_id, full_name, is_male, address, department, contact_info, birthdate, hire_date, created_at, updated_at) VALUES
-(uuid_generate_v4(), (SELECT account_id FROM account WHERE username = 'admin_1'), 'Admin One', TRUE, 'Ho Chi Minh City', 'Management', 'admin1@example.com', '1988-09-10', '2023-03-01', '2025-08-14 19:57:00', '2025-08-14 19:57:00'),
+(uuid_generate_v4(), (SELECT account_id FROM account WHERE username = 'admin_1' AND role = 'ADMIN'), 'Admin One', TRUE, 'Ho Chi Minh City', 'Management', 'admin1@example.com', '1988-09-10', '2023-03-01', '2025-08-14 19:57:00', '2025-08-14 19:57:00'),
 (uuid_generate_v4(), NULL, 'Admin Two', FALSE, 'Ho Chi Minh City', 'HR', 'admin2@example.com', '1990-06-23', '2022-09-10', '2025-08-14 19:57:00', '2025-08-14 19:57:00');
 
 -- CREATE TABLE address (

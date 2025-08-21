@@ -24,4 +24,10 @@ public class AdminServiceImpl implements AdminService {
         return adminProfileRepository.findByContactInfoAndAccount_Role(contactInfo, role)
                 .orElseThrow(() -> new RuntimeException("Admin not found with contact info: " + contactInfo + " and role: " + role));
     }
+
+    @Override
+    public AdminProfile findById(String id) {
+        return adminProfileRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin"));
+    }
 }

@@ -12,12 +12,14 @@ import iuh.house_keeping_service_be.repositories.AccountRepository;
 import iuh.house_keeping_service_be.repositories.AdminProfileRepository;
 import iuh.house_keeping_service_be.repositories.CustomerRepository;
 import iuh.house_keeping_service_be.repositories.EmployeeRepository;
+import iuh.house_keeping_service_be.security.CustomUserDetailsService;
 import iuh.house_keeping_service_be.services.AuthService.AuthService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -61,10 +63,13 @@ public class AuthServiceImpl implements AuthService {
     @Autowired
     private AdminProfileRepository adminProfileRepository;
 
+    @Autowired
+    private CustomUserDetailsService customUserDetailsService;
+
     @Override
     public TokenPair login(String username, String password, String role, String deviceType) {
         log.info("Login attempt for username: {}, role: {}, device: {}", username, role, deviceType);
-    
+
         try {
             // Input validation
             if (username == null || username.trim().isEmpty() ||
@@ -73,57 +78,44 @@ public class AuthServiceImpl implements AuthService {
                     deviceType == null || deviceType.trim().isEmpty()) {
                 throw new IllegalArgumentException("Username, password, role, and device type are required");
             }
-    
-            // Authenticate user credentials
-            authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(username.trim(), password)
-            );
-    
-            // Find account and validate role
-            Account account = accountRepository.findByUsername(username.trim())
-                    .orElseThrow(() -> new RuntimeException("User not found"));
-    
-            // Explicitly verify password
-            if (!passwordEncoder.matches(password, account.getPassword())) {
-                log.warn("Invalid password for user: {}", username);
-                throw new RuntimeException("Invalid credentials");
-            }
-    
-            // Validate role matches account role
+
+            // Validate role
             Role requestedRole;
             try {
                 requestedRole = Role.valueOf(role.toUpperCase().trim());
             } catch (IllegalArgumentException e) {
                 throw new IllegalArgumentException("Invalid role provided: " + role);
             }
-    
-            if (!account.getRole().equals(requestedRole)) {
-                log.warn("Role mismatch for user {}: requested={}, actual={}",
-                        username, requestedRole, account.getRole());
-                throw new RuntimeException("Role mismatch");
-            }
-    
-            // Generate token pair
-            TokenPair tokenPair = jwtUtil.generateTokenPair(username.trim(), account.getRole().name());
-    
-            // Store access token in Redis with device-specific key
+
+            // Load user with specific role
+            UserDetails userDetails =  customUserDetailsService
+                    .loadUserByUsernameAndRole(username.trim(), requestedRole);
+
+            // Authenticate with the specific UserDetails
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(username.trim(), password)
+            );
+
+            // Rest of your existing login logic...
+            TokenPair tokenPair = jwtUtil.generateTokenPair(username.trim(), requestedRole.name());
+
+            // Store tokens in Redis
             redisTemplate.opsForValue().set(
                     "access_token:" + tokenPair.accessToken(),
-                    username.trim() + ":" + account.getRole() + ":" + deviceType,
+                    username.trim() + ":" + requestedRole + ":" + deviceType,
                     jwtUtil.getAccessExpiration() / 1000,
                     TimeUnit.SECONDS
             );
-    
-            // Store refresh token in Redis with device-specific key
+
             redisTemplate.opsForValue().set(
                     "refresh_token:" + tokenPair.refreshToken(),
-                    username.trim() + ":" + account.getRole() + ":" + deviceType,
+                    username.trim() + ":" + requestedRole + ":" + deviceType,
                     jwtUtil.getRefreshExpiration() / 1000,
                     TimeUnit.SECONDS
             );
-    
+
             return tokenPair;
-    
+
         } catch (Exception e) {
             log.error("Login failed for username: {}, error: {}", username, e.getMessage());
             throw new RuntimeException("Login failed: " + e.getMessage());

@@ -122,14 +122,21 @@ public class AuthController {
                         "message", "Tài khoản tạm thời bị khóa do đăng nhập sai nhiều lần"
                 ));
             }
-    
+
             try {
                 // Get token pair first without modifying any database records
                 TokenPair tokenPair = authService.login(username, loginRequest.password(), requestedRole, deviceType);
-    
-                // Find account for role info after successful authentication
-                Account account = accountRepository.findByUsername(username.trim())
-                        .orElseThrow(() -> new RuntimeException("User not found"));
+
+                List<Account> accounts = accountRepository.findAccountsByUsernameAndRole(username.trim(), Role.valueOf(requestedRole));
+
+                if (accounts.isEmpty()) {
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                            "success", false,
+                            "message", "Tài khoản không tồn tại hoặc không có quyền truy cập"
+                    ));
+                }
+
+                Account account = accounts.get(0);
 
                 if (account.getStatus() != AccountStatus.ACTIVE) {
                     return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
