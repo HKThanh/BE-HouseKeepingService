@@ -32,4 +32,9 @@ public class EmployeeServiceImpl implements EmployeeService {
                 .orElseThrow(() -> new RuntimeException("Employee not found with phone number: " + phoneNumber));
     }
 
+    @Override
+    public Employee findById(String id) {
+        return employeeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin nhân viên"));
+    }
 }

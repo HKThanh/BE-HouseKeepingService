@@ -9,4 +9,6 @@ public interface EmployeeService {
     Employee findByEmail(String email);
 
     Employee findByPhoneNumber(String phoneNumber);
+
+    Employee findById(String id);
 }

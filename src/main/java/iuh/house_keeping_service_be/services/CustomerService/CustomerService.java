@@ -9,4 +9,6 @@ public interface CustomerService {
     Customer findByEmail(String email);
 
     Customer findByPhoneNumber(String phoneNumber);
+
+    Customer findById(String id);
 }

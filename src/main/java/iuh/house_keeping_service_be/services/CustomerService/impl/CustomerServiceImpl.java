@@ -31,4 +31,9 @@ public class CustomerServiceImpl implements CustomerService {
                 .orElseThrow(() -> new RuntimeException("Customer not found with phone number: " + phoneNumber));
     }
 
+    @Override
+    public Customer findById(String id) {
+        return customerRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin khách hàng"));
+    }
 }

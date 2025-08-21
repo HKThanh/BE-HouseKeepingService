@@ -7,4 +7,6 @@ public interface AdminService {
     AdminProfile findByAccountId(String accountId);
 
     AdminProfile findByContactInfoAndAccountRole(String contactInfo, Role role);
+
+    AdminProfile findById(String id);
 }
