@@ -1,12 +1,10 @@
 package iuh.house_keeping_service_be.services.CustomerService.impl;
 
-import iuh.house_keeping_service_be.enums.Role;
 import iuh.house_keeping_service_be.models.Customer;
 import iuh.house_keeping_service_be.repositories.CustomerRepository;
 import iuh.house_keeping_service_be.services.CustomerService.CustomerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
 
 @Service
 public class CustomerServiceImpl implements CustomerService {
@@ -15,20 +13,20 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     public Customer findByAccountId(String accountId) {
-        return customerRepository.findCustomerByAccount_AccountId(accountId)
-                .orElseThrow(() -> new RuntimeException("Customer not found with account ID: " + accountId));
+        return customerRepository.findByAccount_AccountId(accountId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin khách hàng: " + accountId));
     }
 
     @Override
     public Customer findByEmail(String email) {
         return customerRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Customer not found with email: " + email));
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin khách hàng: " + email));
     }
 
     @Override
     public Customer findByPhoneNumber(String phoneNumber) {
-        return customerRepository.findByPhoneNumber(phoneNumber)
-                .orElseThrow(() -> new RuntimeException("Customer not found with phone number: " + phoneNumber));
+        return customerRepository.findByAccount_PhoneNumber(phoneNumber)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin khách hàng: " + phoneNumber));
     }
 
     @Override
