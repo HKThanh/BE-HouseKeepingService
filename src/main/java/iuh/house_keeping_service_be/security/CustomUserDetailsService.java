@@ -1,10 +1,9 @@
 package iuh.house_keeping_service_be.security;
 
 import iuh.house_keeping_service_be.enums.AccountStatus;
-import iuh.house_keeping_service_be.enums.Role;
+import iuh.house_keeping_service_be.enums.RoleName;
 import iuh.house_keeping_service_be.models.Account;
 import iuh.house_keeping_service_be.repositories.AccountRepository;
-import jakarta.validation.constraints.Size;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
@@ -13,8 +12,9 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
-import java.util.Collections;
+import java.util.Collection;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
@@ -24,46 +24,52 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        // For JWT filter - load by username only
         List<Account> accounts = accountRepository.findAccountsByUsername(username);
 
         if (accounts.isEmpty()) {
-            throw new UsernameNotFoundException("User not found: " + username);
+            throw new UsernameNotFoundException("Không tìm thấy tài khoản: " + username);
         }
 
         // Use the first active account found
         Account account = accounts.stream()
                 .filter(acc -> acc.getStatus() == AccountStatus.ACTIVE)
                 .findFirst()
-                .orElseThrow(() -> new UsernameNotFoundException("No active account found for: " + username));
+                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy tài khoản hoạt động cho: " + username));
+
+        // Create authorities from all roles
+        Collection<SimpleGrantedAuthority> authorities = account.getRoles().stream()
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getRoleName().name()))
+                .collect(Collectors.toList());
 
         return User.builder()
                 .username(account.getUsername())
                 .password(account.getPassword())
-                .authorities("ROLE_" + account.getRole().name())
+                .authorities(authorities)
                 .disabled(account.getStatus() != AccountStatus.ACTIVE)
                 .build();
     }
 
     // Method specifically for login with role validation
-    public UserDetails loadUserByUsernameAndRole(String username, Role role) throws UsernameNotFoundException {
-        List<Account> accounts = accountRepository.findAccountsByUsernameAndRole(username, role);
+    public UserDetails loadUserByUsernameAndRole(String username, RoleName roleName) throws UsernameNotFoundException {
+        List<Account> accounts = accountRepository.findAccountsByUsernameAndRole(username, roleName);
 
         if (accounts.isEmpty()) {
-            throw new UsernameNotFoundException("User not found with username: " + username + " and role: " + role);
+            throw new UsernameNotFoundException("Không tìm thấy tài khoản với vai trò " + roleName + " cho: " + username);
         }
 
-        Account account = accounts.get(0); // Take the first one as per your existing logic
-
-        if (account.getStatus() != AccountStatus.ACTIVE) {
-            throw new UsernameNotFoundException("Account is not active: " + username);
-        }
+        // Use the first active account with the specified role
+        Account account = accounts.stream()
+                .filter(acc -> acc.getStatus() == AccountStatus.ACTIVE)
+                .filter(acc -> acc.getRoles().stream()
+                        .anyMatch(role -> role.getRoleName() == roleName))
+                .findFirst()
+                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy tài khoản hoạt động với vai trò " + roleName + " cho: " + username));
 
         return User.builder()
                 .username(account.getUsername())
                 .password(account.getPassword())
-                .authorities("ROLE_" + account.getRole().name())
-                .disabled(false)
+                .authorities("ROLE_" + roleName.name())
+                .disabled(account.getStatus() != AccountStatus.ACTIVE)
                 .build();
     }
 }

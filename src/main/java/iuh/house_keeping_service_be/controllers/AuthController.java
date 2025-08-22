@@ -3,33 +3,24 @@ package iuh.house_keeping_service_be.controllers;
 import iuh.house_keeping_service_be.config.JwtUtil;
 import iuh.house_keeping_service_be.dtos.Authentication.*;
 import iuh.house_keeping_service_be.enums.AccountStatus;
-import iuh.house_keeping_service_be.enums.Role;
-import iuh.house_keeping_service_be.models.Account;
-import iuh.house_keeping_service_be.models.AdminProfile;
-import iuh.house_keeping_service_be.models.Customer;
-import iuh.house_keeping_service_be.models.Employee;
+import iuh.house_keeping_service_be.enums.RoleName;
+import iuh.house_keeping_service_be.models.*;
 import iuh.house_keeping_service_be.repositories.AccountRepository;
+import iuh.house_keeping_service_be.services.AddressService.AddressService;
 import iuh.house_keeping_service_be.services.AdminService.AdminService;
 import iuh.house_keeping_service_be.services.AuthService.AuthService;
-import iuh.house_keeping_service_be.services.AuthService.impl.AuthServiceImpl;
 import iuh.house_keeping_service_be.services.CustomerService.CustomerService;
 import iuh.house_keeping_service_be.services.EmployeeService.EmployeeService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.ReactiveRedisOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-
-import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -57,8 +48,12 @@ public class AuthController {
 
     @Autowired
     private JwtUtil jwtUtil;
+
     @Autowired
-    private AuthServiceImpl authServiceImpl;
+    private AuthService authServiceImpl;
+
+    @Autowired
+    private AddressService addressService;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest) {
@@ -66,16 +61,17 @@ public class AuthController {
         String password = loginRequest.password();
         String requestedRole = loginRequest.role();
         String deviceType = loginRequest.deviceType();
-    
+
         log.info("Login attempt for username: {}, role: {}, device: {}", username, requestedRole, deviceType);
-    
+
+        // Input validation
         if (username == null || username.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of(
                     "success", false,
                     "message", "Tên đăng nhập không được để trống"
             ));
         }
-    
+
         if (password == null || password.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of(
                     "success", false,
@@ -110,7 +106,7 @@ public class AuthController {
                     "message", "Loại thiết bị không hợp lệ. Chỉ chấp nhận WEB hoặc MOBILE"
             ));
         }
-    
+
         try {
             // Check if account is locked
             String lockKey = "login:locked:" + username;
@@ -124,15 +120,16 @@ public class AuthController {
             }
 
             try {
-                // Get token pair first without modifying any database records
-                TokenPair tokenPair = authService.login(username, loginRequest.password(), requestedRole, deviceType);
+                // Get token pair first
+                TokenPair tokenPair = authService.login(username, password, requestedRole, deviceType);
 
-                List<Account> accounts = accountRepository.findAccountsByUsernameAndRole(username.trim(), Role.valueOf(requestedRole));
+                List<Account> accounts = accountRepository.findAccountsByUsernameAndRole(username.trim(), RoleName.valueOf(requestedRole.toUpperCase()));
 
                 if (accounts.isEmpty()) {
+                    incrementFailedLoginAttempts(username);
                     return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
                             "success", false,
-                            "message", "Tài khoản không tồn tại hoặc không có quyền truy cập"
+                            "message", "Thông tin đăng nhập không hợp lệ"
                     ));
                 }
 
@@ -144,12 +141,12 @@ public class AuthController {
                             "message", "Tài khoản chưa được kích hoạt hoặc đã bị khóa"
                     ));
                 }
-    
-                Role role = account.getRole();
-    
+
+                RoleName role = RoleName.valueOf(requestedRole.toUpperCase());
+
                 // Store the token in Redis with device-specific key
                 String userSessionKey = "user_session:" + username + ":" + deviceType;
-                
+
                 // Get existing session for this device type
                 Object existingToken = redisTemplate.opsForValue().get(userSessionKey);
                 if (existingToken != null) {
@@ -157,7 +154,7 @@ public class AuthController {
                     redisTemplate.delete("access_token:" + existingToken.toString());
                     redisTemplate.delete("refresh_token:" + existingToken.toString());
                 }
-    
+
                 // Store new session for this device
                 redisTemplate.opsForValue().set(
                         userSessionKey,
@@ -165,129 +162,147 @@ public class AuthController {
                         jwtUtil.getAccessExpiration() / 1000,
                         TimeUnit.SECONDS
                 );
-    
-                // Rest of the existing code for fetching user profile data...
-                EmployeeLoginResponse dataEmployee = null;
-                CustomerLoginResponse dataCustomer = null;
-                DataLoginResponse data = null;
-                AdminLoginResponse dataAdmin = null;
-    
-                switch (role) {
-                    case ADMIN:
-                        AdminProfile adminProfile = adminService.findByAccountId(account.getAccountId());
-                        dataAdmin = new AdminLoginResponse(
-                                adminProfile.getAdminProfileId(),
-                                account.getUsername(),
-                                adminProfile.getFullName(),
-                                adminProfile.getIsMale(),
-                                adminProfile.getAddress(),
-                                adminProfile.getDepartment(),
-                                adminProfile.getContactInfo(),
-                                adminProfile.getHireDate().toString()
-                        );
-                        break;
-    
-                    case CUSTOMER:
-                        Customer customer = customerService.findByAccountId(account.getAccountId());
-                        dataCustomer = new CustomerLoginResponse(
-                                customer.getCustomerId(),
-                                account.getUsername(),
-                                customer.getAvatar(),
-                                customer.getFullName(),
-                                customer.getEmail(),
-                                customer.getPhoneNumber(),
-                                customer.getIsMale(),
-                                account.getStatus().name(),
-                                customer.getAddress()
-                        );
-                        break;
-    
-                    case EMPLOYEE:
-                        Employee employee = employeeService.findByAccountId(account.getAccountId());
-                        dataEmployee = new EmployeeLoginResponse(
-                                employee.getEmployeeId(),
-                                account.getUsername(),
-                                employee.getAvatar(),
-                                employee.getFullName(),
-                                employee.getEmail(),
-                                employee.getPhoneNumber(),
-                                employee.getIsMale(),
-                                account.getStatus().name(),
-                                employee.getAddress()
-                        );
-                        break;
-    
-                    default:
-                        throw new IllegalArgumentException("Invalid role: " + role);
-                }
-    
+
+                // Store access token
+                redisTemplate.opsForValue().set(
+                        "access_token:" + tokenPair.accessToken(),
+                        username + ":" + role.name() + ":" + deviceType,
+                        jwtUtil.getAccessExpiration() / 1000,
+                        TimeUnit.SECONDS
+                );
+
+                // Store refresh token
+                redisTemplate.opsForValue().set(
+                        "refresh_token:" + tokenPair.refreshToken(),
+                        username + ":" + role.name() + ":" + deviceType,
+                        jwtUtil.getRefreshExpiration() / 1000,
+                        TimeUnit.SECONDS
+                );
+
+                // Fetch user profile data
+                Object userData = getUserData(account, role);
+
                 // Reset failed login attempts on successful login
                 redisTemplate.delete("login:failed:" + username);
-    
+
                 log.info("Login successful for user: {}, role: {}, device: {}", username, role, deviceType);
-    
+
                 // Update last login time
                 try {
                     authServiceImpl.updateLastLoginTime(account);
                 } catch (Exception e) {
                     log.warn("Failed to update last login time: {}", e.getMessage());
                 }
-    
+
                 Map<String, Object> responseData = Map.of(
                         "accessToken", tokenPair.accessToken(),
                         "refreshToken", tokenPair.refreshToken(),
                         "expireIn", EXPIRATION_TIME,
                         "role", role.name(),
                         "deviceType", deviceType,
-                        "data", role == Role.ADMIN ? dataAdmin : 
-                                role == Role.EMPLOYEE ? dataEmployee : dataCustomer
+                        "data", userData
                 );
-    
+
                 return ResponseEntity.ok(Map.of(
                         "success", true,
                         "message", "Đăng nhập thành công",
                         "data", responseData
                 ));
-    
+
             } catch (RuntimeException re) {
-                log.error("Login error for user: {}, error: {}", username, re.getMessage(), re);
+                incrementFailedLoginAttempts(username);
+                log.error("Login error for user: {}, error: {}", username, re.getMessage());
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
                         "success", false,
                         "message", "Tài khoản hoặc mật khẩu không hợp lệ"
                 ));
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 incrementFailedLoginAttempts(username);
-                log.warn("Authentication failed for user: {}, error: {}", username, e.getMessage(), e);
+                log.warn("Authentication failed for user: {}, error: {}", username, e.getMessage());
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
                         "success", false,
                         "message", "Thông tin đăng nhập không hợp lệ"
                 ));
             }
-    
+
         } catch (Exception e) {
-            log.error("Login failed for user: {}, error: {}", username, e.getMessage(), e);
+            log.error("Login failed for user: {}, error: {}", username, e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                     "success", false,
                     "message", "Đã xảy ra lỗi khi đăng nhập"
             ));
         }
     }
+
+    private Object getUserData(Account account, RoleName role) {
+        switch (role) {
+            case ADMIN:
+                AdminProfile adminProfile = adminService.findByAccountId(account.getAccountId());
+                return new AdminLoginResponse(
+                        adminProfile.getAdminProfileId(),
+                        account.getUsername(),
+                        adminProfile.getFullName(),
+                        adminProfile.getIsMale(),
+                        adminProfile.getDepartment(),
+                        adminProfile.getContactInfo(),
+                        adminProfile.getHireDate().toString()
+                );
+
+            case CUSTOMER:
+                Customer customer = customerService.findByAccountId(account.getAccountId());
+
+                Address address = addressService.findByCustomerId(customer.getCustomerId());
+                return new CustomerLoginResponse(
+                        customer.getCustomerId(),
+                        account.getUsername(),
+                        customer.getAvatar(),
+                        customer.getFullName(),
+                        customer.getEmail(),
+                        account.getPhoneNumber(),
+                        customer.getIsMale(),
+                        account.getStatus().name(),
+                        address != null ? address.getFullAddress() : null
+                );
+
+            case EMPLOYEE:
+                Employee employee = employeeService.findByAccountId(account.getAccountId());
+                return new EmployeeLoginResponse(
+                        employee.getEmployeeId(),
+                        account.getUsername(),
+                        employee.getAvatar(),
+                        employee.getFullName(),
+                        employee.getEmail(),
+                        account.getPhoneNumber(),
+                        employee.getIsMale(),
+                        account.getStatus().name(),
+                        employee.getHiredDate() != null ? employee.getHiredDate().toString() : null
+                );
+
+            default:
+                throw new IllegalArgumentException("Invalid role: " + role);
+        }
+    }
+
     /**
      * Tracks failed login attempts and locks accounts after multiple failures
      */
     private void incrementFailedLoginAttempts(String username) {
-        String failedKey = "login:failed:" + username;
-        String lockKey = "login:locked:" + username;
+        try {
+            String failedKey = "login:failed:" + username;
+            String lockKey = "login:locked:" + username;
 
-        Long attempts = redisTemplate.opsForValue().increment(failedKey);
+            Long attempts = redisTemplate.opsForValue().increment(failedKey);
+            redisTemplate.expire(failedKey, 600, TimeUnit.SECONDS); // Set expiration for failed attempts
 
-        // Lock account after 3 failed attempts
-        if (attempts >= 3) {
-            // Lock for 10 minutes
-            redisTemplate.opsForValue().set(lockKey, "locked", 600, TimeUnit.SECONDS);
-            redisTemplate.delete(failedKey);
-            log.warn("Account locked due to multiple failed login attempts: {}", username);
+            // Lock account after 3 failed attempts
+            if (attempts != null && attempts >= 3) {
+                // Lock for 10 minutes
+                redisTemplate.opsForValue().set(lockKey, "locked", 600, TimeUnit.SECONDS);
+                redisTemplate.delete(failedKey);
+                log.warn("Account locked due to multiple failed login attempts: {}", username);
+            }
+        } catch (Exception e) {
+            log.error("Error incrementing failed login attempts for {}: {}", username, e.getMessage());
         }
     }
 
@@ -305,19 +320,16 @@ public class AuthController {
             String username = jwtUtil.extractUsername(token);
 
             Set<Object> webSessionsObj = redisTemplate.keys("user_session:" + username + ":WEB");
-            Set<String> webSessions = webSessionsObj != null ?
-                webSessionsObj.stream().map(Object::toString).collect(Collectors.toSet()) :
-                Collections.emptySet();
             Set<Object> mobileSessionsObj = redisTemplate.keys("user_session:" + username + ":MOBILE");
-            Set<String> mobileSessions = mobileSessionsObj != null ?
-                mobileSessionsObj.stream().map(Object::toString).collect(Collectors.toSet()) :
-                Collections.emptySet();
+
+            int webSessionCount = webSessionsObj != null ? webSessionsObj.size() : 0;
+            int mobileSessionCount = mobileSessionsObj != null ? mobileSessionsObj.size() : 0;
 
             return ResponseEntity.ok(Map.of(
                     "success", true,
                     "data", Map.of(
-                            "webSessions", webSessions != null ? webSessions.size() : 0,
-                            "mobileSessions", mobileSessions != null ? mobileSessions.size() : 0
+                            "webSessions", webSessionCount,
+                            "mobileSessions", mobileSessionCount
                     )
             ));
 
@@ -355,7 +367,6 @@ public class AuthController {
             ));
 
         } catch (IllegalArgumentException e) {
-            // Parse the error message to determine the field
             String field = extractFieldFromErrorMessage(e.getMessage());
             return ResponseEntity.badRequest().body(Map.of(
                     "success", false,
@@ -374,7 +385,6 @@ public class AuthController {
     private String extractFieldFromErrorMessage(String message) {
         String lowerMessage = message.toLowerCase();
 
-        // Check for Vietnamese terms
         if (lowerMessage.contains("tên đăng nhập") || lowerMessage.contains("username")) return "username";
         if (lowerMessage.contains("email")) return "email";
         if (lowerMessage.contains("số điện thoại") || lowerMessage.contains("phone")) return "phoneNumber";
@@ -413,15 +423,13 @@ public class AuthController {
             String[] parts = tokenInfo.split(":");
             String username = parts[0];
             String role = parts[1];
-            String deviceType = parts.length > 2 ? parts[2] : "UNKNOWN";
+            String deviceType = parts.length > 2 ? parts[2] : "WEB";
 
             // Generate new token pair
             TokenPair newTokenPair = jwtUtil.generateTokenPair(username, role);
 
             // Delete old tokens
             redisTemplate.delete(refreshTokenKey);
-
-            // Find old access token and delete it
             String oldAccessToken = authHeader.substring(7);
             redisTemplate.delete("access_token:" + oldAccessToken);
 
@@ -460,11 +468,6 @@ public class AuthController {
                     )
             ));
 
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "success", false,
-                    "message", e.getMessage()
-            ));
         } catch (Exception e) {
             log.error("Token refresh error: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
@@ -476,7 +479,7 @@ public class AuthController {
 
     @PostMapping("/logout")
     public ResponseEntity<?> logout(@RequestHeader("Authorization") String authHeader,
-                                   @RequestParam(value = "deviceType", required = false) String deviceType) {
+                                    @RequestParam(value = "deviceType", required = false) String deviceType) {
         try {
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
                 return ResponseEntity.badRequest().body(Map.of(
@@ -495,26 +498,30 @@ public class AuthController {
                 String tokenInfo = tokenInfoObj.toString();
                 String[] parts = tokenInfo.split(":");
                 String username = parts[0];
-                String currentDeviceType = parts.length > 2 ? parts[2] : "UNKNOWN";
+                String currentDeviceType = parts.length > 2 ? parts[2] : "WEB";
 
                 // If deviceType is specified and equals "ALL", logout from all devices
                 if ("ALL".equals(deviceType)) {
                     // Logout from all devices
-                    // Logout from all devices
                     Set<Object> userSessionsObj = redisTemplate.keys("user_session:" + username + ":*");
-                    Set<String> userSessions = userSessionsObj != null ?
-                        userSessionsObj.stream().map(Object::toString).collect(Collectors.toSet()) :
-                        Collections.emptySet();
-                    if (userSessions != null) {
-                        for (String sessionKey : userSessions) {
-                            Object sessionToken = redisTemplate.opsForValue().get(sessionKey);
+                    if (userSessionsObj != null) {
+                        for (Object sessionKey : userSessionsObj) {
+                            Object sessionToken = redisTemplate.opsForValue().get(sessionKey.toString());
                             if (sessionToken != null) {
-                                // Delete tokens for each session
                                 redisTemplate.delete("access_token:" + sessionToken.toString());
-                                redisTemplate.delete("refresh_token:" + sessionToken.toString());
                             }
-                            // Delete session key
-                            redisTemplate.delete(sessionKey);
+                            redisTemplate.delete(sessionKey.toString());
+                        }
+                    }
+
+                    // Delete all refresh tokens for this user
+                    Set<Object> refreshTokenKeysObj = redisTemplate.keys("refresh_token:*");
+                    if (refreshTokenKeysObj != null) {
+                        for (Object refreshKey : refreshTokenKeysObj) {
+                            Object refreshTokenInfo = redisTemplate.opsForValue().get(refreshKey.toString());
+                            if (refreshTokenInfo != null && refreshTokenInfo.toString().startsWith(username + ":")) {
+                                redisTemplate.delete(refreshKey.toString());
+                            }
                         }
                     }
 
@@ -527,19 +534,17 @@ public class AuthController {
                     // Logout from current device only
                     String userSessionKey = "user_session:" + username + ":" + currentDeviceType;
 
-                    // Find refresh token to delete
-                    // Find refresh token to delete
+                    // Find and delete refresh token
                     Set<Object> refreshTokenKeysObj = redisTemplate.keys("refresh_token:*");
-                    Set<String> refreshTokenKeys = refreshTokenKeysObj != null ?
-                        refreshTokenKeysObj.stream().map(Object::toString).collect(Collectors.toSet()) :
-                        Collections.emptySet();
-                    if (refreshTokenKeys != null) {
-                        for (String refreshKey : refreshTokenKeys) {
-                            Object refreshTokenInfo = redisTemplate.opsForValue().get(refreshKey);
-                            if (refreshTokenInfo != null && refreshTokenInfo.toString().startsWith(username + ":")) {
+                    if (refreshTokenKeysObj != null) {
+                        for (Object refreshKey : refreshTokenKeysObj) {
+                            Object refreshTokenInfo = redisTemplate.opsForValue().get(refreshKey.toString());
+                            if (refreshTokenInfo != null) {
                                 String[] refreshParts = refreshTokenInfo.toString().split(":");
-                                if (refreshParts.length > 2 && refreshParts[2].equals(currentDeviceType)) {
-                                    redisTemplate.delete(refreshKey);
+                                if (refreshParts.length >= 3 &&
+                                        refreshParts[0].equals(username) &&
+                                        refreshParts[2].equals(currentDeviceType)) {
+                                    redisTemplate.delete(refreshKey.toString());
                                     break;
                                 }
                             }
@@ -605,7 +610,7 @@ public class AuthController {
             log.error("Token validation error: {}", e.getMessage());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
                     "success", false,
-                    "message", "Token validation failed",
+                    "message", "Token không hợp lệ",
                     "valid", false
             ));
         }
@@ -613,7 +618,7 @@ public class AuthController {
 
     @PostMapping("/change-password")
     public ResponseEntity<?> changePassword(@Valid @RequestBody ChangePasswordRequest request,
-                                          @RequestHeader("Authorization") String authHeader) {
+                                            @RequestHeader("Authorization") String authHeader) {
         try {
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
                 return ResponseEntity.badRequest().body(Map.of(
@@ -647,31 +652,26 @@ public class AuthController {
             // Change password
             authService.changePassword(username, request.currentPassword(), request.newPassword());
 
-            // logout all devices after password change for security
+            // Logout all devices after password change for security
             Set<Object> userSessionsObj = redisTemplate.keys("user_session:" + username + ":*");
-            Set<String> userSessions = userSessionsObj != null ?
-                userSessionsObj.stream().map(Object::toString).collect(Collectors.toSet()) :
-                Collections.emptySet();
-
-            if (userSessions != null) {
-                for (String sessionKey : userSessions) {
-                    Object sessionToken = redisTemplate.opsForValue().get(sessionKey);
+            if (userSessionsObj != null) {
+                for (Object sessionKey : userSessionsObj) {
+                    Object sessionToken = redisTemplate.opsForValue().get(sessionKey.toString());
                     if (sessionToken != null) {
                         redisTemplate.delete("access_token:" + sessionToken.toString());
-                        Set<Object> refreshTokenKeysObj = redisTemplate.keys("refresh_token:*");
-                        Set<String> refreshTokenKeys = refreshTokenKeysObj != null ?
-                            refreshTokenKeysObj.stream().map(Object::toString).collect(Collectors.toSet()) :
-                            Collections.emptySet();
-                        if (refreshTokenKeys != null) {
-                            for (String refreshKey : refreshTokenKeys) {
-                                Object refreshInfo = redisTemplate.opsForValue().get(refreshKey);
-                                if (refreshInfo != null && refreshInfo.toString().startsWith(username + ":")) {
-                                    redisTemplate.delete(refreshKey);
-                                }
-                            }
-                        }
                     }
-                    redisTemplate.delete(sessionKey);
+                    redisTemplate.delete(sessionKey.toString());
+                }
+            }
+
+            // Delete all refresh tokens for this user
+            Set<Object> refreshTokenKeysObj = redisTemplate.keys("refresh_token:*");
+            if (refreshTokenKeysObj != null) {
+                for (Object refreshKey : refreshTokenKeysObj) {
+                    Object refreshTokenInfo = redisTemplate.opsForValue().get(refreshKey.toString());
+                    if (refreshTokenInfo != null && refreshTokenInfo.toString().startsWith(username + ":")) {
+                        redisTemplate.delete(refreshKey.toString());
+                    }
                 }
             }
 
@@ -706,7 +706,7 @@ public class AuthController {
         if (lowerMessage.contains("xác nhận")) return "confirmPassword";
         if (lowerMessage.contains("tên đăng nhập")) return "username";
         if (lowerMessage.contains("ký tự không hợp lệ")) return "newPassword";
-        if (lowerMessage.contains("khoảng trắng")) return "newPassword";
+        if (lowerMessage.contains("chứa ít nhất một chữ cái")) return "newPassword";
 
         return "general";
     }
@@ -714,15 +714,18 @@ public class AuthController {
     @PostMapping("/get-role")
     public ResponseEntity<?> getRole(@Valid @RequestBody GetRoleRequest request) {
         try {
-            String username = request.username(); String password = request.password();
-            if (username == null || username.isBlank()) {
+            String username = request.username();
+            String password = request.password();
+
+            // Validate input
+            if (username == null || username.trim().isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of(
                         "success", false,
                         "message", "Tên đăng nhập không được để trống"
                 ));
             }
 
-            if (password == null || password.isBlank()) {
+            if (password == null || password.trim().isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of(
                         "success", false,
                         "message", "Mật khẩu không được để trống"
@@ -732,20 +735,17 @@ public class AuthController {
             // Find account by username
             List<Account> accounts = accountRepository.findAccountsByUsername(username.trim());
 
-            Account account = accounts.get(0);
-
-            if (account == null) {
+            if (accounts.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
                         "success", false,
                         "message", "Tài khoản không tồn tại"
                 ));
             }
 
-            Map<String, String> data;
-
-            // Verify password
+            // Get roles and their statuses
+            Map<String, String> roleData;
             try {
-                data = authService.getRole(username, password);
+                roleData = authService.getRole(username.trim(), password);
             } catch (Exception e) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
                         "success", false,
@@ -753,15 +753,14 @@ public class AuthController {
                 ));
             }
 
-            int roleNumbers = data.size();
+            int roleNumbers = roleData.size();
 
             return ResponseEntity.ok(Map.of(
-                        "success", true,
-                        "message", "Lấy vai trò thành công",
-                        "data", data,
-                        "roleNumbers", roleNumbers
-                    )
-            );
+                    "success", true,
+                    "message", "Lấy vai trò thành công",
+                    "data", roleData,
+                    "roleNumbers", roleNumbers
+            ));
 
         } catch (Exception e) {
             log.error("Get role error: {}", e.getMessage());
