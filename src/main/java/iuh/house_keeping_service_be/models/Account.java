@@ -59,6 +59,9 @@ public class Account {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+        if (accountId == null) {
+            accountId = java.util.UUID.randomUUID().toString();
+        }
     }
 
     @PreUpdate
