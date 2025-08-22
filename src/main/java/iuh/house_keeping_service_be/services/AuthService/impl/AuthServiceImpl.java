@@ -3,15 +3,17 @@ package iuh.house_keeping_service_be.services.AuthService.impl;
 import iuh.house_keeping_service_be.config.JwtUtil;
 import iuh.house_keeping_service_be.dtos.Authentication.TokenPair;
 import iuh.house_keeping_service_be.enums.AccountStatus;
-import iuh.house_keeping_service_be.enums.Role;
+import iuh.house_keeping_service_be.enums.RoleName;
 import iuh.house_keeping_service_be.models.Account;
 import iuh.house_keeping_service_be.models.AdminProfile;
 import iuh.house_keeping_service_be.models.Customer;
 import iuh.house_keeping_service_be.models.Employee;
+import iuh.house_keeping_service_be.models.Role;
 import iuh.house_keeping_service_be.repositories.AccountRepository;
 import iuh.house_keeping_service_be.repositories.AdminProfileRepository;
 import iuh.house_keeping_service_be.repositories.CustomerRepository;
 import iuh.house_keeping_service_be.repositories.EmployeeRepository;
+import iuh.house_keeping_service_be.repositories.RoleRepository;
 import iuh.house_keeping_service_be.security.CustomUserDetailsService;
 import iuh.house_keeping_service_be.services.AuthService.AuthService;
 import lombok.extern.slf4j.Slf4j;
@@ -25,12 +27,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -39,261 +41,259 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AuthServiceImpl implements AuthService {
 
-    @Autowired
-    private AccountRepository accountRepository;
+   @Autowired
+   private AccountRepository accountRepository;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+   @Autowired
+   private RoleRepository roleRepository;
 
-    @Autowired
-    private JwtUtil jwtUtil;
+   @Autowired
+   private PasswordEncoder passwordEncoder;
 
-    @Autowired
-    private AuthenticationManager authenticationManager;
+   @Autowired
+   private JwtUtil jwtUtil;
 
-    @Autowired
-    private RedisTemplate<Object, Object> redisTemplate;
+   @Autowired
+   private AuthenticationManager authenticationManager;
 
-    @Autowired
-    private CustomerRepository customerRepository;
+   @Autowired
+   private RedisTemplate<Object, Object> redisTemplate;
 
-    @Autowired
-    private EmployeeRepository employeeRepository;
+   @Autowired
+   private CustomerRepository customerRepository;
 
-    @Autowired
-    private AdminProfileRepository adminProfileRepository;
+   @Autowired
+   private EmployeeRepository employeeRepository;
 
-    @Autowired
-    private CustomUserDetailsService customUserDetailsService;
+   @Autowired
+   private AdminProfileRepository adminProfileRepository;
 
-    @Override
-    public TokenPair login(String username, String password, String role, String deviceType) {
-        log.info("Login attempt for username: {}, role: {}, device: {}", username, role, deviceType);
+   @Autowired
+   private CustomUserDetailsService customUserDetailsService;
 
-        try {
-            // Input validation
-            if (username == null || username.trim().isEmpty() ||
-                    password == null || password.trim().isEmpty() ||
-                    role == null || role.trim().isEmpty() ||
-                    deviceType == null || deviceType.trim().isEmpty()) {
-                throw new IllegalArgumentException("Username, password, role, and device type are required");
-            }
+   @Override
+   public TokenPair login(String username, String password, String role, String deviceType) {
+       log.info("Đăng nhập cho username: {}, role: {}, device: {}", username, role, deviceType);
 
-            // Validate role
-            Role requestedRole;
-            try {
-                requestedRole = Role.valueOf(role.toUpperCase().trim());
-            } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException("Invalid role provided: " + role);
-            }
+       try {
+           // Validate input
+           if (username == null || username.trim().isEmpty()) {
+               throw new IllegalArgumentException("Tên đăng nhập không được để trống");
+           }
+           if (password == null || password.isEmpty()) {
+               throw new IllegalArgumentException("Mật khẩu không được để trống");
+           }
+           if (role == null || role.trim().isEmpty()) {
+               throw new IllegalArgumentException("Vai trò không được để trống");
+           }
 
-            // Load user with specific role
-            UserDetails userDetails =  customUserDetailsService
-                    .loadUserByUsernameAndRole(username.trim(), requestedRole);
+           // Validate role
+           RoleName requestedRole;
+           try {
+               requestedRole = RoleName.valueOf(role.toUpperCase().trim());
+           } catch (IllegalArgumentException e) {
+               throw new IllegalArgumentException("Vai trò không hợp lệ: " + role);
+           }
 
-            // Authenticate with the specific UserDetails
-            authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(username.trim(), password)
-            );
+           // Load user with role validation
+           UserDetails userDetails = customUserDetailsService.loadUserByUsernameAndRole(username.trim(), requestedRole);
 
-            // Rest of your existing login logic...
-            TokenPair tokenPair = jwtUtil.generateTokenPair(username.trim(), requestedRole.name());
+           // Authenticate
+           authenticationManager.authenticate(
+               new UsernamePasswordAuthenticationToken(username.trim(), password)
+           );
 
-            // Store tokens in Redis
-            redisTemplate.opsForValue().set(
-                    "access_token:" + tokenPair.accessToken(),
-                    username.trim() + ":" + requestedRole + ":" + deviceType,
-                    jwtUtil.getAccessExpiration() / 1000,
-                    TimeUnit.SECONDS
-            );
+           // Generate tokens
+           TokenPair tokenPair = jwtUtil.generateTokenPair(username.trim(), role.toUpperCase());
 
-            redisTemplate.opsForValue().set(
-                    "refresh_token:" + tokenPair.refreshToken(),
-                    username.trim() + ":" + requestedRole + ":" + deviceType,
-                    jwtUtil.getRefreshExpiration() / 1000,
-                    TimeUnit.SECONDS
-            );
+           // Store in Redis
+           String accessTokenKey = "access_token:" + tokenPair.accessToken();
+           String refreshTokenKey = "refresh_token:" + tokenPair.refreshToken();
 
-            return tokenPair;
+           String redisValue = username.trim() + ":" + role.toUpperCase() + ":" + deviceType;
 
-        } catch (Exception e) {
-            log.error("Login failed for username: {}, error: {}", username, e.getMessage());
-            throw new RuntimeException("Login failed: " + e.getMessage());
-        }
-    }
+           redisTemplate.opsForValue().set(accessTokenKey, redisValue, 60, TimeUnit.MINUTES);
+           redisTemplate.opsForValue().set(refreshTokenKey, redisValue, 7, TimeUnit.DAYS);
 
-    @Override
-    public Account register(String username, String password, String email, String phoneNumber, String role, String fullName) {
-        log.info("Registration attempt for username: {}, email: {}, role: {}", username, email, role);
+           // Update last login
+           Account account = accountRepository.findByUsername(username.trim())
+               .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản"));
+           updateLastLoginTime(account);
 
-        try {
-            // Input validation
-            validateRegistrationInput(username, password, email, role, fullName, phoneNumber);
+           return tokenPair;
+       } catch (Exception e) {
+           log.error("Đăng nhập thất bại cho username: {}", username, e);
+           throw new RuntimeException("Đăng nhập thất bại: " + e.getMessage());
+       }
+   }
 
-            // Check if username already exists
-            if (accountRepository.findByUsername(username.trim()).isPresent()) {
-                throw new IllegalArgumentException("Tên đăng nhập đã được sử dụng");
-            }
+   @Override
+   public Account register(String username, String password, String email, String phoneNumber, String role, String fullName) {
+       log.info("Đăng ký tài khoản cho username: {}, email: {}, role: {}", username, email, role);
 
-            // Validate and convert role string to enum
-            Role accountRole;
-            try {
-                accountRole = Role.valueOf(role.toUpperCase().trim());
-            } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException("Role không hợp lệ");
-            }
+       // Validate input
+       validateRegistrationInput(username, password, email, role, fullName, phoneNumber);
 
-            // Check email uniqueness based on role
-            checkEmailUniqueness(email.trim(), accountRole);
+       // Check if username exists
+       if (accountRepository.existsByUsername(username.trim())) {
+           throw new IllegalArgumentException("Tên đăng nhập đã được sử dụng");
+       }
 
-            // Generate UUID for account
-            String accountId = UUID.randomUUID().toString();
+       // Check if phone number exists
+       if (accountRepository.existsByPhoneNumber(phoneNumber.trim())) {
+           throw new IllegalArgumentException("Số điện thoại đã được sử dụng");
+       }
 
-            // Create account with basic information
-            Account account = new Account();
-            account.setAccountId(accountId);
-            account.setUsername(username.trim());
-            account.setPassword(passwordEncoder.encode(password));
-            account.setRole(accountRole);
-            account.setStatus(AccountStatus.ACTIVE);
-            account.setCreatedAt(Instant.now());
-            account.setUpdatedAt(Instant.now());
+       // Validate role
+       RoleName roleName;
+       try {
+           roleName = RoleName.valueOf(role.toUpperCase().trim());
+       } catch (IllegalArgumentException e) {
+           throw new IllegalArgumentException("Vai trò không hợp lệ: " + role);
+       }
 
-            // Save account first
-            Account savedAccount = accountRepository.save(account);
+       // Check email uniqueness for specific profiles
+       checkEmailUniqueness(email, roleName);
 
-            // Create specific user type based on role
-            switch (accountRole) {
-                case CUSTOMER -> {
-                    Customer customer = new Customer();
-                    customer.setCustomerId(UUID.randomUUID().toString());
-                    customer.setAccount(savedAccount);
-                    customer.setFullName(fullName.trim());
-                    customer.setEmail(email.trim());
-                    customer.setPhoneNumber(phoneNumber != null ? phoneNumber.trim() : null);
-                    customer.setCreatedAt(Instant.now());
-                    customer.setUpdatedAt(Instant.now());
-                    customerRepository.save(customer);
-                }
-                case EMPLOYEE -> {
-                    Employee employee = new Employee();
-                    employee.setEmployeeId(UUID.randomUUID().toString());
-                    employee.setAccount(savedAccount);
-                    employee.setFullName(fullName.trim());
-                    employee.setEmail(email.trim());
-                    employee.setPhoneNumber(phoneNumber != null ? phoneNumber.trim() : null);
-                    employee.setHiredDate(LocalDate.now());
-                    employee.setCreatedAt(Instant.now());
-                    employee.setUpdatedAt(Instant.now());
-                    employeeRepository.save(employee);
-                }
-                case ADMIN -> {
-                    AdminProfile admin = new AdminProfile();
-                    admin.setAdminProfileId(UUID.randomUUID().toString());
-                    admin.setAccount(savedAccount);
-                    admin.setFullName(fullName.trim()); // Added full name
-                    admin.setContactInfo(email.trim());
-                    admin.setHireDate(LocalDate.now());
-                    admin.setCreatedAt(Instant.now());
-                    admin.setUpdatedAt(Instant.now());
-                    adminProfileRepository.save(admin);
-                }
-                default -> throw new IllegalArgumentException("Unsupported role: " + accountRole);
-            }
+       // Create account
+       Account account = new Account();
+       account.setUsername(username.trim());
+       account.setPassword(passwordEncoder.encode(password));
+       account.setPhoneNumber(phoneNumber.trim());
+       account.setStatus(AccountStatus.ACTIVE);
+       account.setIsPhoneVerified(false);
+       account.setCreatedAt(LocalDateTime.now());
+       account.setUpdatedAt(LocalDateTime.now());
 
-            log.info("Successfully registered user: {}", username);
-            return savedAccount;
+       // Get role entity
+       Role roleEntity = roleRepository.findByRoleName(roleName)
+           .orElseThrow(() -> new RuntimeException("Không tìm thấy vai trò: " + roleName));
 
-        } catch (IllegalArgumentException e) {
-            log.error("Registration validation error for username: {}, error: {}", username, e.getMessage());
-            throw e;
-        } catch (Exception e) {
-            log.error("Registration failed for username: {}, error: {}", username, e.getMessage());
-            throw new RuntimeException("Registration failed: " + e.getMessage(), e);
-        }
-    }
+       // Set roles
+       Set<Role> roles = new HashSet<>();
+       roles.add(roleEntity);
+       account.setRoles(roles);
 
-    private void checkEmailUniqueness(String email, Role role) {
-        switch (role) {
-            case CUSTOMER -> {
-                if (customerRepository.existsByEmail(email)) {
-                    throw new IllegalArgumentException("Đã có khách hàng dùng email này");
-                }
-            }
-            case EMPLOYEE -> {
-                if (employeeRepository.existsByEmail(email)) {
-                    throw new IllegalArgumentException("Đã có nhân viên dùng email này");
-                }
-            }
-            case ADMIN -> {
-                if (adminProfileRepository.existsByContactInfo(email)) {
-                    throw new IllegalArgumentException("Đã có admin dùng email này");
-                }
-            }
-        }
-    }
+       // Save account
+       account = accountRepository.save(account);
 
-    private void validateRegistrationInput(String username, String password, String email, String role, String fullName, String phoneNumber) {
-        // Username validation
-        if (username == null || username.trim().isEmpty()) {
-            throw new IllegalArgumentException("Tên đăng nhập không được thiếu");
-        }
-        if (username.trim().length() < 3 || username.trim().length() > 50) {
-            throw new IllegalArgumentException("Tên đăng nhập phải có từ 3 đến 50 ký tự");
-        }
-        if (!username.trim().matches("^[a-zA-Z0-9_]+$")) {
-            throw new IllegalArgumentException("Tên đăng nhập chỉ được chứa chữ cái, số và dấu gạch dưới");
-        }
+       // Create profile based on role
+       createProfileForRole(account, roleName, fullName, email);
 
-        // Password validation
-        if (password == null || password.isEmpty()) {
-            throw new IllegalArgumentException("Mật khẩu không được thiếu");
-        }
-        if (password.length() < 6) {
-            throw new IllegalArgumentException("Mật khẩu phải có ít nhất 6 ký tự");
-        }
-        if (password.length() > 100) {
-            throw new IllegalArgumentException("Mật khẩu không được vượt quá 100 ký tự");
-        }
+       return account;
+   }
 
-        // Email validation
-        if (email == null || email.trim().isEmpty()) {
-            throw new IllegalArgumentException("Email không được thiếu");
-        }
-        if (!email.trim().matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")) {
-            throw new IllegalArgumentException("Định dạng email không hợp lệ");
-        }
-        if (email.trim().length() > 255) {
-            throw new IllegalArgumentException("Email không được vượt quá 255 ký tự");
-        }
+   private void createProfileForRole(Account account, RoleName roleName, String fullName, String email) {
+       switch (roleName) {
+           case CUSTOMER:
+               Customer customer = new Customer();
+               customer.setAccount(account);
+               customer.setFullName(fullName);
+               customer.setEmail(email.trim());
+               customer.setCreatedAt(LocalDateTime.now());
+               customer.setUpdatedAt(LocalDateTime.now());
+               customerRepository.save(customer);
+               break;
 
-        // Role validation
-        if (role == null || role.trim().isEmpty()) {
-            throw new IllegalArgumentException("Vai trò không được thiếu");
-        }
-        if (!role.trim().matches("^(CUSTOMER|EMPLOYEE|ADMIN)$")) {
-            throw new IllegalArgumentException("Vai trò phải là CUSTOMER, EMPLOYEE hoặc ADMIN");
-        }
+           case EMPLOYEE:
+               Employee employee = new Employee();
+               employee.setAccount(account);
+               employee.setFullName(fullName);
+               employee.setEmail(email.trim());
+               employee.setHiredDate(LocalDate.now());
+               employee.setCreatedAt(LocalDateTime.now());
+               employee.setUpdatedAt(LocalDateTime.now());
+               employeeRepository.save(employee);
+               break;
 
-        // Full name validation
-        if (fullName == null || fullName.trim().isEmpty()) {
-            throw new IllegalArgumentException("Họ và tên không được thiếu");
-        }
-        if (fullName.trim().length() > 100) {
-            throw new IllegalArgumentException("Họ và tên không được vượt quá 100 ký tự");
-        }
-        if (!fullName.trim().matches("^[a-zA-ZÀ-ỹ\\s]+$")) {
-            throw new IllegalArgumentException("Họ và tên chỉ được chứa chữ cái và khoảng trắng");
-        }
+           case ADMIN:
+               AdminProfile adminProfile = new AdminProfile();
+               adminProfile.setAccount(account);
+               adminProfile.setFullName(fullName);
+               adminProfile.setContactInfo(email.trim());
+               adminProfile.setHireDate(LocalDate.now());
+               adminProfile.setCreatedAt(LocalDateTime.now());
+               adminProfile.setUpdatedAt(LocalDateTime.now());
+               adminProfileRepository.save(adminProfile);
+               break;
+       }
+   }
 
-        // Phone number validation
-        if (phoneNumber == null || phoneNumber.trim().isEmpty()) {
-            throw new IllegalArgumentException("Số điện thoại không được thiếu");
-        }
-        if (!phoneNumber.trim().matches("^\\+?[0-9]{10,15}$")) {
-            throw new IllegalArgumentException("Định dạng số điện thoại không hợp lệ");
-        }
-    }
+   private void checkEmailUniqueness(String email, RoleName role) {
+       switch (role) {
+           case CUSTOMER:
+               if (customerRepository.existsByEmail(email.trim())) {
+                   throw new IllegalArgumentException("Email đã được sử dụng bởi khách hàng khác");
+               }
+               break;
+           case EMPLOYEE:
+               if (employeeRepository.existsByEmail(email.trim())) {
+                   throw new IllegalArgumentException("Email đã được sử dụng bởi nhân viên khác");
+               }
+               break;
+           case ADMIN:
+               if (adminProfileRepository.existsByContactInfo(email.trim())) {
+                   throw new IllegalArgumentException("Email đã được sử dụng bởi quản trị viên khác");
+               }
+               break;
+       }
+   }
+
+   private void validateRegistrationInput(String username, String password, String email, String role, String fullName, String phoneNumber) {
+       // Username validation
+       if (username == null || username.trim().isEmpty()) {
+           throw new IllegalArgumentException("Tên đăng nhập không được để trống");
+       }
+       if (username.trim().length() > 50) {
+           throw new IllegalArgumentException("Tên đăng nhập không được quá 50 ký tự");
+       }
+
+       // Password validation
+       if (password == null || password.isEmpty()) {
+           throw new IllegalArgumentException("Mật khẩu không được để trống");
+       }
+       if (password.length() < 6) {
+           throw new IllegalArgumentException("Mật khẩu phải có ít nhất 6 ký tự");
+       }
+       if (password.length() > 100) {
+           throw new IllegalArgumentException("Mật khẩu không được quá 100 ký tự");
+       }
+
+       // Email validation
+       if (email == null || email.trim().isEmpty()) {
+           throw new IllegalArgumentException("Email không được để trống");
+       }
+       if (!email.trim().matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$")) {
+           throw new IllegalArgumentException("Email không đúng định dạng");
+       }
+       if (email.trim().length() > 255) {
+           throw new IllegalArgumentException("Email không được quá 255 ký tự");
+       }
+
+       // Role validation
+       if (role == null || role.trim().isEmpty()) {
+           throw new IllegalArgumentException("Vai trò không được để trống");
+       }
+       if (!role.trim().matches("^(CUSTOMER|EMPLOYEE|ADMIN)$")) {
+           throw new IllegalArgumentException("Vai trò không hợp lệ");
+       }
+
+       // Full name validation
+       if (fullName == null || fullName.trim().isEmpty()) {
+           throw new IllegalArgumentException("Họ tên không được để trống");
+       }
+       if (fullName.trim().length() > 100) {
+           throw new IllegalArgumentException("Họ tên không được quá 100 ký tự");
+       }
+
+       // Phone number validation
+       if (phoneNumber == null || phoneNumber.trim().isEmpty()) {
+           throw new IllegalArgumentException("Số điện thoại không được để trống");
+       }
+       if (!phoneNumber.trim().matches("^\\+?[0-9]{10,15}$")) {
+           throw new IllegalArgumentException("Số điện thoại không đúng định dạng");
+       }
+   }
 
     @Override
     public boolean validateToken(String token) {
@@ -333,236 +333,166 @@ public class AuthServiceImpl implements AuthService {
         }
     }
 
-    @Override
-    public TokenPair refreshToken(String refreshToken) {
-        if (refreshToken == null || refreshToken.trim().isEmpty()) {
-            throw new IllegalArgumentException("Refresh token là bắt buộc");
-        }
+   @Override
+   public TokenPair refreshToken(String refreshToken) {
+       if (refreshToken == null || refreshToken.trim().isEmpty()) {
+           throw new IllegalArgumentException("Refresh token không được để trống");
+       }
 
-        // Validate refresh token
-        String refreshTokenKey = "refresh_token:" + refreshToken.trim();
-        Object userInfoObj = redisTemplate.opsForValue().get(refreshTokenKey);
+       // Validate refresh token
+       String refreshTokenKey = "refresh_token:" + refreshToken.trim();
+       Object userInfoObj = redisTemplate.opsForValue().get(refreshTokenKey);
 
-        if (userInfoObj == null) {
-            throw new RuntimeException("Refresh token không hợp lệ");
-        }
+       if (userInfoObj == null) {
+           throw new RuntimeException("Refresh token không hợp lệ hoặc đã hết hạn");
+       }
 
-        String userInfo = userInfoObj.toString();
-        String[] parts = userInfo.split(":");
-        String username = parts[0];
-        String role = parts[1];
-        String deviceType = parts.length > 2 ? parts[2] : "UNKNOWN";
+       String userInfo = userInfoObj.toString();
+       String[] parts = userInfo.split(":");
+       String username = parts[0];
+       String role = parts[1];
+       String deviceType = parts.length > 2 ? parts[2] : "UNKNOWN";
 
-        // Generate new token pair
-        TokenPair newTokenPair = jwtUtil.generateTokenPair(username, role);
+       // Generate new token pair
+       TokenPair newTokenPair = jwtUtil.generateTokenPair(username, role);
 
-        // Delete old refresh token
-        redisTemplate.delete(refreshTokenKey);
+       // Delete old refresh token
+       redisTemplate.delete(refreshTokenKey);
 
-        // Store new tokens in Redis with device info
-        redisTemplate.opsForValue().set(
-                "access_token:" + newTokenPair.accessToken(),
-                username + ":" + role + ":" + deviceType,
-                jwtUtil.getAccessExpiration() / 1000,
-                TimeUnit.SECONDS
-        );
+       // Store new tokens in Redis with device info
+       redisTemplate.opsForValue().set(
+           "access_token:" + newTokenPair.accessToken(),
+           username + ":" + role + ":" + deviceType,
+           15, TimeUnit.MINUTES
+       );
 
-        redisTemplate.opsForValue().set(
-                "refresh_token:" + newTokenPair.refreshToken(),
-                username + ":" + role + ":" + deviceType,
-                jwtUtil.getRefreshExpiration() / 1000,
-                TimeUnit.SECONDS
-        );
+       redisTemplate.opsForValue().set(
+           "refresh_token:" + newTokenPair.refreshToken(),
+           username + ":" + role + ":" + deviceType,
+           7, TimeUnit.DAYS
+       );
 
-        return newTokenPair;
-    }
+       return newTokenPair;
+   }
 
-    @Override
-    public String logout(String token) {
-        try {
-            // Get token info
-            String tokenKey = "access_token:" + token;
-            Object tokenInfoObj = redisTemplate.opsForValue().get(tokenKey);
+   @Override
+   public String logout(String token) {
+       try {
+           if (token == null || token.trim().isEmpty()) {
+               throw new IllegalArgumentException("Token không được để trống");
+           }
 
-            if (tokenInfoObj != null) {
-                String tokenInfo = tokenInfoObj.toString();
-                String[] parts = tokenInfo.split(":");
-                String username = parts[0];
-                String deviceType = parts.length > 2 ? parts[2] : "UNKNOWN";
+           String accessTokenKey = "access_token:" + token.trim();
+           Object userInfoObj = redisTemplate.opsForValue().get(accessTokenKey);
 
-                // Remove user session for this device
-                String userSessionKey = "user_session:" + username + ":" + deviceType;
-                redisTemplate.delete(userSessionKey);
+           if (userInfoObj != null) {
+               redisTemplate.delete(accessTokenKey);
 
-                // Find and remove corresponding refresh token
-                Set<String> refreshTokenKeys = (Set<String>) (Set<?>) redisTemplate.keys("refresh_token:*");
-                if (refreshTokenKeys != null) {
-                    for (String refreshKey : refreshTokenKeys) {
-                        Object refreshTokenInfo = redisTemplate.opsForValue().get(refreshKey);
-                        if (refreshTokenInfo != null && refreshTokenInfo.toString().equals(tokenInfo)) {
-                            redisTemplate.delete(refreshKey);
-                            break;
-                        }
-                    }
-                }
-            }
+               // Find and delete corresponding refresh token
+               String userInfo = userInfoObj.toString();
+               String[] parts = userInfo.split(":");
+               String username = parts[0];
 
-            // Remove access token
-            redisTemplate.delete(tokenKey);
+               Set<Object> refreshTokenKeys = redisTemplate.keys("refresh_token:*");
+               for (Object key : refreshTokenKeys) {
+                   Object refreshUserInfo = redisTemplate.opsForValue().get(key);
+                   if (refreshUserInfo != null && refreshUserInfo.toString().startsWith(username + ":")) {
+                       redisTemplate.delete(key);
+                       break;
+                   }
+               }
+           }
 
-            return "Logout successful";
-        } catch (Exception e) {
-            log.error("Logout error: {}", e.getMessage());
-            throw new RuntimeException("Logout failed: " + e.getMessage());
-        }
-    }
+           return "Đăng xuất thành công";
+       } catch (Exception e) {
+           log.error("Lỗi khi đăng xuất", e);
+           throw new RuntimeException("Đăng xuất thất bại: " + e.getMessage());
+       }
+   }
 
-    @Override
-    public String logoutAllDevices(String username) {
-        try {
-            // Get all user sessions
-            Set<String> userSessions = (Set<String>) (Set<?>) redisTemplate.keys("user_session:" + username + ":*");
-            if (userSessions != null) {
-                for (String sessionKey : userSessions) {
-                    Object sessionToken = redisTemplate.opsForValue().get(sessionKey);
-                    if (sessionToken != null) {
-                        // Delete corresponding access and refresh tokens
-                        redisTemplate.delete("access_token:" + sessionToken.toString());
+   @Override
+   public String logoutAllDevices(String username) {
+       try {
+           if (username == null || username.trim().isEmpty()) {
+               throw new IllegalArgumentException("Tên đăng nhập không được để trống");
+           }
 
-                        // Find and delete refresh token
-                        Set<String> refreshTokenKeys = (Set<String>) (Set<?>) redisTemplate.keys("refresh_token:*");
-                        if (refreshTokenKeys != null) {
-                            for (String refreshKey : refreshTokenKeys) {
-                                Object refreshTokenInfo = redisTemplate.opsForValue().get(refreshKey);
-                                if (refreshTokenInfo != null && refreshTokenInfo.toString().startsWith(username + ":")) {
-                                    redisTemplate.delete(refreshKey);
-                                }
-                            }
-                        }
-                    }
-                    // Delete session key
-                    redisTemplate.delete(sessionKey);
-                }
-            }
+           // Delete all tokens for this user
+           Set<Object> allKeys = redisTemplate.keys("*token:*");
+           int deletedCount = 0;
 
-            return "Logged out from all devices successfully";
-        } catch (Exception e) {
-            log.error("Logout all devices error: {}", e.getMessage());
-            throw new RuntimeException("Logout from all devices failed: " + e.getMessage());
-        }
-    }
+           for (Object key : allKeys) {
+               Object userInfo = redisTemplate.opsForValue().get(key);
+               if (userInfo != null && userInfo.toString().startsWith(username.trim() + ":")) {
+                   redisTemplate.delete(key);
+                   deletedCount++;
+               }
+           }
 
-    // Helper methods
-//    private void validateRegistrationInput(String username, String password, String email, String role, String fullName) {
-//        if (username == null || username.trim().isEmpty()) {
-//            throw new IllegalArgumentException("Username is required");
-//        }
-//        if (password == null || password.length() < 6) {
-//            throw new IllegalArgumentException("Password must be at least 6 characters");
-//        }
-//        if (email == null || !email.contains("@")) {
-//            throw new IllegalArgumentException("Valid email is required");
-//        }
-//        if (role == null || role.trim().isEmpty()) {
-//            throw new IllegalArgumentException("Role is required");
-//        }
-//        if (fullName == null || fullName.trim().isEmpty()) {
-//            throw new IllegalArgumentException("Full name is required");
-//        }
-//    }
+           return "Đã đăng xuất khỏi " + deletedCount + " thiết bị";
+       } catch (Exception e) {
+           log.error("Lỗi khi đăng xuất tất cả thiết bị cho user: {}", username, e);
+           throw new RuntimeException("Đăng xuất tất cả thiết bị thất bại: " + e.getMessage());
+       }
+   }
 
-    @Override
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void updateLastLoginTime(Account account) {
-        // Fetch a fresh managed entity to avoid detached entity issues
-        Account managedAccount = accountRepository.findById(account.getAccountId().toString())
-                .orElseThrow(() -> new RuntimeException("Account not found"));
+   @Override
+   @Transactional(propagation = Propagation.REQUIRES_NEW)
+   public void updateLastLoginTime(Account account) {
+       try {
+           account.setLastLogin(LocalDateTime.now());
+           accountRepository.save(account);
+       } catch (Exception e) {
+           log.error("Lỗi khi cập nhật thời gian đăng nhập cuối cho user: {}", account.getUsername(), e);
+       }
+   }
 
-        managedAccount.setLastLogin(Instant.now());
-        accountRepository.saveAndFlush(managedAccount);
-    }
+   @Override
+   public void changePassword(String username, String currentPassword, String newPassword) {
+       if (username == null || username.trim().isEmpty()) {
+           throw new IllegalArgumentException("Tên đăng nhập không được để trống");
+       }
+       if (currentPassword == null || currentPassword.isEmpty()) {
+           throw new IllegalArgumentException("Mật khẩu hiện tại không được để trống");
+       }
+       if (newPassword == null || newPassword.length() < 6) {
+           throw new IllegalArgumentException("Mật khẩu mới phải có ít nhất 6 ký tự");
+       }
 
-    @Override
-    public void changePassword(String username, String currentPassword, String newPassword) {
-        // Validate input
-        if (username == null || username.trim().isEmpty()) {
-            throw new IllegalArgumentException("Tên đăng nhập không được thiếu");
-        }
-        if (currentPassword == null || currentPassword.trim().isEmpty()) {
-            throw new IllegalArgumentException("Mật khẩu hiện tại không được thiếu");
-        }
-        if (newPassword == null || newPassword.trim().isEmpty()) {
-            throw new IllegalArgumentException("Mật khẩu mới không được thiếu");
-        }
-        if (newPassword.length() < 6) {
-            throw new IllegalArgumentException("Mật khẩu mới phải có ít nhất 6 ký tự");
-        }
-        if (newPassword.length() > 50) {
-            throw new IllegalArgumentException("Mật khẩu mới không được vượt quá 50 ký tự");
-        }
-        if (currentPassword.equals(newPassword)) {
-            throw new IllegalArgumentException("Mật khẩu mới phải khác mật khẩu hiện tại");
-        }
+       Account account = accountRepository.findByUsername(username.trim())
+           .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản"));
 
-        if (!newPassword.matches("^[\\x20-\\x7E]*$")) {
-            throw new IllegalArgumentException("Mật khẩu mới chứa ký tự không hợp lệ");
-        }
+       if (!passwordEncoder.matches(currentPassword, account.getPassword())) {
+           throw new RuntimeException("Mật khẩu hiện tại không chính xác");
+       }
 
-        // Password strength validation (optional)
-        if (!newPassword.matches(".*[a-zA-Z].*")) {
-            throw new IllegalArgumentException("Mật khẩu mới phải chứa ít nhất một chữ cái");
-        }
+       account.setPassword(passwordEncoder.encode(newPassword));
+       accountRepository.save(account);
+   }
 
-        // Find account
-        Account account = accountRepository.findByUsername(username.trim())
-                .orElseThrow(() -> new IllegalArgumentException("Tài khoản không tồn tại"));
+   @Override
+   public Map<String, String> getRole(String username, String password) {
+       try {
+           if (username == null || username.trim().isEmpty() || password == null || password.isEmpty()) {
+               throw new IllegalArgumentException("Tên đăng nhập và mật khẩu không được để trống");
+           }
 
-        // Verify current password
-        if (!passwordEncoder.matches(currentPassword, account.getPassword())) {
-            throw new IllegalArgumentException("Mật khẩu hiện tại không đúng");
-        }
+           Account account = accountRepository.findByUsername(username.trim())
+               .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản"));
 
-        // Update password
-        account.setPassword(passwordEncoder.encode(newPassword));
-        accountRepository.save(account);
+           if (!passwordEncoder.matches(password, account.getPassword())) {
+               throw new RuntimeException("Thông tin đăng nhập không chính xác");
+           }
 
-        log.info("Password changed successfully for user: {}", username);
-    }
-
-    @Override
-    public Map<String, String> getRole(String username, String password) {
-        try {
-            // Validate input
-            if (username == null || username.trim().isEmpty() || password == null || password.trim().isEmpty()) {
-                throw new IllegalArgumentException("Phải nhập tài khoản và mật khẩu");
-            }
-
-            // Find all accounts with the same username
-            List<Account> accounts = accountRepository.findAccountsByUsername(username.trim());
-
-            if (accounts.isEmpty()) {
-                throw new IllegalArgumentException("Tài khoản không tồn tại");
-            }
-
-            // Verify password against the first account (since all should have same password)
-            Account firstAccount = accounts.get(0);
-            if (!passwordEncoder.matches(password, firstAccount.getPassword())) {
-                throw new IllegalArgumentException("Mật khẩu không đúng");
-            }
-
-            log.info("Found {} roles for user: {}", accounts.size(), username);
-
-            // Map roles to a string representation
-
-            return accounts.stream()
-                    .collect(Collectors.toMap(
-                            account -> account.getRole().name(),
-                            account -> account.getStatus().name(),
-                            (existing, replacement) -> existing // Handle duplicates by keeping the first
-                    ));
-        } catch (Exception e) {
-            log.error("Error getting role for user {}: {}", username, e.getMessage());
-            throw new RuntimeException("Xác thực thất bại: " + e.getMessage());
-        }
-    }
+           return account.getRoles().stream()
+               .collect(Collectors.toMap(
+                   role -> role.getRoleName().name(),
+                   role -> account.getStatus().name(),
+                   (existing, replacement) -> existing
+               ));
+       } catch (Exception e) {
+           log.error("Lỗi khi lấy thông tin vai trò cho username: {}", username, e);
+           throw new RuntimeException("Lấy thông tin vai trò thất bại: " + e.getMessage());
+       }
+   }
 }

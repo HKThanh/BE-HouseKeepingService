@@ -1,57 +1,68 @@
 package iuh.house_keeping_service_be.models;
 
 import iuh.house_keeping_service_be.enums.AccountStatus;
-import iuh.house_keeping_service_be.enums.Role;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
-import lombok.Getter;
-import lombok.Setter;
-import org.hibernate.annotations.ColumnDefault;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.GenericGenerator;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
+import java.util.Set;
 
-@Getter
-@Setter
 @Entity
 @Table(name = "account")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class Account {
     @Id
-    @Size(max = 36)
-    @Column(name = "account_id", nullable = false, length = 36)
+    @GeneratedValue(generator = "UUID")
+    @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
+    @Column(name = "account_id", length = 36)
     private String accountId;
 
-    @Size(max = 50)
-    @NotNull
-    @Column(name = "username", nullable = false, length = 50)
+    @Column(name = "username", length = 50, unique = true, nullable = false)
     private String username;
 
-    @Size(max = 255)
-    @NotNull
     @Column(name = "password", nullable = false)
     private String password;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "role", length = 20)
-    private Role role;
+    @Column(name = "phone_number", length = 20, unique = true)
+    private String phoneNumber;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", length = 20)
-    private AccountStatus status;
+    @Column(name = "status", length = 20, nullable = false)
+    private AccountStatus status = AccountStatus.ACTIVE;
 
-    @ColumnDefault("false")
-    @Column(name = "is_admin")
-    private Boolean isAdmin;
+    @Column(name = "is_phone_verified")
+    private Boolean isPhoneVerified = false;
 
-    @ColumnDefault("CURRENT_TIMESTAMP")
     @Column(name = "created_at")
-    private Instant createdAt;
+    private LocalDateTime createdAt;
 
-    @ColumnDefault("CURRENT_TIMESTAMP")
     @Column(name = "updated_at")
-    private Instant updatedAt;
+    private LocalDateTime updatedAt;
 
     @Column(name = "last_login")
-    private Instant lastLogin;
+    private LocalDateTime lastLogin;
 
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "account_roles",
+        joinColumns = @JoinColumn(name = "account_id"),
+        inverseJoinColumns = @JoinColumn(name = "role_id")
+    )
+    private Set<Role> roles;
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }

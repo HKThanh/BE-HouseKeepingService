@@ -1,27 +1,30 @@
 package iuh.house_keeping_service_be.repositories;
 
-import iuh.house_keeping_service_be.enums.Role;
+import iuh.house_keeping_service_be.enums.RoleName;
 import iuh.house_keeping_service_be.models.Account;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+import iuh.house_keeping_service_be.models.Role;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
+@Repository
 public interface AccountRepository extends JpaRepository<Account, String> {
     Optional<Account> findByUsername(String username);
+
+    Optional<Account> findByPhoneNumber(String phoneNumber);
 
     List<Account> findAccountsByUsernameAndPassword(String username, String password);
 
     List<Account> findAccountsByUsername(String username);
 
-//    Optional<Account> findAccountByUsernameAndRole(String username, Role role);
+    @Query("SELECT a FROM Account a JOIN a.roles r WHERE a.username = :username AND r.roleName = :roleName ORDER BY a.createdAt DESC")
+    List<Account> findAccountsByUsernameAndRole(@Param("username") String username, @Param("roleName") RoleName roleName);
 
-    @Query("SELECT a FROM Account a WHERE a.username = :username AND a.role = :role ORDER BY a.createdAt DESC")
-    List<Account> findAccountsByUsernameAndRole(@Param("username") String username, @Param("role") Role role);
+    boolean existsByUsername(String username);
+
+    boolean existsByPhoneNumber(String phoneNumber);
 }

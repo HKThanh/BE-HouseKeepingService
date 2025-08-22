@@ -1,66 +1,67 @@
 package iuh.house_keeping_service_be.models;
 
-import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
-import lombok.Getter;
-import lombok.Setter;
-import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.OnDelete;
-import org.hibernate.annotations.OnDeleteAction;
+    import iuh.house_keeping_service_be.enums.Rating;
+    import jakarta.persistence.*;
+    import lombok.AllArgsConstructor;
+    import lombok.Data;
+    import lombok.NoArgsConstructor;
+    import org.hibernate.annotations.GenericGenerator;
 
-import java.time.Instant;
-import java.time.LocalDate;
+    import java.time.LocalDate;
+    import java.time.LocalDateTime;
 
-@Getter
-@Setter
-@Entity
-@Table(name = "customer")
-public class Customer {
-    @Id
-    @Size(max = 36)
-    @Column(name = "customer_id", nullable = false, length = 36)
-    private String customerId;
+    @Entity
+    @Table(name = "customer")
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public class Customer {
+        @Id
+        @GeneratedValue(generator = "UUID")
+        @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
+        @Column(name = "customer_id", length = 36)
+        private String customerId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @OnDelete(action = OnDeleteAction.SET_NULL)
-    @JoinColumn(name = "account_id")
-    private Account account;
+        @OneToOne
+        @JoinColumn(name = "account_id", nullable = false, unique = true)
+        private Account account;
 
-    @Size(max = 255)
-    @Column(name = "avatar")
-    private String avatar;
+        @Column(name = "avatar")
+        private String avatar;
 
-    @Size(max = 100)
-    @NotNull
-    @Column(name = "full_name", nullable = false, length = 100)
-    private String fullName;
+        @Column(name = "full_name", length = 100, nullable = false)
+        private String fullName;
 
-    @Column(name = "is_male")
-    private Boolean isMale;
+        @Column(name = "is_male")
+        private Boolean isMale;
 
-    @Size(max = 100)
-    @NotNull
-    @Column(name = "email", nullable = false, length = 100)
-    private String email;
+        @Column(name = "email", length = 100, unique = true)
+        private String email;
 
-    @Size(max = 20)
-    @Column(name = "phone_number", length = 20)
-    private String phoneNumber;
+        @Column(name = "birthdate")
+        private LocalDate birthdate;
 
-    @Size(max = 255)
-    @Column(name = "address", length = 255)
-    private String address;
+        @Enumerated(EnumType.STRING)
+        @Column(name = "rating", length = 10)
+        private Rating rating;
 
-    @Column(name = "birthdate")
-    private LocalDate birthDate;
+        @Column(name = "vip_level")
+        private Integer vipLevel;
 
-    @ColumnDefault("CURRENT_TIMESTAMP")
-    @Column(name = "created_at")
-    private Instant createdAt;
+        @Column(name = "created_at")
+        private LocalDateTime createdAt;
 
-    @ColumnDefault("CURRENT_TIMESTAMP")
-    @Column(name = "updated_at")
-    private Instant updatedAt;
+        @Column(name = "updated_at")
+        private LocalDateTime updatedAt;
 
-}
+        @PrePersist
+        protected void onCreate() {
+            createdAt = LocalDateTime.now();
+            updatedAt = LocalDateTime.now();
+        }
+
+        @PreUpdate
+        protected void onUpdate() {
+            updatedAt = LocalDateTime.now();
+        }
+    }

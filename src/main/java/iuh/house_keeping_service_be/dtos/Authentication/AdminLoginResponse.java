@@ -5,7 +5,6 @@ public record AdminLoginResponse(
         String username,
         String fullName,
         boolean isMale,
-        String address,
         String department,
         String contactInfo,
         String hireDate
