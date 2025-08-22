@@ -1,62 +1,62 @@
 package iuh.house_keeping_service_be.models;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.Size;
-import lombok.Getter;
-import lombok.Setter;
-import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.OnDelete;
-import org.hibernate.annotations.OnDeleteAction;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.GenericGenerator;
 
-import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
-@Getter
-@Setter
 @Entity
 @Table(name = "admin_profile")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class AdminProfile {
     @Id
-    @Size(max = 36)
-    @Column(name = "admin_profile_id", nullable = false, length = 36)
+    @GeneratedValue(generator = "UUID")
+    @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
+    @Column(name = "admin_profile_id", length = 36)
     private String adminProfileId;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @OnDelete(action = OnDeleteAction.CASCADE)
-    @JoinColumn(name = "account_id")
+    @OneToOne
+    @JoinColumn(name = "account_id", nullable = false, unique = true)
     private Account account;
 
-    @Size(max = 100)
-    @Column(name = "full_name", length = 100)
+    @Column(name = "full_name", length = 100, nullable = false)
     private String fullName;
 
     @Column(name = "is_male")
     private Boolean isMale;
 
-    @Size(max = 100)
-    @Column(name = "address", length = 100)
-    private String address;
-
-    @Size(max = 50)
     @Column(name = "department", length = 50)
     private String department;
 
-    @Size(max = 255)
     @Column(name = "contact_info")
     private String contactInfo;
 
     @Column(name = "birthdate")
-    private LocalDate birthDate;
+    private LocalDate birthdate;
 
     @Column(name = "hire_date")
     private LocalDate hireDate;
 
-    @ColumnDefault("CURRENT_TIMESTAMP")
     @Column(name = "created_at")
-    private Instant createdAt;
+    private LocalDateTime createdAt;
 
-    @ColumnDefault("CURRENT_TIMESTAMP")
     @Column(name = "updated_at")
-    private Instant updatedAt;
+    private LocalDateTime updatedAt;
 
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }

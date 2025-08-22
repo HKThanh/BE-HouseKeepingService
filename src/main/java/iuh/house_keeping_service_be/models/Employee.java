@@ -1,72 +1,81 @@
 package iuh.house_keeping_service_be.models;
 
+import iuh.house_keeping_service_be.enums.EmployeeStatus;
+import iuh.house_keeping_service_be.enums.Rating;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
-import lombok.Getter;
-import lombok.Setter;
-import org.hibernate.annotations.ColumnDefault;
-import org.hibernate.annotations.OnDelete;
-import org.hibernate.annotations.OnDeleteAction;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.GenericGenerator;
 
-import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
 
-@Getter
-@Setter
 @Entity
 @Table(name = "employee")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class Employee {
     @Id
-    @Size(max = 36)
-    @Column(name = "employee_id", nullable = false, length = 36)
+    @GeneratedValue(generator = "UUID")
+    @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
+    @Column(name = "employee_id", length = 36)
     private String employeeId;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @OnDelete(action = OnDeleteAction.CASCADE)
-    @JoinColumn(name = "account_id")
+    @OneToOne
+    @JoinColumn(name = "account_id", nullable = false, unique = true)
     private Account account;
 
-    @Size(max = 255)
     @Column(name = "avatar")
     private String avatar;
 
-    @Size(max = 100)
-    @NotNull
-    @Column(name = "full_name", nullable = false, length = 100)
+    @Column(name = "full_name", length = 100, nullable = false)
     private String fullName;
 
     @Column(name = "is_male")
     private Boolean isMale;
 
-    @Size(max = 100)
-    @NotNull
-    @Column(name = "email", nullable = false, length = 100)
+    @Column(name = "email", length = 100, unique = true)
     private String email;
 
-    @Size(max = 20)
-    @Column(name = "phone_number", length = 20)
-    private String phoneNumber;
-
     @Column(name = "birthdate")
-    private LocalDate birthDate;
+    private LocalDate birthdate;
 
     @Column(name = "hired_date")
     private LocalDate hiredDate;
 
-    @Column(name = "skills", length = Integer.MAX_VALUE)
-    private String skills;
+    @ElementCollection
+    @CollectionTable(name = "employee_skills", joinColumns = @JoinColumn(name = "employee_id"))
+    @Column(name = "skill")
+    private List<String> skills;
 
-    @Size(max = 255)
-    @Column(name = "address", length = 255)
-    private String address;
+    @Column(name = "bio", columnDefinition = "TEXT")
+    private String bio;
 
-    @ColumnDefault("CURRENT_TIMESTAMP")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "rating", length = 10)
+    private Rating rating;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "employee_status", length = 20)
+    private EmployeeStatus employeeStatus = EmployeeStatus.AVAILABLE;
+
     @Column(name = "created_at")
-    private Instant createdAt;
+    private LocalDateTime createdAt;
 
-    @ColumnDefault("CURRENT_TIMESTAMP")
     @Column(name = "updated_at")
-    private Instant updatedAt;
+    private LocalDateTime updatedAt;
 
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
 }
