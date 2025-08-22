@@ -1,5 +1,6 @@
 package iuh.house_keeping_service_be.models;
 
+import iuh.house_keeping_service_be.enums.RoleName;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -18,8 +19,4 @@ public class Role {
     @Enumerated(EnumType.STRING)
     @Column(name = "role_name", length = 20, unique = true, nullable = false)
     private RoleName roleName;
-
-    public enum RoleName {
-        ADMIN, EMPLOYEE, CUSTOMER
-    }
 }
