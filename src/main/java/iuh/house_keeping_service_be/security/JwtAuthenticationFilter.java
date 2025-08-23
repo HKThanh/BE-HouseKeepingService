@@ -39,64 +39,44 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        String requestURI = request.getRequestURI();
-        boolean isSessionsEndpoint = "/api/v1/auth/sessions".equals(requestURI);
+        final String authHeader = request.getHeader("Authorization");
+        final String jwt;
+        final String username;
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         try {
-            String authHeader = request.getHeader("Authorization");
+            jwt = authHeader.substring(7);
+            username = jwtUtil.extractUsername(jwt);
 
-            // Special handling for sessions endpoint - return 400 for missing header
-            if (isSessionsEndpoint && (authHeader == null || !authHeader.startsWith("Bearer "))) {
-                response.setStatus(HttpStatus.BAD_REQUEST.value());
-                response.setContentType("application/json");
-                response.setCharacterEncoding("UTF-8");
-                response.getWriter().write("{\"success\":false,\"message\":\"Authorization header is required\"}");
-                return;
-            }
+            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                // Sử dụng UserDetailsService thay vì truy cập trực tiếp repository
+                UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
 
-            // Normal JWT processing for all endpoints with Authorization header
-            if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                String token = authHeader.substring(7);
-                String username = jwtUtil.extractUsername(token);
-                String role = jwtUtil.extractRole(token);
+                if (jwtUtil.validateToken(jwt, username)) {
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                            userDetails,
+                            null,
+                            userDetails.getAuthorities()
+                    );
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
 
-                if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-                    if (jwtUtil.validateToken(token, userDetails.getUsername()) &&
-                            authService.validateToken(token)) {
-
-                        // Create authorities based on role from JWT
-                        var authorities = Collections.singletonList(
-                            new SimpleGrantedAuthority("ROLE_" + role)
-                        );
-
-                        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                                userDetails, null, authorities);
-                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                        SecurityContextHolder.getContext().setAuthentication(authentication);
-                    }
+                    log.debug("Set authentication for user: {} with authorities: {}",
+                        username, userDetails.getAuthorities());
                 }
             }
-
         } catch (MalformedJwtException e) {
-            // Special handling for sessions endpoint - return 400 for malformed JWT
-            if (isSessionsEndpoint) {
-                response.setStatus(HttpStatus.BAD_REQUEST.value());
-                response.setContentType("application/json");
-                response.setCharacterEncoding("UTF-8");
-                response.getWriter().write("{\"success\":false,\"message\":\"Authorization header is required\"}");
-                return;
-            }
-            // For other endpoints, let Spring Security handle it (will return 403/401)
-            log.error("Malformed JWT token for URI: {}, error: {}", requestURI, e.getMessage());
+            log.warn("JWT filter error for URI: {}, error: Invalid JWT token format", request.getRequestURI());
+            SecurityContextHolder.clearContext();
+            response.setStatus(HttpStatus.UNAUTHORIZED.value());
+            return;
         } catch (Exception e) {
-            log.error("JWT filter error for URI: {}, error: {}", requestURI, e.getMessage());
-            // For non-sessions endpoints, let Spring Security handle authentication failures
-            if (!isSessionsEndpoint) {
-                // Clear any partial authentication context to prevent security issues
-                SecurityContextHolder.clearContext();
-                log.warn("Cleared security context due to JWT processing error for URI: {}", requestURI);
-            }
+            log.error("JWT filter error for URI: {}, error: {}", request.getRequestURI(), e.getMessage());
+            SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);
