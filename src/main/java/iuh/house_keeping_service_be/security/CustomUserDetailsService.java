@@ -11,6 +11,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.List;
@@ -23,6 +24,7 @@ public class CustomUserDetailsService implements UserDetailsService {
     private AccountRepository accountRepository;
 
     @Override
+    @Transactional(readOnly = true) // Đảm bảo session được giữ lại để load lazy collections
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         List<Account> accounts = accountRepository.findAccountsByUsername(username);
 
@@ -35,6 +37,9 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .filter(acc -> acc.getStatus() == AccountStatus.ACTIVE)
                 .findFirst()
                 .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy tài khoản hoạt động cho: " + username));
+
+        // Explicitly initialize the roles collection within transaction
+        account.getRoles().size(); // Force lazy loading
 
         // Create authorities from all roles
         Collection<SimpleGrantedAuthority> authorities = account.getRoles().stream()
@@ -50,6 +55,7 @@ public class CustomUserDetailsService implements UserDetailsService {
     }
 
     // Method specifically for login with role validation
+    @Transactional(readOnly = true)
     public UserDetails loadUserByUsernameAndRole(String username, RoleName roleName) throws UsernameNotFoundException {
         List<Account> accounts = accountRepository.findAccountsByUsernameAndRole(username, roleName);
 
@@ -64,6 +70,9 @@ public class CustomUserDetailsService implements UserDetailsService {
                         .anyMatch(role -> role.getRoleName() == roleName))
                 .findFirst()
                 .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy tài khoản hoạt động với vai trò " + roleName + " cho: " + username));
+
+        // Force lazy loading within transaction
+        account.getRoles().size();
 
         return User.builder()
                 .username(account.getUsername())

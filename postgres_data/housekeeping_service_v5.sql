@@ -269,11 +269,27 @@ CREATE TABLE promotions (
 ALTER TABLE bookings
 ADD COLUMN promotion_id INT REFERENCES promotions(promotion_id);
 
--- LƯU Ý: Mật khẩu '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK' tương ứng với 'password123'.
--- TRONG THỰC TẾ, LUÔN MÃ HÓA MẬT KHẨU TRƯỚC KHI LƯU VÀO DATABASE.
-
 -- =================================================================================
--- THÊM DỮ LIỆU MẪU TỪ V4 VÀO KHỐI I CỦA V5
+-- KHỐI V: HỆ THỐNG PHÂN QUYỀN ĐỘNG (DYNAMIC PERMISSIONS)
+-- Các bảng mới để hỗ trợ ý tưởng phân quyền linh hoạt cho Admin.
+-- =================================================================================
+
+-- Bảng định nghĩa tất cả các chức năng có trong hệ thống
+CREATE TABLE features (
+    feature_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    feature_name VARCHAR(100) UNIQUE NOT NULL, -- Tên định danh (code) của chức năng, Vd: 'booking.create'
+    description TEXT, -- Mô tả thân thiện, Vd: 'Tạo một lịch đặt mới'
+    module VARCHAR(50) -- Gom nhóm chức năng theo module, Vd: 'Booking', 'Account', 'Payment'
+);
+
+-- Bảng trung gian để gán quyền (chức năng) cho vai trò và quản lý trạng thái
+CREATE TABLE role_features (
+    role_id INT NOT NULL REFERENCES roles(role_id) ON DELETE CASCADE,
+    feature_id INT NOT NULL REFERENCES features(feature_id) ON DELETE CASCADE,
+    is_enabled BOOLEAN DEFAULT TRUE, -- TRUE: chức năng được phép, FALSE: chức năng bị vô hiệu hóa
+    PRIMARY KEY (role_id, feature_id)
+);
+
 -- =================================================================================
 
 -- Thêm dữ liệu vào bảng `account` từ dữ liệu gốc của v4
@@ -321,3 +337,42 @@ INSERT INTO employee_working_zones (employee_id, district, city) VALUES
 ('e1000001-0000-0000-0000-000000000001', 'Quận Tân Phú', 'TP. Hồ Chí Minh'),
 ('e1000001-0000-0000-0000-000000000001', 'Quận Tân Bình', 'TP. Hồ Chí Minh'),
 ('e1000001-0000-0000-0000-000000000002', 'Quận Gò Vấp', 'TP. Hồ Chí Minh');
+
+-- Thêm các chức năng mẫu vào bảng `features`
+INSERT INTO features (feature_name, description, module) VALUES
+-- Chức năng của Customer
+('booking.create', 'Tạo một lịch đặt mới', 'Booking'),
+('booking.view.history', 'Xem lịch sử đặt lịch của bản thân', 'Booking'),
+('booking.cancel', 'Hủy một lịch đặt', 'Booking'),
+('review.create', 'Viết đánh giá cho nhân viên', 'Review'),
+('profile.customer.edit', 'Chỉnh sửa hồ sơ cá nhân', 'Account'),
+-- Chức năng của Employee
+('booking.view.available', 'Xem các lịch đặt mới có sẵn', 'Booking'),
+('booking.accept', 'Chấp nhận một lịch đặt', 'Booking'),
+('booking.view.assigned', 'Xem các lịch đã nhận', 'Booking'),
+('profile.employee.edit', 'Chỉnh sửa hồ sơ nhân viên', 'Account'),
+-- Chức năng của Admin
+('admin.dashboard.view', 'Xem bảng điều khiển tổng quan', 'Admin'),
+('admin.user.manage', 'Quản lý tất cả người dùng', 'Admin'),
+('admin.permission.manage', 'Quản lý và phân quyền', 'Admin');
+
+-- Gán quyền mặc định cho các vai trò
+INSERT INTO role_features (role_id, feature_id, is_enabled) VALUES
+-- Quyền của CUSTOMER (role_id = 1)
+(1, (SELECT feature_id FROM features WHERE feature_name = 'booking.create'), true),
+(1, (SELECT feature_id FROM features WHERE feature_name = 'booking.view.history'), true),
+(1, (SELECT feature_id FROM features WHERE feature_name = 'booking.cancel'), true),
+(1, (SELECT feature_id FROM features WHERE feature_name = 'review.create'), true),
+(1, (SELECT feature_id FROM features WHERE feature_name = 'profile.customer.edit'), true),
+
+-- Quyền của EMPLOYEE (role_id = 2)
+(2, (SELECT feature_id FROM features WHERE feature_name = 'booking.view.available'), true),
+(2, (SELECT feature_id FROM features WHERE feature_name = 'booking.accept'), true),
+(2, (SELECT feature_id FROM features WHERE feature_name = 'booking.view.assigned'), true),
+(2, (SELECT feature_id FROM features WHERE feature_name = 'profile.employee.edit'), true),
+
+-- Quyền của ADMIN (role_id = 3)
+-- Admin có tất cả các quyền trên và thêm các quyền quản trị
+(3, (SELECT feature_id FROM features WHERE feature_name = 'admin.dashboard.view'), true),
+(3, (SELECT feature_id FROM features WHERE feature_name = 'admin.user.manage'), true),
+(3, (SELECT feature_id FROM features WHERE feature_name = 'admin.permission.manage'), true);
