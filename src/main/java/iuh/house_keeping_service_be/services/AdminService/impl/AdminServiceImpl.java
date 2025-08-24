@@ -30,4 +30,9 @@ package iuh.house_keeping_service_be.services.AdminService.impl;
          return adminProfileRepository.findById(id)
                  .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin"));
      }
+
+     @Override
+     public boolean isAdminByUsername(String username) {
+         return !adminProfileRepository.existsByAccount_Username(username);
+     }
  }
