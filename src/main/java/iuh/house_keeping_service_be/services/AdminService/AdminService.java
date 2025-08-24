@@ -9,4 +9,6 @@ public interface AdminService {
     AdminProfile findByContactInfoAndAccountRole(String contactInfo, RoleName roleName);
 
     AdminProfile findById(String id);
+
+    boolean isAdminByUsername(String username);
 }

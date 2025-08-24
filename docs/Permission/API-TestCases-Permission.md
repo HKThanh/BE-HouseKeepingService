@@ -26,35 +26,17 @@ All endpoints require:
 
 ---
 
-## Field Requirements
-
-### Authorization Token
-- **Format**: Must be a valid JWT token in Bearer format
-- **Role**: Must have ADMIN role to access permission management endpoints
-- **Status**: Token must not be expired or revoked
-
-### Request Parameters
-**roleId (Path Parameter)**
-- **Type**: Integer
-- **Validation**: Must be a valid existing role ID in the system
-
-**featureId (Path Parameter)**
-- **Type**: Integer  
-- **Validation**: Must be a valid existing feature ID in the system
-
-**isEnabled (Request Body)**
-- **Type**: Boolean
-- **Required**: Yes for PUT requests
-- **Values**: `true` to enable permission, `false` to disable permission
-
----
-
-## Business Rules
-- **Admin Only Access**: Only users with ADMIN role can manage permissions
-- **Non-Admin Roles**: Only CUSTOMER and EMPLOYEE roles can be managed
-- **Feature Organization**: Features are organized by modules
-- **Permission States**: Each role-feature combination can be enabled or disabled
-- **Transaction Safety**: All permission updates are wrapped in database transactions
+## Database Test Data
+Based on housekeeping_service_v5.sql:
+- **Roles**: CUSTOMER (roleId=1), EMPLOYEE (roleId=2), ADMIN (roleId=3)
+- **Features**: Organized by modules (Booking, Account, Service, Review, Admin)
+- **Sample Customer Features**: 
+  - Feature ID 1: "booking.create" (Module: Booking)
+  - Feature ID 5: "profile.customer.edit" (Module: Account)
+- **Sample Employee Features**:
+  - Feature ID 7: "booking.view.available" (Module: Booking)
+  - Feature ID 8: "booking.accept" (Module: Booking)
+  - Feature ID 10: "profile.employee.edit" (Module: Account)
 
 ---
 
@@ -71,7 +53,7 @@ All endpoints require:
   - **URL**: `/api/v1/admin/permissions/roles`
   - **Headers**: 
     ```
-    Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+    Authorization: Bearer <valid_admin_token>
     ```
 - **Expected Output**:
   ```json
@@ -113,39 +95,9 @@ All endpoints require:
 
 ---
 
-### Test Case 2: Get Roles Without Authorization Header
+### Test Case 2: Security Test - Non-Admin Access Denied
 - **Test Case ID**: TC_PERMISSION_002
-- **Description**: Verify that request fails when Authorization header is missing.
-- **Preconditions**: None
-- **Input**: 
-  - **Method**: `GET`
-  - **URL**: `/api/v1/admin/permissions/roles`
-  - No Authorization header
-- **Expected Output**:
-  ```json
-  {
-    "success": false,
-    "message": "Token không hợp lệ",
-    "data": null
-  }
-  ```
-- **Status Code**: `400 Bad Request`
-
-- **Actual Output**:
-  ```json
-  {
-    "success": false,
-    "message": "Token không hợp lệ",
-    "data": null
-  }
-  ```
-- **Status Code**: `400 Bad Request`
-
----
-
-### Test Case 3: Non-Admin User Access (Security Config Test)
-- **Test Case ID**: TC_PERMISSION_003
-- **Description**: Verify that non-admin users cannot access permission management endpoints.
+- **Description**: Verify that non-admin users cannot access permission management endpoints (SecurityConfig test).
 - **Preconditions**: 
   - User has valid token but with CUSTOMER role
 - **Input**:
@@ -153,12 +105,12 @@ All endpoints require:
   - **URL**: `/api/v1/admin/permissions/roles`
   - **Headers**: 
     ```
-    Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.customer.token
+    Authorization: Bearer <customer_token>
     ```
 - **Expected Output**:
   ```json
   {
-    "timestamp": "2025-08-23T10:30:00.000+00:00",
+    "timestamp": "2025-08-24T10:30:00.000+00:00",
     "status": 403,
     "error": "Forbidden",
     "path": "/api/v1/admin/permissions/roles"
@@ -169,7 +121,7 @@ All endpoints require:
 - **Actual Output**:
   ```json
   {
-    "timestamp": "2025-08-23T10:30:00.000+00:00",
+    "timestamp": "2025-08-24T10:30:00.000+00:00",
     "status": 403,
     "error": "Forbidden",
     "path": "/api/v1/admin/permissions/roles"
@@ -181,9 +133,9 @@ All endpoints require:
 
 ## GET /roles/{roleId} - Get Role Permissions
 
-### Test Case 4: Successfully Get Role Permissions
-- **Test Case ID**: TC_PERMISSION_004
-- **Description**: Verify that admin can retrieve permissions for a specific role.
+### Test Case 3: Successfully Get Customer Role Permissions
+- **Test Case ID**: TC_PERMISSION_003
+- **Description**: Verify that admin can retrieve permissions for CUSTOMER role.
 - **Preconditions**:
   - Admin is authenticated with valid token.
   - Role with ID 1 (CUSTOMER) exists in database.
@@ -194,7 +146,7 @@ All endpoints require:
   - **Path Parameter**: `roleId = 1`
   - **Headers**: 
     ```
-    Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+    Authorization: Bearer <valid_admin_token>
     ```
 - **Expected Output**:
   ```json
@@ -207,18 +159,362 @@ All endpoints require:
         "roleName": "CUSTOMER",
         "modules": [
           {
-            "moduleName": "User Management",
+            "moduleName": "Account",
+            "features": [
+              {
+                "featureId": 5,
+                "featureName": "profile.customer.edit",
+                "description": "Chỉnh sửa hồ sơ cá nhân",
+                "isEnabled": true
+              }
+            ]
+          },
+          {
+            "moduleName": "Booking",
             "features": [
               {
                 "featureId": 1,
-                "featureName": "View Profile",
-                "description": "View user profile information",
+                "featureName": "booking.create",
+                "description": "Tạo một lịch đặt mới",
                 "isEnabled": true
               },
               {
                 "featureId": 2,
-                "featureName": "Edit Profile",
-                "description": "Edit user profile information",
+                "featureName": "booking.view.history",
+                "description": "Xem lịch sử đặt lịch của bản thân",
+                "isEnabled": true
+              },
+              {
+                "featureId": 3,
+                "featureName": "booking.cancel",
+                "description": "Hủy một lịch đặt",
+                "isEnabled": true
+              }
+            ]
+          },
+          {
+            "moduleName": "Review",
+            "features": [
+              {
+                "featureId": 4,
+                "featureName": "review.create",
+                "description": "Viết đánh giá cho nhân viên",
+                "isEnabled": true
+              }
+            ]
+          },
+          {
+            "moduleName": "Service",
+            "features": [
+              {
+                "featureId": 6,
+                "featureName": "service.view",
+                "description": "Xem danh sách và chi tiết dịch vụ",
+                "isEnabled": true
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+  ```
+- **Status Code**: `200 OK`
+
+- **Actual Output**:
+  ```json
+  {
+    "success": true,
+    "message": "Lấy quyền vai trò thành công",
+    "data": [
+      {
+        "roleId": 1,
+        "roleName": "CUSTOMER",
+        "modules": [
+          {
+            "moduleName": "Account", 
+            "features": [
+              {
+                "featureId": 5,
+                "featureName": "profile.customer.edit",
+                "description": "Chỉnh sửa hồ sơ cá nhân",
+                "isEnabled": true
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+  ```
+- **Status Code**: `200 OK`
+
+---
+
+### Test Case 4: Get Permissions for Non-Existent Role
+- **Test Case ID**: TC_PERMISSION_004
+- **Description**: Verify that request fails when roleId does not exist.
+- **Preconditions**:
+  - Admin is authenticated with valid token.
+  - Role with ID 999 does not exist in database.
+- **Input**:
+  - **Method**: `GET`
+  - **URL**: `/api/v1/admin/permissions/roles/999`
+  - **Path Parameter**: `roleId = 999`
+  - **Headers**: 
+    ```
+    Authorization: Bearer <valid_admin_token>
+    ```
+- **Expected Output**:
+  ```json
+  {
+    "success": false,
+    "message": "Vai trò không tồn tại",
+    "data": []
+  }
+  ```
+- **Status Code**: `200 OK`
+
+- **Actual Output**:
+  ```json
+  {
+    "success": false,
+    "message": "Vai trò không tồn tại",
+    "data": []
+  }
+  ```
+- **Status Code**: `200 OK`
+
+---
+
+### Test Case 4.1: Successfully Get Employee Role Permissions
+- **Test Case ID**: TC_PERMISSION_004_1
+- **Description**: Verify that admin can retrieve permissions for EMPLOYEE role.
+- **Preconditions**:
+  - Admin is authenticated with valid token.
+  - Role with ID 2 (EMPLOYEE) exists in database.
+  - Features and permissions are configured for the employee role.
+- **Input**:
+  - **Method**: `GET`
+  - **URL**: `/api/v1/admin/permissions/roles/2`
+  - **Path Parameter**: `roleId = 2`
+  - **Headers**: 
+    ```
+    Authorization: Bearer <valid_admin_token>
+    ```
+- **Expected Output**:
+  ```json
+  {
+    "success": true,
+    "message": "Lấy quyền vai trò thành công",
+    "data": [
+      {
+        "roleId": 2,
+        "roleName": "EMPLOYEE",
+        "modules": [
+          {
+            "moduleName": "Account",
+            "features": [
+              {
+                "featureId": 10,
+                "featureName": "profile.employee.edit",
+                "description": "Chỉnh sửa hồ sơ nhân viên",
+                "isEnabled": true
+              }
+            ]
+          },
+          {
+            "moduleName": "Booking",
+            "features": [
+              {
+                "featureId": 7,
+                "featureName": "booking.view.available",
+                "description": "Xem các lịch đặt mới có sẵn",
+                "isEnabled": true
+              },
+              {
+                "featureId": 8,
+                "featureName": "booking.accept",
+                "description": "Chấp nhận một lịch đặt",
+                "isEnabled": true
+              },
+              {
+                "featureId": 9,
+                "featureName": "booking.view.assigned",
+                "description": "Xem các lịch đã nhận",
+                "isEnabled": true
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+  ```
+- **Status Code**: `200 OK`
+
+- **Actual Output**:
+  ```json
+  {
+    "success": true,
+    "message": "Lấy quyền vai trò thành công",
+    "data": [
+      {
+        "roleId": 2,
+        "roleName": "EMPLOYEE",
+        "modules": [
+          {
+            "moduleName": "Account",
+            "features": [
+              {
+                "featureId": 10,
+                "featureName": "profile.employee.edit",
+                "description": "Chỉnh sửa hồ sơ nhân viên",
+                "isEnabled": true
+              }
+            ]
+          },
+          {
+            "moduleName": "Booking",
+            "features": [
+              {
+                "featureId": 7,
+                "featureName": "booking.view.available",
+                "description": "Xem các lịch đặt mới có sẵn",
+                "isEnabled": true
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+  ```
+- **Status Code**: `200 OK`
+
+---
+
+## PUT /roles/{roleId}/features/{featureId} - Update Role Permission
+
+### Test Case 5: Successfully Enable Customer Booking Permission
+- **Test Case ID**: TC_PERMISSION_005
+- **Description**: Verify that admin can enable/disable booking.create permission for CUSTOMER role.
+- **Preconditions**:
+  - Admin is authenticated with valid token.
+  - Role with ID 1 (CUSTOMER) exists in database.
+  - Feature with ID 1 (booking.create) exists in database.
+- **Input**:
+  - **Method**: `PUT`
+  - **URL**: `/api/v1/admin/permissions/roles/1/features/1`
+  - **Path Parameters**: `roleId = 1`, `featureId = 1`
+  - **Headers**: 
+    ```
+    Authorization: Bearer <valid_admin_token>
+    Content-Type: application/json
+    ```
+  - **Request Body**:
+    ```json
+    {
+      "isEnabled": true
+    }
+    ```
+- **Expected Output**:
+  ```json
+  {
+    "success": true,
+    "message": "Lấy quyền vai trò thành công",
+    "data": [
+      {
+        "roleId": 1,
+        "roleName": "CUSTOMER",
+        "modules": [
+          {
+            "moduleName": "Booking",
+            "features": [
+              {
+                "featureId": 1,
+                "featureName": "booking.create",
+                "description": "Tạo một lịch đặt mới",
+                "isEnabled": true
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+  ```
+- **Status Code**: `200 OK`
+
+- **Actual Output**:
+  ```json
+  {
+    "success": true,
+    "message": "Lấy quyền vai trò thành công",
+    "data": [
+      {
+        "roleId": 1,
+        "roleName": "CUSTOMER",
+        "modules": [
+          {
+            "moduleName": "Booking",
+            "features": [
+              {
+                "featureId": 1,
+                "featureName": "booking.create",
+                "description": "Tạo một lịch đặt mới",
+                "isEnabled": true
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+  ```
+- **Status Code**: `200 OK`
+
+---
+
+### Test Case 5.1: Successfully Enable Employee Booking Permission
+- **Test Case ID**: TC_PERMISSION_005_1
+- **Description**: Verify that admin can enable/disable booking.accept permission for EMPLOYEE role.
+- **Preconditions**:
+  - Admin is authenticated with valid token.
+  - Role with ID 2 (EMPLOYEE) exists in database.
+  - Feature with ID 8 (booking.accept) exists in database.
+- **Input**:
+  - **Method**: `PUT`
+  - **URL**: `/api/v1/admin/permissions/roles/2/features/8`
+  - **Path Parameters**: `roleId = 2`, `featureId = 8`
+  - **Headers**: 
+    ```
+    Authorization: Bearer <valid_admin_token>
+    Content-Type: application/json
+    ```
+  - **Request Body**:
+    ```json
+    {
+      "isEnabled": false
+    }
+    ```
+- **Expected Output**:
+  ```json
+  {
+    "success": true,
+    "message": "Lấy quyền vai trò thành công",
+    "data": [
+      {
+        "roleId": 2,
+        "roleName": "EMPLOYEE",
+        "modules": [
+          {
+            "moduleName": "Booking",
+            "features": [
+              {
+                "featureId": 8,
+                "featureName": "booking.accept",
+                "description": "Chấp nhận một lịch đặt",
                 "isEnabled": false
               }
             ]
@@ -237,17 +533,17 @@ All endpoints require:
     "message": "Lấy quyền vai trò thành công",
     "data": [
       {
-        "roleId": 1,
-        "roleName": "CUSTOMER",
+        "roleId": 2,
+        "roleName": "EMPLOYEE",
         "modules": [
           {
-            "moduleName": "User Management",
+            "moduleName": "Booking",
             "features": [
               {
-                "featureId": 1,
-                "featureName": "View Profile",
-                "description": "View user profile information",
-                "isEnabled": true
+                "featureId": 8,
+                "featureName": "booking.accept",
+                "description": "Chấp nhận một lịch đặt",
+                "isEnabled": false
               }
             ]
           }
@@ -260,311 +556,50 @@ All endpoints require:
 
 ---
 
-### Test Case 5: Get Permissions for Non-Existent Role
-- **Test Case ID**: TC_PERMISSION_005
-- **Description**: Verify that request fails when roleId does not exist.
-- **Preconditions**:
-  - Admin is authenticated with valid token.
-  - Role with ID 999 does not exist in database.
-- **Input**:
-  - **Method**: `GET`
-  - **URL**: `/api/v1/admin/permissions/roles/999`
-  - **Path Parameter**: `roleId = 999`
-  - **Headers**: 
-    ```
-    Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-    ```
-- **Expected Output**:
-  ```json
-  {
-    "success": false,
-    "message": "Vai trò không tồn tại",
-    "data": []
-  }
-  ```
-- **Status Code**: `200 OK`
-
-- **Actual Output**:
-  ```json
-  {
-    "success": false,
-    "message": "Vai trò không tồn tại",
-    "data": []
-  }
-  ```
-- **Status Code**: `200 OK`
-
----
-
-## PUT /roles/{roleId}/features/{featureId} - Update Role Permission
-
-### Test Case 6: Successfully Enable Permission
+### Test Case 6: Invalid Token Test
 - **Test Case ID**: TC_PERMISSION_006
-- **Description**: Verify that admin can enable a permission for a role.
-- **Preconditions**:
-  - Admin is authenticated with valid token.
-  - Role with ID 1 exists in database.
-  - Feature with ID 2 exists in database.
-  - Permission is currently disabled.
-- **Input**:
-  - **Method**: `PUT`
-  - **URL**: `/api/v1/admin/permissions/roles/1/features/2`
-  - **Path Parameters**: `roleId = 1`, `featureId = 2`
-  - **Headers**: 
-    ```
-    Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-    Content-Type: application/json
-    ```
-  - **Request Body**:
-    ```json
-    {
-      "isEnabled": true
-    }
-    ```
-- **Expected Output**:
-  ```json
-  {
-    "success": true,
-    "message": "Lấy quyền vai trò thành công",
-    "data": [
-      {
-        "roleId": 1,
-        "roleName": "CUSTOMER",
-        "modules": [
-          {
-            "moduleName": "User Management",
-            "features": [
-              {
-                "featureId": 2,
-                "featureName": "Edit Profile",
-                "description": "Edit user profile information",
-                "isEnabled": true
-              }
-            ]
-          }
-        ]
-      }
-    ]
-  }
-  ```
-- **Status Code**: `200 OK`
-
-- **Actual Output**:
-  ```json
-  {
-    "success": true,
-    "message": "Lấy quyền vai trò thành công",
-    "data": [
-      {
-        "roleId": 1,
-        "roleName": "CUSTOMER",
-        "modules": [
-          {
-            "moduleName": "User Management",
-            "features": [
-              {
-                "featureId": 2,
-                "featureName": "Edit Profile",
-                "description": "Edit user profile information",
-                "isEnabled": true
-              }
-            ]
-          }
-        ]
-      }
-    ]
-  }
-  ```
-- **Status Code**: `200 OK`
-
----
-
-### Test Case 7: Update Permission for Non-Existent Role
-- **Test Case ID**: TC_PERMISSION_007
-- **Description**: Verify that request fails when roleId does not exist.
-- **Preconditions**:
-  - Admin is authenticated with valid token.
-  - Role with ID 999 does not exist in database.
-- **Input**:
-  - **Method**: `PUT`
-  - **URL**: `/api/v1/admin/permissions/roles/999/features/1`
-  - **Path Parameters**: `roleId = 999`, `featureId = 1`
-  - **Headers**: 
-    ```
-    Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-    Content-Type: application/json
-    ```
-  - **Request Body**:
-    ```json
-    {
-      "isEnabled": true
-    }
-    ```
-- **Expected Output**:
-  ```json
-  {
-    "success": false,
-    "message": "Vai trò không tồn tại",
-    "data": []
-  }
-  ```
-- **Status Code**: `200 OK`
-
-- **Actual Output**:
-  ```json
-  {
-    "success": false,
-    "message": "Vai trò không tồn tại",
-    "data": []
-  }
-  ```
-- **Status Code**: `200 OK`
-
----
-
-### Test Case 8: Update Permission for Non-Existent Feature
-- **Test Case ID**: TC_PERMISSION_008
-- **Description**: Verify that request fails when featureId does not exist.
-- **Preconditions**:
-  - Admin is authenticated with valid token.
-  - Role with ID 1 exists in database.
-  - Feature with ID 999 does not exist in database.
-- **Input**:
-  - **Method**: `PUT`
-  - **URL**: `/api/v1/admin/permissions/roles/1/features/999`
-  - **Path Parameters**: `roleId = 1`, `featureId = 999`
-  - **Headers**: 
-    ```
-    Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-    Content-Type: application/json
-    ```
-  - **Request Body**:
-    ```json
-    {
-      "isEnabled": true
-    }
-    ```
-- **Expected Output**:
-  ```json
-  {
-    "success": false,
-    "message": "Chức năng không tồn tại",
-    "data": []
-  }
-  ```
-- **Status Code**: `200 OK`
-
-- **Actual Output**:
-  ```json
-  {
-    "success": false,
-    "message": "Chức năng không tồn tại",
-    "data": []
-  }
-  ```
-- **Status Code**: `200 OK`
-
----
-
-### Test Case 9: Invalid Request Body for PUT
-- **Test Case ID**: TC_PERMISSION_009
-- **Description**: Verify that request fails when request body is invalid.
-- **Preconditions**:
-  - Admin is authenticated with valid token.
-  - Role and feature exist.
-- **Input**:
+- **Description**: Verify that request fails when Authorization header is missing or invalid.
+- **Preconditions**: None
+- **Input**: 
   - **Method**: `PUT`
   - **URL**: `/api/v1/admin/permissions/roles/1/features/1`
   - **Headers**: 
     ```
-    Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
     Content-Type: application/json
     ```
   - **Request Body**:
     ```json
     {
-      "invalidField": "value"
+      "isEnabled": true
     }
     ```
 - **Expected Output**:
   ```json
   {
     "success": false,
-    "message": "Lỗi hệ thống",
+    "message": "Token không hợp lệ",
     "data": null
   }
   ```
-- **Status Code**: `500 Internal Server Error`
+- **Status Code**: `400 Bad Request`
 
 - **Actual Output**:
   ```json
   {
     "success": false,
-    "message": "Lỗi hệ thống",
+    "message": "Token không hợp lệ",
     "data": null
   }
   ```
-- **Status Code**: `500 Internal Server Error`
-
----
-
-## Service Layer Test Cases
-
-### Test Case 10: Service - Get User Permissions
-- **Test Case ID**: TC_PERMISSION_010
-- **Description**: Verify getUserPermissions service method works correctly.
-- **Preconditions**:
-  - User "john_doe" exists in database.
-  - User has roles with enabled permissions.
-- **Input**: `username = "john_doe"`
-- **Expected Output**:
-  ```json
-  {
-    "success": true,
-    "message": "Lấy quyền người dùng thành công",
-    "data": {
-      "username": "john_doe",
-      "primaryRole": "CUSTOMER",
-      "permissions": [
-        "VIEW_PROFILE",
-        "CREATE_BOOKING"
-      ]
-    }
-  }
-  ```
-
----
-
-### Test Case 11: Service - Check User Permission
-- **Test Case ID**: TC_PERMISSION_011
-- **Description**: Verify hasPermission service method works correctly.
-- **Preconditions**:
-  - User "john_doe" exists in database.
-  - User has CUSTOMER role with VIEW_PROFILE permission enabled.
-- **Input**: 
-  - `username = "john_doe"`
-  - `featureName = "VIEW_PROFILE"`
-- **Expected Output**: `true`
-
----
-
-### Test Case 12: Service - Check Permission for Non-Existent User
-- **Test Case ID**: TC_PERMISSION_012
-- **Description**: Verify hasPermission returns false for non-existent user.
-- **Preconditions**:
-  - User "non_existent_user" does not exist in database.
-- **Input**: 
-  - `username = "non_existent_user"`
-  - `featureName = "VIEW_PROFILE"`
-- **Expected Output**: `false`
+- **Status Code**: `400 Bad Request`
 
 ---
 
 ## Notes
-- **Test Environment**: Ensure the database is properly configured with test data including roles, features, and role-feature relationships.
-- **Authentication**: All endpoints require valid admin authentication token with proper JWT format.
-- **Authorization**: Only ADMIN role users can access permission management endpoints (enforced by SecurityConfig).
-- **Transaction Management**: Update operations are wrapped in database transactions for data consistency.
-- **Error Handling**: Service layer catches exceptions and returns appropriate error responses with consistent format.
-- **Security**: JWT tokens are validated for format, expiration, and role authorization by Spring Security.
-- **Data Validation**: Input validation is performed at both controller and service layers.
+- **Test Environment**: Database should be configured with test data including roles and features from housekeeping_service_v5.sql.
+- **Authentication**: All endpoints require valid admin JWT tokens (enforced by SecurityConfig).
+- **Authorization**: Only ADMIN role users can access these endpoints.
+- **Transaction Management**: Update operations are wrapped in database transactions.
+- **Error Handling**: Service layer catches exceptions and returns appropriate error responses.
+- **Security**: JWT tokens are validated for format, expiration, and role authorization.
+- **Data Structure**: Features are organized by modules (Account, Booking, Service, Review, Admin) as defined in the database schema.

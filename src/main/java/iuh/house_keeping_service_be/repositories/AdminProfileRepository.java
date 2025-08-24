@@ -17,4 +17,6 @@ public interface AdminProfileRepository extends JpaRepository<AdminProfile, Stri
     Optional<AdminProfile> findByContactInfoAndAccountRole(@Param("contactInfo") String contactInfo, @Param("roleName") RoleName roleName);
 
     boolean existsByContactInfo(String contactInfo);
+
+    boolean existsByAccount_Username(String username);
 }
