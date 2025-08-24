@@ -44,8 +44,8 @@ CREATE TABLE customer (
     is_male BOOLEAN,
     email VARCHAR(100) UNIQUE,
     birthdate DATE,
-	rating varchar(10) CHECK (rating IN ('LOWEST', 'LOW', 'MEDIUM', 'HIGH', 'HIGHEST')),
-	vip_level int CHECK (vip_level BETWEEN 1 AND 5),
+    rating varchar(10) CHECK (rating IN ('LOWEST', 'LOW', 'MEDIUM', 'HIGH', 'HIGHEST')),
+    vip_level int CHECK (vip_level BETWEEN 1 AND 5),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -61,7 +61,7 @@ CREATE TABLE employee (
     hired_date DATE,
     skills TEXT[],
     bio TEXT,
-	rating varchar(10) CHECK (rating IN ('LOWEST', 'LOW', 'MEDIUM', 'HIGH', 'HIGHEST')),
+    rating varchar(10) CHECK (rating IN ('LOWEST', 'LOW', 'MEDIUM', 'HIGH', 'HIGHEST')),
     employee_status VARCHAR(20) DEFAULT 'AVAILABLE' CHECK (employee_status IN ('AVAILABLE', 'BUSY', 'ON_LEAVE')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -123,7 +123,7 @@ CREATE TABLE bookings (
     booking_code VARCHAR(10) UNIQUE, -- Mã đặt lịch dễ nhớ cho người dùng
     booking_time TIMESTAMP WITH TIME ZONE NOT NULL, -- Thời gian khách hàng muốn thực hiện
     note TEXT,
-    total_amount DECIMAL(10, 2), 
+    total_amount DECIMAL(10, 2),
     status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -136,7 +136,7 @@ CREATE TABLE booking_details (
     quantity INT DEFAULT 1,
     price_per_unit DECIMAL(10, 2),
     sub_total DECIMAL(10, 2), -- (price_per_unit * quantity)
-   	CONSTRAINT unique_booking_service UNIQUE (booking_id, service_id)
+    CONSTRAINT unique_booking_service UNIQUE (booking_id, service_id)
 );
 
 CREATE TABLE recurring_bookings (
@@ -165,6 +165,16 @@ CREATE TABLE assignments (
     check_in_time TIMESTAMP WITH TIME ZONE,
     check_out_time TIMESTAMP WITH TIME ZONE,
     UNIQUE (booking_detail_id, employee_id)
+);
+
+CREATE TABLE employee_unavailability (
+     unavailability_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4(),
+     employee_id VARCHAR(36) NOT NULL REFERENCES employee(employee_id) ON DELETE CASCADE,
+     start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+     end_time TIMESTAMP WITH TIME ZONE NOT NULL,
+     reason TEXT, -- Lý do: "Lịch cá nhân", "Nghỉ phép", "Khám bệnh"
+     is_approved BOOLEAN DEFAULT TRUE, -- Có thể cần Admin duyệt nếu là nghỉ phép dài
+     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- =================================================================================
@@ -346,6 +356,7 @@ INSERT INTO features (feature_name, description, module) VALUES
 ('booking.cancel', 'Hủy một lịch đặt', 'Booking'),
 ('review.create', 'Viết đánh giá cho nhân viên', 'Review'),
 ('profile.customer.edit', 'Chỉnh sửa hồ sơ cá nhân', 'Account'),
+('service.view', 'Xem danh sách và chi tiết dịch vụ', 'Service'),
 -- Chức năng của Employee
 ('booking.view.available', 'Xem các lịch đặt mới có sẵn', 'Booking'),
 ('booking.accept', 'Chấp nhận một lịch đặt', 'Booking'),
@@ -364,6 +375,7 @@ INSERT INTO role_features (role_id, feature_id, is_enabled) VALUES
 (1, (SELECT feature_id FROM features WHERE feature_name = 'booking.cancel'), true),
 (1, (SELECT feature_id FROM features WHERE feature_name = 'review.create'), true),
 (1, (SELECT feature_id FROM features WHERE feature_name = 'profile.customer.edit'), true),
+(1, (SELECT feature_id FROM features WHERE feature_name = 'service.view'), true),
 
 -- Quyền của EMPLOYEE (role_id = 2)
 (2, (SELECT feature_id FROM features WHERE feature_name = 'booking.view.available'), true),
@@ -376,3 +388,106 @@ INSERT INTO role_features (role_id, feature_id, is_enabled) VALUES
 (3, (SELECT feature_id FROM features WHERE feature_name = 'admin.dashboard.view'), true),
 (3, (SELECT feature_id FROM features WHERE feature_name = 'admin.user.manage'), true),
 (3, (SELECT feature_id FROM features WHERE feature_name = 'admin.permission.manage'), true);
+
+-- =================================================================================
+-- THÊM DỮ LIỆU MẪU (TIẾNG VIỆT) VÀO CÁC KHỐI CÒN LẠI
+-- =================================================================================
+
+-- Khối II: Thêm dữ liệu cho Dịch vụ, Khuyến mãi và Đặt lịch
+-- =================================================================================
+
+-- Thêm các dịch vụ
+INSERT INTO service (name, description, base_price, unit, estimated_duration_hours) VALUES
+('Dọn dẹp theo giờ', 'Lau dọn, hút bụi, làm sạch các bề mặt cơ bản trong nhà.', 50000, 'hour', 2.0),
+('Tổng vệ sinh', 'Làm sạch sâu toàn bộ căn nhà, bao gồm lau kính, vệ sinh các khu vực khó tiếp cận.', 400000, 'package', 4.0),
+('Giặt ủi', 'Thu gom, giặt, sấy và ủi quần áo gia đình.', 30000, 'kg', 1.5),
+('Nấu ăn gia đình', 'Đi chợ và chuẩn bị bữa ăn cho gia đình theo yêu cầu.', 60000, 'hour', 2.5);
+
+-- Thêm các chương trình khuyến mãi
+INSERT INTO promotions (promo_code, description, discount_type, discount_value, max_discount_amount, start_date, end_date, is_active) VALUES
+('GIAM20K', 'Giảm giá 20,000đ cho mọi đơn hàng', 'FIXED_AMOUNT', 20000, NULL, '2025-08-01 00:00:00+07', '2025-09-30 23:59:59+07', TRUE),
+('KHAITRUONG10', 'Giảm 10% mừng khai trương', 'PERCENTAGE', 10, 50000, '2025-08-01 00:00:00+07', '2025-08-31 23:59:59+07', TRUE);
+
+-- Thêm 2 lịch đặt (bookings) mẫu
+-- Một lịch đã HOÀN THÀNH của khách hàng 'John Doe'
+-- Một lịch đã XÁC NHẬN của khách hàng 'Jane Smith Customer'
+INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status, promotion_id) VALUES
+('b0000001-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000001', 'BK000001', '2025-08-20 09:00:00+07', 'Nhà có trẻ nhỏ, vui lòng lau dọn kỹ khu vực phòng khách.', 380000.00, 'COMPLETED', (SELECT promotion_id FROM promotions WHERE promo_code = 'GIAM20K')),
+('b0000001-0000-0000-0000-000000000002', 'c1000001-0000-0000-0000-000000000003', 'adrs0001-0000-0000-0000-000000000003', 'BK000002', '2025-08-28 14:00:00+07', 'Vui lòng đến đúng giờ.', 90000.00, 'CONFIRMED', (SELECT promotion_id FROM promotions WHERE promo_code = 'KHAITRUONG10'));
+
+-- Thêm chi tiết dịch vụ cho các lịch đặt
+INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
+('bd000001-0000-0000-0000-000000000001', 'b0000001-0000-0000-0000-000000000001', (SELECT service_id FROM service WHERE name = 'Tổng vệ sinh'), 1, 400000.00, 400000.00),
+('bd000001-0000-0000-0000-000000000002', 'b0000001-0000-0000-0000-000000000002', (SELECT service_id FROM service WHERE name = 'Dọn dẹp theo giờ'), 2, 50000.00, 100000.00);
+
+-- Phân công nhân viên cho các lịch đặt
+INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status, check_in_time, check_out_time) VALUES
+('as000001-0000-0000-0000-000000000001', 'bd000001-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000002', 'CHECKED_OUT', '2025-08-20 09:00:00+07', '2025-08-20 13:00:00+07'),
+('as000001-0000-0000-0000-000000000002', 'bd000001-0000-0000-0000-000000000002', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED', NULL, NULL);
+
+-- Khối IV: Thêm dữ liệu cho Thanh toán và Đánh giá
+-- =================================================================================
+
+-- Thêm dữ liệu thanh toán
+INSERT INTO payments (payment_id, booking_id, amount, payment_method, payment_status, transaction_code, paid_at) VALUES
+('pay00001-0000-0000-0000-000000000001', 'b0000001-0000-0000-0000-000000000001', 380000.00, 'VNPAY', 'PAID', 'VNP123456789', '2025-08-20 13:05:00+07'),
+('pay00001-0000-0000-0000-000000000002', 'b0000001-0000-0000-0000-000000000002', 90000.00, 'MOMO', 'PENDING', NULL, NULL);
+
+-- Thêm các tiêu chí đánh giá
+INSERT INTO review_criteria (criteria_name) VALUES
+('Thái độ'),
+('Đúng giờ'),
+('Chất lượng công việc');
+
+-- Thêm một đánh giá cho lịch đặt đã hoàn thành
+INSERT INTO review ( booking_id, customer_id, employee_id, comment) VALUES
+('b0000001-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000002', 'Bạn nhân viên làm việc rất chuyên nghiệp và sạch sẽ. Rất hài lòng!');
+
+-- Thêm chi tiết đánh giá theo từng tiêu chí
+INSERT INTO review_details (review_id, criteria_id, rating) VALUES
+(1, (SELECT criteria_id FROM review_criteria WHERE criteria_name = 'Thái độ'), 5.0),
+(1, (SELECT criteria_id FROM review_criteria WHERE criteria_name = 'Đúng giờ'), 5.0),
+(1, (SELECT criteria_id FROM review_criteria WHERE criteria_name = 'Chất lượng công việc'), 4.5);
+
+
+-- Khối III: Thêm dữ liệu cho Checklist và Media
+-- =================================================================================
+
+-- Thêm một mẫu checklist cho dịch vụ 'Tổng vệ sinh'
+INSERT INTO checklist_templates (service_id, name, description) VALUES
+((SELECT service_id FROM service WHERE name = 'Tổng vệ sinh'), 'Checklist Tổng Vệ Sinh Cơ Bản', 'Các đầu việc cần làm cho gói tổng vệ sinh');
+
+-- Thêm các mục con cho mẫu checklist
+INSERT INTO checklist_template_items (template_id, item_description, item_order) VALUES
+(1, 'Quét và lau sàn tất cả các phòng', 1),
+(1, 'Hút bụi thảm, sofa', 2),
+(1, 'Lau bụi bề mặt tủ, bàn, ghế', 3),
+(1, 'Vệ sinh toàn bộ khu vực nhà vệ sinh', 4),
+(1, 'Lau cửa kính mặt trong', 5),
+(1, 'Thu gom và đổ rác', 6);
+
+-- Thêm các mục checklist vào lịch đặt đã hoàn thành (giả sử được copy từ template)
+INSERT INTO booking_checklist_items (booking_id, item_description, is_completed, completed_at, employee_id) VALUES
+('b0000001-0000-0000-0000-000000000001', 'Quét và lau sàn tất cả các phòng', true, '2025-08-20 10:00:00+07', 'e1000001-0000-0000-0000-000000000002'),
+('b0000001-0000-0000-0000-000000000001', 'Hút bụi thảm, sofa', true, '2025-08-20 10:30:00+07', 'e1000001-0000-0000-0000-000000000002'),
+('b0000001-0000-0000-0000-000000000001', 'Lau bụi bề mặt tủ, bàn, ghế', true, '2025-08-20 11:00:00+07', 'e1000001-0000-0000-0000-000000000002');
+
+
+-- Thêm media (ảnh Trước & Sau) cho lịch đặt đã hoàn thành
+INSERT INTO booking_media (booking_id, assignment_id, media_url, media_type) VALUES
+('b0000001-0000-0000-0000-000000000001', 'as000001-0000-0000-0000-000000000001', 'https://example.com/images/before_job1.jpg', 'BEFORE'),
+('b0000001-0000-0000-0000-000000000001', 'as000001-0000-0000-0000-000000000001', 'https://example.com/images/after_job1.jpg', 'AFTER');
+
+-- =================================================================================
+-- THÊM DỮ LIỆU MẪU VÀO BẢNG LỊCH BẬN CỦA NHÂN VIÊN
+-- =================================================================================
+
+INSERT INTO employee_unavailability (employee_id, start_time, end_time, reason, is_approved) VALUES
+-- Nhân viên 'Jane Smith' (id: e1000001-...-0001) có lịch cá nhân vào buổi sáng
+('e1000001-0000-0000-0000-000000000001', '2025-08-28 09:00:00+07', '2025-08-28 11:00:00+07', 'Lịch cá nhân', true),
+
+-- Nhân viên 'Jane Smith' (id: e1000001-...-0001) bận đi học vào buổi tối
+('e1000001-0000-0000-0000-000000000001', '2025-08-29 18:00:00+07', '2025-08-29 20:00:00+07', 'Lớp học buổi tối', true),
+
+-- Nhân viên 'Bob Wilson' (id: e1000001-...-0002) đăng ký nghỉ phép 3 ngày
+('e1000001-0000-0000-0000-000000000002', '2025-09-01 00:00:00+07', '2025-09-03 23:59:59+07', 'Nghỉ phép', true);
