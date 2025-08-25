@@ -104,6 +104,16 @@ CREATE TABLE address (
 -- CÁC KHỐI CÒN LẠI (BOOKINGS, SERVICES, PAYMENTS...)
 -- =================================================================================
 
+-- Bảng mới để quản lý các danh mục dịch vụ
+CREATE TABLE service_categories (
+    category_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    parent_category_id INT REFERENCES service_categories(category_id), -- Để tạo cấu trúc cha-con
+    category_name VARCHAR(100) NOT NULL,
+    description TEXT,
+    icon_url VARCHAR(255), -- URL icon cho danh mục
+    is_active BOOLEAN DEFAULT TRUE
+);
+
 CREATE TABLE service (
     service_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     name VARCHAR(100) NOT NULL,
@@ -115,6 +125,9 @@ CREATE TABLE service (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE service
+    ADD COLUMN category_id INT REFERENCES service_categories(category_id);
 
 CREATE TABLE bookings (
     booking_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -137,6 +150,30 @@ CREATE TABLE booking_details (
     price_per_unit DECIMAL(10, 2),
     sub_total DECIMAL(10, 2), -- (price_per_unit * quantity)
     CONSTRAINT unique_booking_service UNIQUE (booking_id, service_id)
+);
+
+CREATE TABLE service_options (
+     option_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+     service_id INT NOT NULL REFERENCES service(service_id) ON DELETE CASCADE,
+     option_name TEXT NOT NULL, -- Ví dụ: 'Loại hình nhà ở?', 'Diện tích cần dọn dẹp?'
+     option_type VARCHAR(20) NOT NULL CHECK (option_type IN ('SINGLE_CHOICE', 'MULTIPLE_CHOICE')), -- Loại câu hỏi: chọn 1 hay chọn nhiều
+     display_order INT, -- Thứ tự hiển thị câu hỏi
+     is_required BOOLEAN DEFAULT TRUE
+);
+
+CREATE TABLE service_option_choices (
+    choice_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    option_id INT NOT NULL REFERENCES service_options(option_id) ON DELETE CASCADE,
+    choice_name TEXT NOT NULL, -- Ví dụ: 'Căn hộ', 'Nhà phố', 'Dưới 50m²', 'Từ 50m² - 100m²'
+    display_order INT
+);
+
+CREATE TABLE pricing_rules (
+   rule_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+   choice_id INT NOT NULL REFERENCES service_option_choices(choice_id) ON DELETE CASCADE,
+   price_adjustment DECIMAL(10, 2) DEFAULT 0, -- Số tiền CỘNG THÊM vào giá gốc
+   staff_adjustment INT DEFAULT 0, -- Số lượng nhân viên CỘNG THÊM
+   duration_adjustment_hours DECIMAL(5, 2) DEFAULT 0 -- Thời gian CỘNG THÊM (tính bằng giờ)
 );
 
 CREATE TABLE recurring_bookings (
