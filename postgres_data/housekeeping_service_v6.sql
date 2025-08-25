@@ -110,7 +110,6 @@ CREATE TABLE service_categories (
     parent_category_id INT REFERENCES service_categories(category_id), -- Để tạo cấu trúc cha-con
     category_name VARCHAR(100) NOT NULL,
     description TEXT,
-    icon_url VARCHAR(255), -- URL icon cho danh mục
     is_active BOOLEAN DEFAULT TRUE
 );
 
@@ -444,10 +443,10 @@ TRUNCATE TABLE service RESTART IDENTITY CASCADE;
 -- THÊM DỮ LIỆU MẪU CHO DANH MỤC VÀ DỊCH VỤ
 
 -- Thêm các danh mục cha
-INSERT INTO service_categories (category_name, description, icon_url) VALUES
-('Dọn dẹp nhà', 'Các dịch vụ liên quan đến vệ sinh, làm sạch nhà cửa', 'https://example.com/icons/cleaning.png'),
-('Giặt ủi', 'Dịch vụ giặt sấy, ủi đồ chuyên nghiệp', 'https://example.com/icons/laundry.png'),
-('Việc nhà khác', 'Các dịch vụ tiện ích gia đình khác', 'https://example.com/icons/other.png');
+INSERT INTO service_categories (category_name, description) VALUES
+('Dọn dẹp nhà', 'Các dịch vụ liên quan đến vệ sinh, làm sạch nhà cửa'),
+('Giặt ủi', 'Dịch vụ giặt sấy, ủi đồ chuyên nghiệp'),
+('Việc nhà khác', 'Các dịch vụ tiện ích gia đình khác');
 
 -- Thêm các dịch vụ con vào từng danh mục
 -- Dữ liệu cho danh mục 'Dọn dẹp nhà' (category_id = 1)
