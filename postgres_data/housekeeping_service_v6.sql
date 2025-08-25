@@ -110,7 +110,6 @@ CREATE TABLE service_categories (
     parent_category_id INT REFERENCES service_categories(category_id), -- Để tạo cấu trúc cha-con
     category_name VARCHAR(100) NOT NULL,
     description TEXT,
-    icon_url VARCHAR(255), -- URL icon cho danh mục
     is_active BOOLEAN DEFAULT TRUE
 );
 
@@ -129,6 +128,7 @@ CREATE TABLE service (
 ALTER TABLE service
     ADD COLUMN category_id INT REFERENCES service_categories(category_id);
 
+-- Đặt dịch vụ
 CREATE TABLE bookings (
     booking_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4(),
     customer_id VARCHAR(36) NOT NULL REFERENCES customer(customer_id),
@@ -152,6 +152,7 @@ CREATE TABLE booking_details (
     CONSTRAINT unique_booking_service UNIQUE (booking_id, service_id)
 );
 
+-- Các tuỳ chọn cho dịch vụ
 CREATE TABLE service_options (
      option_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
      service_id INT NOT NULL REFERENCES service(service_id) ON DELETE CASCADE,
@@ -161,6 +162,7 @@ CREATE TABLE service_options (
      is_required BOOLEAN DEFAULT TRUE
 );
 
+
 CREATE TABLE service_option_choices (
     choice_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     option_id INT NOT NULL REFERENCES service_options(option_id) ON DELETE CASCADE,
@@ -168,6 +170,7 @@ CREATE TABLE service_option_choices (
     display_order INT
 );
 
+-- Tính toán giá tổng
 CREATE TABLE pricing_rules (
    rule_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
    choice_id INT NOT NULL REFERENCES service_option_choices(choice_id) ON DELETE CASCADE,
@@ -433,12 +436,35 @@ INSERT INTO role_features (role_id, feature_id, is_enabled) VALUES
 -- Khối II: Thêm dữ liệu cho Dịch vụ, Khuyến mãi và Đặt lịch
 -- =================================================================================
 
--- Thêm các dịch vụ
-INSERT INTO service (name, description, base_price, unit, estimated_duration_hours) VALUES
-('Dọn dẹp theo giờ', 'Lau dọn, hút bụi, làm sạch các bề mặt cơ bản trong nhà.', 50000, 'hour', 2.0),
-('Tổng vệ sinh', 'Làm sạch sâu toàn bộ căn nhà, bao gồm lau kính, vệ sinh các khu vực khó tiếp cận.', 400000, 'package', 4.0),
-('Giặt ủi', 'Thu gom, giặt, sấy và ủi quần áo gia đình.', 30000, 'kg', 1.5),
-('Nấu ăn gia đình', 'Đi chợ và chuẩn bị bữa ăn cho gia đình theo yêu cầu.', 60000, 'hour', 2.5);
+-- XÓA DỮ LIỆU DỊCH VỤ CŨ ĐỂ CẬP NHẬT CẤU TRÚC MỚI
+TRUNCATE TABLE service RESTART IDENTITY CASCADE;
+-- TRUNCATE TABLE service_categories RESTART IDENTITY CASCADE; -- (Chạy nếu bảng đã tồn tại và có dữ liệu)
+
+-- THÊM DỮ LIỆU MẪU CHO DANH MỤC VÀ DỊCH VỤ
+
+-- Thêm các danh mục cha
+INSERT INTO service_categories (category_name, description) VALUES
+('Dọn dẹp nhà', 'Các dịch vụ liên quan đến vệ sinh, làm sạch nhà cửa'),
+('Giặt ủi', 'Dịch vụ giặt sấy, ủi đồ chuyên nghiệp'),
+('Việc nhà khác', 'Các dịch vụ tiện ích gia đình khác');
+
+-- Thêm các dịch vụ con vào từng danh mục
+-- Dữ liệu cho danh mục 'Dọn dẹp nhà' (category_id = 1)
+INSERT INTO service (category_id, name, description, base_price, unit, estimated_duration_hours, is_active) VALUES
+(1, 'Dọn dẹp theo giờ', 'Lau dọn, hút bụi, làm sạch các bề mặt cơ bản trong nhà. Phù hợp cho nhu cầu duy trì vệ sinh hàng tuần.', 50000, 'Giờ', 2.0, TRUE),
+(1, 'Tổng vệ sinh', 'Làm sạch sâu toàn diện, bao gồm các khu vực khó tiếp cận, trần nhà, lau cửa kính. Thích hợp cho nhà mới hoặc dọn dẹp theo mùa.', 400000, 'Gói', 4.0, TRUE),
+(1, 'Vệ sinh Sofa - Nệm - Rèm', 'Giặt sạch và khử khuẩn Sofa, Nệm, Rèm cửa bằng máy móc chuyên dụng.', 300000, 'Gói', 3.0, TRUE),
+(1, 'Vệ sinh máy lạnh', 'Bảo trì, làm sạch dàn nóng và dàn lạnh, bơm gas nếu cần.', 150000, 'Máy', 1.0, TRUE);
+
+-- Dữ liệu cho danh mục 'Giặt ủi' (category_id = 2)
+INSERT INTO service (category_id, name, description, base_price, unit, estimated_duration_hours, is_active) VALUES
+(2, 'Giặt sấy theo kg', 'Giặt và sấy khô quần áo thông thường, giao nhận tận nơi.', 30000, 'Kg', 24.0, TRUE),
+(2, 'Giặt hấp cao cấp', 'Giặt khô cho các loại vải cao cấp như vest, áo dài, lụa.', 120000, 'Bộ', 48.0, TRUE);
+
+-- Dữ liệu cho danh mục 'Việc nhà khác' (category_id = 3)
+INSERT INTO service (category_id, name, description, base_price, unit, estimated_duration_hours, is_active) VALUES
+(3, 'Nấu ăn gia đình', 'Đi chợ (chi phí thực phẩm tính riêng) và chuẩn bị bữa ăn cho gia đình theo thực đơn yêu cầu.', 60000, 'Giờ', 2.5, TRUE),
+(3, 'Đi chợ hộ', 'Mua sắm và giao hàng tận nơi theo danh sách của bạn.', 40000, 'Lần', 1.0, TRUE);
 
 -- Thêm các chương trình khuyến mãi
 INSERT INTO promotions (promo_code, description, discount_type, discount_value, max_discount_amount, start_date, end_date, is_active) VALUES
@@ -528,3 +554,78 @@ INSERT INTO employee_unavailability (employee_id, start_time, end_time, reason, 
 
 -- Nhân viên 'Bob Wilson' (id: e1000001-...-0002) đăng ký nghỉ phép 3 ngày
 ('e1000001-0000-0000-0000-000000000002', '2025-09-01 00:00:00+07', '2025-09-03 23:59:59+07', 'Nghỉ phép', true);
+
+-- =================================================================================
+-- TUỲ CHỌN CHO DỊCH VỤ: "Tổng vệ sinh" (service_id = 2)
+-- =================================================================================
+
+-- Thêm 2 câu hỏi cho dịch vụ 'Tổng vệ sinh'
+INSERT INTO service_options (service_id, option_name, option_type, display_order, is_required) VALUES
+(2, 'Loại hình nhà ở của bạn là gì?', 'SINGLE_CHOICE', 1, true),
+(2, 'Diện tích cần dọn dẹp ước tính?', 'SINGLE_CHOICE', 2, true);
+
+-- Thêm các câu trả lời cho câu hỏi 'Loại hình nhà ở?' (option_id = 1)
+INSERT INTO service_option_choices (option_id, choice_name, display_order) VALUES
+(1, 'Căn hộ chung cư', 1),
+(1, 'Nhà phố / Biệt thự', 2);
+
+-- Thêm các câu trả lời cho câu hỏi 'Diện tích?' (option_id = 2)
+INSERT INTO service_option_choices (option_id, choice_name, display_order) VALUES
+(2, 'Dưới 80m²', 1),
+(2, 'Từ 80m² - 150m²', 2),
+(2, 'Trên 150m²', 3);
+
+-- Thêm các quy tắc giá/nhân sự cho 'Tổng vệ sinh'
+INSERT INTO pricing_rules (choice_id, price_adjustment, staff_adjustment, duration_adjustment_hours) VALUES
+-- choice_id=2 ('Nhà phố / Biệt thự') -> cộng thêm 100,000đ và 0.5 giờ
+(2, 100000, 0, 0.5),
+-- choice_id=4 ('Từ 80m² - 150m²') -> cộng thêm 150,000đ và 1 giờ
+(4, 150000, 0, 1.0),
+-- choice_id=5 ('Trên 150m²') -> cộng thêm 300,000đ, thêm 1 nhân viên và 2 giờ
+(5, 300000, 1, 2.0);
+
+
+-- =================================================================================
+-- TUỲ CHỌN CHO DỊCH VỤ: "Vệ sinh máy lạnh" (service_id = 4)
+-- =================================================================================
+
+-- Thêm câu hỏi 'Số lượng'
+INSERT INTO service_options (service_id, option_name, option_type, display_order, is_required) VALUES
+(4, 'Bạn muốn vệ sinh bao nhiêu máy?', 'SINGLE_CHOICE', 1, true);
+
+-- Thêm các câu trả lời cho câu hỏi 'Số lượng' (option_id = 3)
+INSERT INTO service_option_choices (option_id, choice_name, display_order) VALUES
+(3, '1 máy', 1),
+(3, '2 máy', 2),
+(3, '3 máy', 3);
+
+-- Thêm quy tắc giá cho 'Vệ sinh máy lạnh' (base_price = 150,000đ/máy)
+INSERT INTO pricing_rules (choice_id, price_adjustment, duration_adjustment_hours) VALUES
+-- choice_id=6 ('1 máy') -> không cộng thêm gì, dùng giá gốc
+(6, 0, 0),
+-- choice_id=7 ('2 máy') -> cộng thêm giá của 1 máy nữa
+(7, 150000, 1.0),
+-- choice_id=8 ('3 máy') -> cộng thêm giá của 2 máy nữa
+(8, 300000, 2.0);
+
+
+-- =================================================================================
+-- TUỲ CHỌN CHO DỊCH VỤ: "Nấu ăn gia đình" (service_id = 7)
+-- =================================================================================
+
+-- Thêm câu hỏi 'Số người ăn'
+INSERT INTO service_options (service_id, option_name, option_type, display_order, is_required) VALUES
+(7, 'Bữa ăn dành cho bao nhiêu người?', 'SINGLE_CHOICE', 1, true);
+
+-- Thêm các câu trả lời cho câu hỏi 'Số người ăn' (option_id = 4)
+INSERT INTO service_option_choices (option_id, choice_name, display_order) VALUES
+(4, '2-3 người', 1),
+(4, '4-5 người', 2),
+(4, 'Trên 5 người', 3);
+
+-- Thêm quy tắc thời gian cho 'Nấu ăn gia đình' (base_price = 60,000đ/giờ)
+INSERT INTO pricing_rules (choice_id, duration_adjustment_hours) VALUES
+-- choice_id=10 ('4-5 người') -> cộng thêm 0.5 giờ
+(10, 0.5),
+-- choice_id=11 ('Trên 5 người') -> cộng thêm 1 giờ
+(11, 1.0);
