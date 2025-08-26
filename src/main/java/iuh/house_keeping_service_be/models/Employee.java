@@ -68,6 +68,16 @@ public class Employee {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    // Relationships
+    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<EmployeeUnavailability> unavailabilities;
+
+    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Assignment> assignments;
+
+    @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<EmployeeWorkingZone> workingZones;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

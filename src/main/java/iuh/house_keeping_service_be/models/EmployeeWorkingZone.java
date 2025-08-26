@@ -2,26 +2,29 @@ package iuh.house_keeping_service_be.models;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "employee_working_zones")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
-@IdClass(EmployeeWorkingZoneId.class)
 public class EmployeeWorkingZone {
-    @Id
-    @ManyToOne
+
+    @EmbeddedId
+    private EmployeeWorkingZoneId id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @MapsId("employeeId")
     @JoinColumn(name = "employee_id")
     private Employee employee;
 
-    @Id
-    @Column(name = "district", length = 100)
+    @Column(name = "district", insertable = false, updatable = false)
     private String district;
 
-    @Id
-    @Column(name = "city", length = 100)
+    @Column(name = "city", insertable = false, updatable = false)
     private String city;
 }
