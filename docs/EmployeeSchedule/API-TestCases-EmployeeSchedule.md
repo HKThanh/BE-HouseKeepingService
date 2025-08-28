@@ -135,7 +135,7 @@ Based on housekeeping_service_v6.sql:
 - **Description**: Verify that admin can retrieve busy employees for a specific time period.
 - **Preconditions**:
   - User is authenticated with valid admin token.
-  - User has ROLE_ADMIN authority.
+  - User has ROLE_ADMIN (ADMIN), ROLE_CUSTOMER (CUSTOMER) authority.
   - Database contains busy employees in the specified time period.
 - **Input**:
   - **Method**: `GET`
