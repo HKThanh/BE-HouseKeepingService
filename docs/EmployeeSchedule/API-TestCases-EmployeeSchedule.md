@@ -128,7 +128,7 @@ Based on housekeeping_service_v6.sql:
 
 ---
 
-## GET /employee-schedule/busy - Get Busy Employees
+## GET /employee-schedule - Get Busy Employees
 
 ### Test Case 3: Successfully Get Busy Employees
 - **Test Case ID**: TC_SCHEDULE_003
@@ -139,8 +139,9 @@ Based on housekeeping_service_v6.sql:
   - Database contains busy employees in the specified time period.
 - **Input**:
   - **Method**: `GET`
-  - **URL**: `/api/v1/employee-schedule/busy?city=TP. Hồ Chí Minh&startDate=2025-08-28T09:00:00&endDate=2025-08-28T17:00:00`
+  - **URL**: `/api/v1/employee-schedule?status=BUSY&city=TP. Hồ Chí Minh&startDate=2025-08-28T09:00:00&endDate=2025-08-28T17:00:00`
   - **Query Parameters**: 
+    - `status = BUSY` or `status = AVAILABLE`
     - `city = TP. Hồ Chí Minh`
     - `startDate = 2025-08-28T09:00:00`
     - `endDate = 2025-08-28T17:00:00`
