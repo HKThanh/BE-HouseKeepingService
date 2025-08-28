@@ -23,29 +23,57 @@ public class CustomUserDetailsService implements UserDetailsService {
     @Autowired
     private AccountRepository accountRepository;
 
-    @Override
-    @Transactional(readOnly = true) // Đảm bảo session được giữ lại để load lazy collections
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        List<Account> accounts = accountRepository.findAccountsByUsername(username);
+//    @Override
+//    @Transactional(readOnly = true) // Đảm bảo session được giữ lại để load lazy collections
+//    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+//        List<Account> accounts = accountRepository.findAccountsByUsername(username);
+//
+//        if (accounts.isEmpty()) {
+//            throw new UsernameNotFoundException("Không tìm thấy tài khoản: " + username);
+//        }
+//
+//        // Use the first active account found
+//        Account account = accounts.stream()
+//                .filter(acc -> acc.getStatus() == AccountStatus.ACTIVE)
+//                .findFirst()
+//                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy tài khoản hoạt động cho: " + username));
+//
+//        // Explicitly initialize the roles collection within transaction
+//        account.getRoles().size(); // Force lazy loading
+//
+//        // Create authorities from all roles
+//        Collection<SimpleGrantedAuthority> authorities = account.getRoles().stream()
+//                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getRoleName().name()))
+//                .collect(Collectors.toList());
+//
+//        return User.builder()
+//                .username(account.getUsername())
+//                .password(account.getPassword())
+//                .authorities(authorities)
+//                .disabled(account.getStatus() != AccountStatus.ACTIVE)
+//                .build();
+//    }
 
-        if (accounts.isEmpty()) {
-            throw new UsernameNotFoundException("Không tìm thấy tài khoản: " + username);
+    @Override
+    @Transactional(readOnly = true)
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        // 1. Tìm một và chỉ một tài khoản bằng username (vì username là UNIQUE)
+        Account account = accountRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy tài khoản: " + username));
+
+        // 2. Kiểm tra trạng thái tài khoản
+        if (account.getStatus() != AccountStatus.ACTIVE) {
+            throw new UsernameNotFoundException("Tài khoản không hoạt động: " + username);
         }
 
-        // Use the first active account found
-        Account account = accounts.stream()
-                .filter(acc -> acc.getStatus() == AccountStatus.ACTIVE)
-                .findFirst()
-                .orElseThrow(() -> new UsernameNotFoundException("Không tìm thấy tài khoản hoạt động cho: " + username));
-
-        // Explicitly initialize the roles collection within transaction
-        account.getRoles().size(); // Force lazy loading
-
-        // Create authorities from all roles
+        // 3. Lấy tất cả các vai trò được gán cho tài khoản này
+        //    (Hibernate sẽ tự động JOIN với bảng account_roles)
         Collection<SimpleGrantedAuthority> authorities = account.getRoles().stream()
-                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getRoleName().name()))
+                .map(role -> new SimpleGrantedAuthority("ROLE_"
+                        + role.getRoleName().name()))
                 .collect(Collectors.toList());
 
+        // 4. Tạo đối tượng UserDetails với đầy đủ các vai trò
         return User.builder()
                 .username(account.getUsername())
                 .password(account.getPassword())
@@ -53,6 +81,7 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .disabled(account.getStatus() != AccountStatus.ACTIVE)
                 .build();
     }
+
 
     // Method specifically for login with role validation
     @Transactional(readOnly = true)
