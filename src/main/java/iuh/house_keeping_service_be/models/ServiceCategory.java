@@ -30,9 +30,6 @@ public class ServiceCategory {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "icon_url", length = 255)
-    private String iconUrl;
-
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 

@@ -55,4 +55,16 @@ package iuh.house_keeping_service_be.repositories;
     );
 
      List<Assignment> findByEmployeeEmployeeIdOrderByCreatedAtDesc(String employeeId);
+
+        @Query("SELECT a FROM Assignment a WHERE a.employee.employeeId = :employeeId AND a.status IN :statuses AND " +
+        "((a.checkInTime BETWEEN :startTime AND :endTime) OR (a.checkOutTime BETWEEN :startTime AND :endTime) OR " +
+        "(a.checkInTime <= :startTime AND a.checkOutTime >= :endTime))")
+        List<Assignment> findActiveAssignmentsByEmployeeAndTimeRange(
+                @Param("employeeId") String employeeId,
+                @Param("startTime") LocalDateTime startTime,
+                @Param("endTime") LocalDateTime endTime,
+                @Param("statuses") List<AssignmentStatus> statuses);
+
+        @Query("SELECT COUNT(a) FROM Assignment a WHERE a.employee.employeeId = :employeeId AND a.status = 'COMPLETED'")
+        Integer countCompletedJobsByEmployee(@Param("employeeId") String employeeId);
   }

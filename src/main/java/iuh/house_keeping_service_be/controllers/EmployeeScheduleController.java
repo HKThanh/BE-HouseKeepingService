@@ -120,7 +120,7 @@ public class EmployeeScheduleController {
 
         ApiResponse<EmployeeScheduleResponse> response = employeeScheduleService.getEmployeeSchedule(employeeId, startDate, endDate);
 
-            return response.success() ? ResponseEntity.ok(response) : ResponseEntity.badRequest().body(response);
+        return response.success() ? ResponseEntity.ok(response) : ResponseEntity.badRequest().body(response);
     }
 
     @PostMapping("/unavailability")
@@ -142,8 +142,32 @@ public class EmployeeScheduleController {
         } catch (Exception e) {
             log.error("Error in createUnavailability: ", e);
             ApiResponse<EmployeeScheduleResponse> errorResponse =
-                new ApiResponse<>(false, "Internal server error: " + e.getMessage(), null);
+                    new ApiResponse<>(false, "Internal server error: " + e.getMessage(), null);
             return ResponseEntity.internalServerError().body(errorResponse);
+        }
+    }
+
+    @GetMapping("/suitable")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_CUSTOMER')")
+    public ResponseEntity<ApiResponse<List<SuitableEmployeeResponse>>> findSuitableEmployees(
+            @RequestParam Integer serviceId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime bookingTime,
+            @RequestParam(required = false) String district,
+            @RequestParam(required = false) String city) {
+
+        log.info("Finding suitable employees for service: {}, booking time: {}, district: {}, city: {}",
+                serviceId, bookingTime, district, city);
+
+        try {
+            SuitableEmployeeRequest request = new SuitableEmployeeRequest(serviceId, bookingTime, district, city);
+            ApiResponse<List<SuitableEmployeeResponse>> response = employeeScheduleService.findSuitableEmployees(request);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error in findSuitableEmployees: ", e);
+            return ResponseEntity.internalServerError().body(
+                    new ApiResponse<>(false, "Internal server error: " + e.getMessage(), null)
+            );
         }
     }
 }

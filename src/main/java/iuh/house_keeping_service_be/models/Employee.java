@@ -1,5 +1,6 @@
 package iuh.house_keeping_service_be.models;
 
+import com.vladmihalcea.hibernate.type.array.ListArrayType;
 import iuh.house_keeping_service_be.enums.EmployeeStatus;
 import iuh.house_keeping_service_be.enums.Rating;
 import jakarta.persistence.*;
@@ -7,6 +8,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.Type;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -46,12 +50,11 @@ public class Employee {
     @Column(name = "hired_date")
     private LocalDate hiredDate;
 
-    @ElementCollection
-    @CollectionTable(name = "employee_skills", joinColumns = @JoinColumn(name = "employee_id"))
-    @Column(name = "skill")
+    @JdbcTypeCode(SqlTypes.ARRAY) // Giúp Hibernate hiểu đây là kiểu mảng text của Postgres
+    @Column(name = "skills", columnDefinition = "text[]")
     private List<String> skills;
 
-    @Column(name = "bio", columnDefinition = "TEXT")
+    @Column(name = "bio", columnDefinition = "TEXT[]")
     private String bio;
 
     @Enumerated(EnumType.STRING)

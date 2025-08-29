@@ -2,7 +2,7 @@
 
 ## Overview
 This document describes the test cases for the **Employee Schedule** endpoints of the Admin API.  
-The endpoints allow admin and employees to manage employee schedules, availability, and unavailability periods.  
+The endpoints allow admin, customers, and employees to manage employee schedules, availability, and unavailability periods.  
 **Base URL**: `/api/v1/employee-schedule`
 
 ---
@@ -23,6 +23,7 @@ All endpoints require:
 - **Authorization Header**: `Bearer <valid_token>`
 - **Role**: 
   - ADMIN: Full access to all endpoints
+  - CUSTOMER: Access to search suitable employees and view employee lists
   - EMPLOYEE: Limited access (can only view/modify own schedule)
 
 ---
@@ -36,23 +37,25 @@ Based on housekeeping_service_v6.sql:
   - Jane Smith: Quận Tân Phú, Quận Tân Bình (TP. Hồ Chí Minh)
   - Bob Wilson: Quận Gò Vấp (TP. Hồ Chí Minh)
 - **Assignments**: Active assignments and unavailability periods exist
+- **Services**: Various services with different estimated durations
 - **Time Period**: Test queries with 2025-08-28 to 2025-08-30 range
 
 ---
 
-## GET /employee-schedule/available - Get Available Employees
+## GET /employee-schedule - Get Employees by Status
 
-### Test Case 1: Successfully Get Available Employees
+### Test Case 1: Successfully Get Available Employees (Default)
 - **Test Case ID**: TC_SCHEDULE_001
-- **Description**: Verify that admin can retrieve available employees for a specific time period and location.
+- **Description**: Verify that admin/customer can retrieve available employees for a specific time period and location.
 - **Preconditions**:
-  - User is authenticated with valid admin token.
-  - User has ROLE_ADMIN authority.
+  - User is authenticated with valid token.
+  - User has ROLE_ADMIN or ROLE_CUSTOMER authority.
   - Database contains available employees in specified location.
 - **Input**:
   - **Method**: `GET`
-  - **URL**: `/api/v1/employee-schedule/available?district=Quận Tân Phú&city=TP. Hồ Chí Minh&startDate=2025-08-28T09:00:00&endDate=2025-08-28T17:00:00`
+  - **URL**: `/api/v1/employee-schedule?status=AVAILABLE&district=Quận Tân Phú&city=TP. Hồ Chí Minh&startDate=2025-08-28T09:00:00&endDate=2025-08-28T17:00:00`
   - **Query Parameters**: 
+    - `status = AVAILABLE` (default parameter)
     - `district = Quận Tân Phú`
     - `city = TP. Hồ Chí Minh`
     - `startDate = 2025-08-28T09:00:00`
@@ -106,25 +109,28 @@ Based on housekeeping_service_v6.sql:
 
 ---
 
-### Test Case 2: Access Denied - No Admin Role
+### Test Case 2: Customer Access to Employee List
 - **Test Case ID**: TC_SCHEDULE_002
-- **Description**: Verify that non-admin users cannot access available employees endpoint.
+- **Description**: Verify that customer can retrieve available employees for booking purposes.
 - **Preconditions**: 
-  - User has valid token but lacks ROLE_ADMIN authority
+  - User is authenticated with valid customer token.
+  - User has ROLE_CUSTOMER authority.
 - **Input**:
   - **Method**: `GET`
-  - **URL**: `/api/v1/employee-schedule/available?startDate=2025-08-28T09:00:00&endDate=2025-08-28T17:00:00`
+  - **URL**: `/api/v1/employee-schedule?startDate=2025-08-28T09:00:00&endDate=2025-08-28T17:00:00`
   - **Headers**: 
     ```
-    Authorization: Bearer <customer_token>
+    Authorization: Bearer <valid_customer_token>
     ```
 - **Expected Output**:
   ```json
   {
-    "error": "Access Denied"
+    "success": true,
+    "message": "Lấy danh sách nhân viên rảnh thành công",
+    "data": [...employees...]
   }
   ```
-- **Status Code**: `403 Forbidden`
+- **Status Code**: `200 OK`
 
 ---
 
@@ -417,16 +423,127 @@ Based on housekeeping_service_v6.sql:
 
 ---
 
+## GET /employee-schedule/suitable - Find Suitable Employees
+
+### Test Case 9: Successfully Find Suitable Employees (Admin/Customer)
+- **Test Case ID**: TC_SCHEDULE_009
+- **Description**: Verify that admin or customer can find suitable employees for a specific service and time.
+- **Preconditions**:
+  - User is authenticated with valid admin or customer token.
+  - User has ROLE_ADMIN or ROLE_CUSTOMER authority.
+  - Database contains employees available for the requested time and service.
+- **Input**:
+  - **Method**: `GET`
+  - **URL**: `/api/v1/employee-schedule/suitable?serviceId=1&bookingTime=2025-08-28T10:00:00&district=Quận Tân Phú&city=TP. Hồ Chí Minh`
+  - **Query Parameters**: 
+    - `serviceId = 1`
+    - `bookingTime = 2025-08-28T10:00:00`
+    - `district = Quận Tân Phú` (optional)
+    - `city = TP. Hồ Chí Minh` (optional)
+  - **Headers**: 
+    ```
+    Authorization: Bearer <valid_admin_or_customer_token>
+    ```
+- **Expected Output**:
+  ```json
+  {
+    "success": true,
+    "message": "Tìm thấy 2 nhân viên phù hợp cho dịch vụ Dọn dẹp nhà",
+    "data": [
+      {
+        "employeeId": "e1000001-0000-0000-0000-000000000001",
+        "fullName": "Jane Smith",
+        "avatar": "https://picsum.photos/200",
+        "skills": ["Cleaning", "Organizing"],
+        "rating": 4.5,
+        "phone": "+84987654321",
+        "workingZones": [
+          {
+            "district": "Quận Tân Phú",
+            "city": "TP. Hồ Chí Minh"
+          },
+          {
+            "district": "Quận Tân Bình",
+            "city": "TP. Hồ Chí Minh"
+          }
+        ],
+        "completedJobs": 25,
+        "totalJobs": 30,
+        "isAvailable": true
+      }
+    ]
+  }
+  ```
+- **Status Code**: `200 OK`
+
+---
+
+### Test Case 10: No Suitable Employees Found
+- **Test Case ID**: TC_SCHEDULE_010
+- **Description**: Verify response when no employees are available for the requested service and time.
+- **Preconditions**:
+  - User is authenticated with valid token.
+  - All employees are busy during the requested time period.
+- **Input**:
+  - **Method**: `GET`
+  - **URL**: `/api/v1/employee-schedule/suitable?serviceId=1&bookingTime=2025-08-28T14:00:00`
+  - **Headers**: 
+    ```
+    Authorization: Bearer <valid_admin_token>
+    ```
+- **Expected Output**:
+  ```json
+  {
+    "success": true,
+    "message": "Không có nhân viên nào rảnh trong thời gian được yêu cầu",
+    "data": []
+  }
+  ```
+- **Status Code**: `200 OK`
+
+---
+
+### Test Case 11: Service Not Found
+- **Test Case ID**: TC_SCHEDULE_011
+- **Description**: Verify error response when service ID does not exist.
+- **Preconditions**:
+  - User is authenticated with valid token.
+  - Service ID does not exist in database.
+- **Input**:
+  - **Method**: `GET`
+  - **URL**: `/api/v1/employee-schedule/suitable?serviceId=999&bookingTime=2025-08-28T10:00:00`
+  - **Headers**: 
+    ```
+    Authorization: Bearer <valid_admin_token>
+    ```
+- **Expected Output**:
+  ```json
+  {
+    "success": false,
+    "message": "Không tìm thấy dịch vụ với ID: 999",
+    "data": null
+  }
+  ```
+- **Status Code**: `200 OK`
+
+---
+
 ## Notes
-- **Test Environment**: Database should be configured with test data including employees and assignments from housekeeping_service_v6.sql.
+- **Test Environment**: Database should be configured with test data including employees, assignments, and services from housekeeping_service_v6.sql.
 - **Authentication**: All endpoints require valid JWT tokens with appropriate roles.
 - **Authorization**: 
   - Admin (ROLE_ADMIN): Full access to all endpoints
+  - Customer (ROLE_CUSTOMER): Can search for available employees and find suitable employees
   - Employee (ROLE_EMPLOYEE): Can only access own schedule and create own unavailability
 - **Time Format**: All datetime parameters use ISO format (yyyy-MM-ddTHH:mm:ss)
-- **Working Zones**: Employees can work in multiple districts/cities
+- **Working Zones**: Employees can work in multiple districts/cities, filtered by location parameters
 - **Schedule Conflicts**: System prevents overlapping assignments and unavailability periods
 - **Error Handling**: Service layer catches exceptions and returns appropriate error responses
 - **Security**: Role-based access control using Spring Security @PreAuthorize annotations
-- **Business Logic**: Availability is determined by checking both unavailability periods and active assignments
+- **Business Logic**: 
+  - Availability is determined by checking both unavailability periods and active assignments
+  - Suitable employees are filtered by working zone and sorted by rating (highest first)
+  - Service duration is calculated from estimated_duration_hours field
 - **Time Slots**: Response includes detailed time slot information with assignment details when applicable
+- **Status Parameter**: GET /employee-schedule endpoint supports status=AVAILABLE (default) or status=BUSY
+- **Location Filtering**: All endpoints support optional district and city parameters for geographic filtering

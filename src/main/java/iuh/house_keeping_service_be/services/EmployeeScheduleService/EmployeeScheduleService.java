@@ -9,4 +9,5 @@ public interface EmployeeScheduleService {
     ApiResponse<List<EmployeeScheduleResponse>> getBusyEmployees(EmployeeScheduleRequest request);
     ApiResponse<EmployeeScheduleResponse> getEmployeeSchedule(String employeeId, LocalDateTime startDate, LocalDateTime endDate);
     ApiResponse<EmployeeScheduleResponse> createUnavailability(UnavailabilityRequest request);
+    ApiResponse<List<SuitableEmployeeResponse>> findSuitableEmployees(SuitableEmployeeRequest request);
 }

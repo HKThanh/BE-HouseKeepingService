@@ -487,7 +487,7 @@ INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity
 
 -- Phân công nhân viên cho các lịch đặt
 INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status, check_in_time, check_out_time) VALUES
-('as000001-0000-0000-0000-000000000001', 'bd000001-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000002', 'CHECKED_OUT', '2025-08-20 09:00:00+07', '2025-08-20 13:00:00+07'),
+('as000001-0000-0000-0000-000000000001', 'bd000001-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000002', 'COMPLETED', '2025-08-20 09:00:00+07', '2025-08-20 13:00:00+07'),
 ('as000001-0000-0000-0000-000000000002', 'bd000001-0000-0000-0000-000000000002', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED', NULL, NULL);
 
 -- Khối IV: Thêm dữ liệu cho Thanh toán và Đánh giá
