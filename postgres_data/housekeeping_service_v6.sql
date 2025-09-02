@@ -110,7 +110,9 @@ CREATE TABLE service_categories (
     parent_category_id INT REFERENCES service_categories(category_id), -- Để tạo cấu trúc cha-con
     category_name VARCHAR(100) NOT NULL,
     description TEXT,
-    is_active BOOLEAN DEFAULT TRUE
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE service (
@@ -315,7 +317,9 @@ CREATE TABLE promotions (
     start_date TIMESTAMP WITH TIME ZONE,
     end_date TIMESTAMP WITH TIME ZONE,
     usage_limit INT,
-    is_active BOOLEAN DEFAULT TRUE
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 ALTER TABLE bookings
@@ -454,7 +458,7 @@ INSERT INTO service_categories (category_name, description) VALUES
 -- Dữ liệu cho danh mục 'Dọn dẹp nhà' (category_id = 1)
 INSERT INTO service (category_id, name, description, base_price, unit, estimated_duration_hours, is_active) VALUES
 (1, 'Dọn dẹp theo giờ', 'Lau dọn, hút bụi, làm sạch các bề mặt cơ bản trong nhà. Phù hợp cho nhu cầu duy trì vệ sinh hàng tuần.', 50000, 'Giờ', 2.0, TRUE),
-(1, 'Tổng vệ sinh', 'Làm sạch sâu toàn diện, bao gồm các khu vực khó tiếp cận, trần nhà, lau cửa kính. Thích hợp cho nhà mới hoặc dọn dẹp theo mùa.', 400000, 'Gói', 4.0, TRUE),
+(1, 'Tổng vệ sinh', 'Làm sạch sâu toàn diện, bao gồm các khu vực khó tiếp cận, trần nhà, lau cửa kính. Thích hợp cho nhà mới hoặc dọn dẹp theo mùa.', 100000, 'Gói', 2.0, TRUE),
 (1, 'Vệ sinh Sofa - Nệm - Rèm', 'Giặt sạch và khử khuẩn Sofa, Nệm, Rèm cửa bằng máy móc chuyên dụng.', 300000, 'Gói', 3.0, TRUE),
 (1, 'Vệ sinh máy lạnh', 'Bảo trì, làm sạch dàn nóng và dàn lạnh, bơm gas nếu cần.', 150000, 'Máy', 1.0, TRUE);
 
@@ -579,12 +583,12 @@ INSERT INTO service_option_choices (option_id, choice_name, display_order) VALUE
 
 -- Thêm các quy tắc giá/nhân sự cho 'Tổng vệ sinh'
 INSERT INTO pricing_rules (choice_id, price_adjustment, staff_adjustment, duration_adjustment_hours) VALUES
--- choice_id=2 ('Nhà phố / Biệt thự') -> cộng thêm 100,000đ và 0.5 giờ
-(2, 100000, 0, 0.5),
+-- choice_id=2 ('Nhà phố / Biệt thự') -> cộng thêm 100,000đ, 1 nhân viên và 1 giờ
+(2, 100000, 1, 1.0),
 -- choice_id=4 ('Từ 80m² - 150m²') -> cộng thêm 150,000đ và 1 giờ
-(4, 150000, 0, 1.0),
+(4, 150000, 2, 2.0),
 -- choice_id=5 ('Trên 150m²') -> cộng thêm 300,000đ, thêm 1 nhân viên và 2 giờ
-(5, 300000, 1, 2.0);
+(5, 300000, 3, 3.0);
 
 
 -- =================================================================================

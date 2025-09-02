@@ -32,7 +32,7 @@ services:
       - POSTGRES_PASSWORD=123456
     volumes:
       - ./postgres_data/data:/var/lib/postgresql/data
-      - ./postgres_data/housekeeping_service_v6.sql:/docker-entrypoint-initdb.d/housekeeping_service_v5.sql
+      - ./postgres_data/housekeeping_service_v6.sql:/docker-entrypoint-initdb.d/housekeeping_service_v6.sql
     networks:
       - house_keeping_network
 
