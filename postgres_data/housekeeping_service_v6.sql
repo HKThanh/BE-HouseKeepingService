@@ -334,6 +334,7 @@ ADD COLUMN promotion_id INT REFERENCES promotions(promotion_id);
 CREATE TABLE features (
     feature_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     feature_name VARCHAR(100) UNIQUE NOT NULL, -- Tên định danh (code) của chức năng, Vd: 'booking.create'
+
     description TEXT, -- Mô tả thân thiện, Vd: 'Tạo một lịch đặt mới'
     module VARCHAR(50) -- Gom nhóm chức năng theo module, Vd: 'Booking', 'Account', 'Payment'
 );
@@ -433,7 +434,21 @@ INSERT INTO role_features (role_id, feature_id, is_enabled) VALUES
 -- Admin có tất cả các quyền trên và thêm các quyền quản trị
 (3, (SELECT feature_id FROM features WHERE feature_name = 'admin.dashboard.view'), true),
 (3, (SELECT feature_id FROM features WHERE feature_name = 'admin.user.manage'), true),
-(3, (SELECT feature_id FROM features WHERE feature_name = 'admin.permission.manage'), true);
+(3, (SELECT feature_id FROM features WHERE feature_name = 'admin.permission.manage'), true),
+
+-- Quyền của CUSTOMER
+(3, (SELECT feature_id FROM features WHERE feature_name = 'booking.create'), true),
+(3, (SELECT feature_id FROM features WHERE feature_name = 'booking.view.history'), true),
+(3, (SELECT feature_id FROM features WHERE feature_name = 'booking.cancel'), true),
+(3, (SELECT feature_id FROM features WHERE feature_name = 'review.create'), true),
+(3, (SELECT feature_id FROM features WHERE feature_name = 'profile.customer.edit'), true),
+(3, (SELECT feature_id FROM features WHERE feature_name = 'service.view'), true),
+
+-- Quyền của EMPLOYEE
+(3, (SELECT feature_id FROM features WHERE feature_name = 'booking.view.available'), true),
+(3, (SELECT feature_id FROM features WHERE feature_name = 'booking.accept'), true),
+(3, (SELECT feature_id FROM features WHERE feature_name = 'booking.view.assigned'), true),
+(3, (SELECT feature_id FROM features WHERE feature_name = 'profile.employee.edit'), true);
 
 -- =================================================================================
 -- THÊM DỮ LIỆU MẪU (TIẾNG VIỆT) VÀO CÁC KHỐI CÒN LẠI
