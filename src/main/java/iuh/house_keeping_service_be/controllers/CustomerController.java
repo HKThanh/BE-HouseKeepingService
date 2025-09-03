@@ -5,6 +5,7 @@ import iuh.house_keeping_service_be.dtos.Admin.UserPermission.response.UserPermi
 import iuh.house_keeping_service_be.dtos.Admin.UserPermission.response.UserPermissionsResponse;
 import iuh.house_keeping_service_be.dtos.Service.ServiceDetailResponse;
 import iuh.house_keeping_service_be.enums.RoleName;
+import iuh.house_keeping_service_be.models.Customer;
 import iuh.house_keeping_service_be.services.AdminService.PermissionService;
 import iuh.house_keeping_service_be.services.CustomerService.CustomerService;
 import iuh.house_keeping_service_be.services.AuthorizationService.AuthorizationService;
@@ -70,7 +71,18 @@ public class CustomerController {
             String token = authHeader.substring(7);
             String username = jwtUtil.extractUsername(token);
 
-            UserPermissionsResponse userPermissionsResponse = permissionService.getUserPermissions(username);
+            Customer customer = customerService.findById(customerId);
+
+            if (customer == null) {
+                return ResponseEntity.badRequest().body(
+                    Map.of(
+                        "success", false,
+                        "message", "Khách hàng không tồn tại"
+                    )
+                );
+            }
+
+            UserPermissionsResponse userPermissionsResponse = permissionService.getUserPermissions(customer.getAccount().getUsername());
 
             return ResponseEntity.ok(Map.of(
                 "success", true,

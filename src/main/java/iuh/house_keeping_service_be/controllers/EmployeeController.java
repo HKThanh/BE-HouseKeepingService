@@ -4,6 +4,8 @@ import iuh.house_keeping_service_be.config.JwtUtil;
 import iuh.house_keeping_service_be.dtos.Admin.UserPermission.response.UserPermissionsResponse;
 import iuh.house_keeping_service_be.dtos.Service.ServiceDetailResponse;
 import iuh.house_keeping_service_be.enums.RoleName;
+import iuh.house_keeping_service_be.models.Account;
+import iuh.house_keeping_service_be.models.Employee;
 import iuh.house_keeping_service_be.services.AdminService.PermissionService;
 import iuh.house_keeping_service_be.services.EmployeeService.EmployeeService;
 import iuh.house_keeping_service_be.services.AuthorizationService.AuthorizationService;
@@ -69,7 +71,18 @@ public class EmployeeController {
             String token = authHeader.substring(7);
             String username = jwtUtil.extractUsername(token);
 
-            UserPermissionsResponse userPermissionsResponse = permissionService.getUserPermissions(username);
+            Employee employee = employeeService.findById(employeeId);
+
+            if (employee == null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "Nhân viên không tồn tại"
+                ));
+            }
+
+            Account employeeAccount = employee.getAccount();
+
+            UserPermissionsResponse userPermissionsResponse = permissionService.getUserPermissions(employeeAccount.getUsername());
 
             return ResponseEntity.ok(Map.of(
                     "success", true,
