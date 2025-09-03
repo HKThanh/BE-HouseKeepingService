@@ -66,22 +66,48 @@ public class PermissionServiceImpl implements PermissionService {
             Map<String, List<Feature>> featuresByModule = allFeatures.stream()
                 .collect(Collectors.groupingBy(Feature::getModule));
 
-            List<ModulePermissionData> modules = featuresByModule.entrySet().stream()
-                .map(entry -> {
-                    String moduleName = entry.getKey();
-                    List<FeaturePermissionData> features = entry.getValue().stream()
-                        .map(feature -> new FeaturePermissionData(
-                            feature.getFeatureId(),
-                            feature.getFeatureName(),
-                            feature.getDescription(),
-                            featureStatusMap.getOrDefault(feature.getFeatureId(), false)
-                        ))
-                        .collect(Collectors.toList());
+            int roleAdminId = roleRepository.findByRoleName(RoleName.ADMIN)
+                .map(Role::getRoleId)
+                .orElse(-1);
 
-                    return new ModulePermissionData(moduleName, features);
-                })
-                .sorted(Comparator.comparing(ModulePermissionData::moduleName))
-                .collect(Collectors.toList());
+            List<ModulePermissionData> modules;
+
+            if (!roleId.equals(roleAdminId)) {
+                modules = featuresByModule.entrySet().stream()
+                        .map(entry -> {
+                            String moduleName = entry.getKey();
+                            List<FeaturePermissionData> features = entry.getValue().stream()
+                                    .map(feature -> new FeaturePermissionData(
+                                            feature.getFeatureId(),
+                                            feature.getFeatureName(),
+                                            feature.getDescription(),
+                                            featureStatusMap.getOrDefault(feature.getFeatureId(), false)
+                                    ))
+                                    .collect(Collectors.toList());
+
+                            return new ModulePermissionData(moduleName, features);
+                        })
+                        .filter(module -> !"ADMIN".equalsIgnoreCase(module.moduleName()))
+                        .sorted(Comparator.comparing(ModulePermissionData::moduleName))
+                        .collect(Collectors.toList());
+            } else {
+                modules = featuresByModule.entrySet().stream()
+                        .map(entry -> {
+                            String moduleName = entry.getKey();
+                            List<FeaturePermissionData> features = entry.getValue().stream()
+                                    .map(feature -> new FeaturePermissionData(
+                                            feature.getFeatureId(),
+                                            feature.getFeatureName(),
+                                            feature.getDescription(),
+                                            featureStatusMap.getOrDefault(feature.getFeatureId(), false)
+                                    ))
+                                    .collect(Collectors.toList());
+
+                            return new ModulePermissionData(moduleName, features);
+                        })
+                        .sorted(Comparator.comparing(ModulePermissionData::moduleName))
+                        .collect(Collectors.toList());
+            }
 
             RolePermissionData rolePermissionData = new RolePermissionData(
                 role.getRoleId(),

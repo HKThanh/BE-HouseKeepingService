@@ -1,5 +1,8 @@
 package iuh.house_keeping_service_be.controllers;
 
+import iuh.house_keeping_service_be.config.JwtUtil;
+import iuh.house_keeping_service_be.dtos.Admin.UserPermission.response.UserPermissionsResponse;
+import iuh.house_keeping_service_be.dtos.Service.ServiceDetailResponse;
 import iuh.house_keeping_service_be.enums.RoleName;
 import iuh.house_keeping_service_be.services.AdminService.PermissionService;
 import iuh.house_keeping_service_be.services.EmployeeService.EmployeeService;
@@ -24,6 +27,8 @@ public class EmployeeController {
 //    private final AuthorizationService authorizationService;
 
     private final PermissionService permissionService;
+
+    private final JwtUtil jwtUtil;
 
     @GetMapping("/{employeeId}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_EMPLOYEE')")
@@ -55,11 +60,20 @@ public class EmployeeController {
     public ResponseEntity<?> getEnabledFeaturesByRoleEmployee(@PathVariable String employeeId,
                                              @RequestHeader("Authorization") String authHeader) {
         try {
-            List<String> features = permissionService.getEnabledPermissionsByRole(RoleName.EMPLOYEE);
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.badRequest().body(
+                        new ServiceDetailResponse(false, "Token không hợp lệ", null)
+                );
+            }
+
+            String token = authHeader.substring(7);
+            String username = jwtUtil.extractUsername(token);
+
+            UserPermissionsResponse userPermissionsResponse = permissionService.getUserPermissions(username);
 
             return ResponseEntity.ok(Map.of(
                     "success", true,
-                    "data", features
+                    "data", userPermissionsResponse
             ));
         } catch (IllegalArgumentException e) {
             log.error("Employee not found: {}", e.getMessage());

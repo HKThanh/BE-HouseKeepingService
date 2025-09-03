@@ -1,5 +1,9 @@
 package iuh.house_keeping_service_be.controllers;
 
+import iuh.house_keeping_service_be.config.JwtUtil;
+import iuh.house_keeping_service_be.dtos.Admin.UserPermission.response.UserPermissionData;
+import iuh.house_keeping_service_be.dtos.Admin.UserPermission.response.UserPermissionsResponse;
+import iuh.house_keeping_service_be.dtos.Service.ServiceDetailResponse;
 import iuh.house_keeping_service_be.enums.RoleName;
 import iuh.house_keeping_service_be.services.AdminService.PermissionService;
 import iuh.house_keeping_service_be.services.CustomerService.CustomerService;
@@ -24,6 +28,8 @@ public class CustomerController {
 //    private final AuthorizationService authorizationService;
 
     private final PermissionService permissionService;
+
+    private final JwtUtil jwtUtil;
 
     @GetMapping("/{customerId}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_CUSTOMER')")
@@ -55,10 +61,20 @@ public class CustomerController {
     public ResponseEntity<?> getCustomerFeatures(@PathVariable String customerId,
                                                  @RequestHeader("Authorization") String authHeader) {
         try {
-            List<String> features = permissionService.getEnabledPermissionsByRole(RoleName.EMPLOYEE);
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.badRequest().body(
+                        new ServiceDetailResponse(false, "Token không hợp lệ", null)
+                );
+            }
+
+            String token = authHeader.substring(7);
+            String username = jwtUtil.extractUsername(token);
+
+            UserPermissionsResponse userPermissionsResponse = permissionService.getUserPermissions(username);
+
             return ResponseEntity.ok(Map.of(
                 "success", true,
-                "data", features
+                "data", userPermissionsResponse
             ));
         } catch (IllegalArgumentException e) {
             log.error("Customer not found: {}", e.getMessage());
