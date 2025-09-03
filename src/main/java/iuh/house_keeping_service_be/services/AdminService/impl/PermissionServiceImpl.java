@@ -201,7 +201,7 @@ public class PermissionServiceImpl implements PermissionService {
                 return Collections.emptyList();
             }
 
-            return roleFeatureRepository.findEnabledFeatureNamesByRoleId(roleOpt.get().getRoleId());
+            return roleFeatureRepository.findEnabledFeatureDescriptionsByRoleId(roleOpt.get().getRoleId());
 
         } catch (Exception e) {
             log.error("Error getting enabled permissions for role {}: {}", roleName, e.getMessage());

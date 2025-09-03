@@ -24,4 +24,7 @@ public interface RoleFeatureRepository extends JpaRepository<RoleFeature, RoleFe
 
     @Query("SELECT f.featureName FROM RoleFeature rf JOIN rf.feature f WHERE rf.role.roleId = :roleId AND rf.isEnabled = true")
     List<String> findEnabledFeatureNamesByRoleId(@Param("roleId") Integer roleId);
+
+    @Query("SELECT f.description FROM RoleFeature rf JOIN rf.feature f WHERE rf.role.roleId = :roleId AND rf.isEnabled = true")
+    List<String> findEnabledFeatureDescriptionsByRoleId(@Param("roleId") Integer roleId);
 }

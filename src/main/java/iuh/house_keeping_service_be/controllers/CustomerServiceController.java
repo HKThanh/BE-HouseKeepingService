@@ -1,8 +1,7 @@
 package iuh.house_keeping_service_be.controllers;
 
 import iuh.house_keeping_service_be.config.JwtUtil;
-import iuh.house_keeping_service_be.dtos.Service.ServiceDetailResponse;
-import iuh.house_keeping_service_be.dtos.Service.ServiceListResponse;
+import iuh.house_keeping_service_be.dtos.Service.*;
 import iuh.house_keeping_service_be.services.AdminService.PermissionService;
 import iuh.house_keeping_service_be.services.ServiceService.ServiceService;
 import lombok.RequiredArgsConstructor;
@@ -168,6 +167,81 @@ public class CustomerServiceController {
             return ResponseEntity.internalServerError().body(
                     Map.of("success", false, "message", "Lỗi hệ thống")
             );
+        }
+    }
+
+    @GetMapping("/{serviceId}/options")
+    public ResponseEntity<ServiceOptionsResponse> getServiceOptions(
+            @PathVariable Integer serviceId,
+            @RequestHeader("Authorization") String authHeader) {
+        try {
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.badRequest().body(
+                        new ServiceOptionsResponse(false, "Token không hợp lệ", null)
+                );
+            }
+
+            String token = authHeader.substring(7);
+            String username = jwtUtil.extractUsername(token);
+
+            if (username == null || !jwtUtil.validateToken(token, username)) {
+                return ResponseEntity.badRequest().body(
+                        new ServiceOptionsResponse(false, "Token không hợp lệ", null)
+                );
+            }
+
+            ServiceOptionsResponse response = serviceService.getServiceOptions(serviceId);
+
+            if (!response.success()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            log.error("Error getting service options for service {}: {}", serviceId, e.getMessage());
+            return ResponseEntity.internalServerError().body(
+                    new ServiceOptionsResponse(false, "Lỗi hệ thống", null)
+            );
+        }
+    }
+
+    @PostMapping("/calculate-price")
+    public ResponseEntity<CalculatePriceResponse> calculatePrice(
+            @RequestBody CalculatePriceRequest request,
+            @RequestHeader("Authorization") String authHeader) {
+
+        try {
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                return ResponseEntity.badRequest().body(
+                        new CalculatePriceResponse(false, "Token không hợp lệ", null)
+                );
+            }
+
+            String token = authHeader.substring(7);
+            String username = jwtUtil.extractUsername(token);
+            if (username == null || !jwtUtil.validateToken(token, username)) {
+                return ResponseEntity.badRequest().body(
+                        new CalculatePriceResponse(false, "Token không hợp lệ", null)
+                );
+            }
+
+            CalculatePriceResponse response = serviceService.calculatePrice(request);
+
+            if (response.success()) {
+                return ResponseEntity.ok(response);
+            } else {
+                return ResponseEntity.badRequest().body(response);
+            }
+
+        } catch (Exception e) {
+            log.error("Error in calculatePrice endpoint: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new CalculatePriceResponse(
+                            false,
+                            "Lỗi hệ thống khi tính toán giá",
+                            null
+                    ));
         }
     }
 }
