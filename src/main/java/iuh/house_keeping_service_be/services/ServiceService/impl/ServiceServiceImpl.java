@@ -2,6 +2,10 @@ package iuh.house_keeping_service_be.services.ServiceService.impl;
 
 import iuh.house_keeping_service_be.dtos.Service.*;
 import iuh.house_keeping_service_be.models.Service;
+import iuh.house_keeping_service_be.models.ServiceOption;
+import iuh.house_keeping_service_be.models.ServiceOptionChoice;
+import iuh.house_keeping_service_be.repositories.PricingRuleRepository;
+import iuh.house_keeping_service_be.repositories.ServiceOptionRepository;
 import iuh.house_keeping_service_be.repositories.ServiceRepository;
 import iuh.house_keeping_service_be.services.ServiceService.ServiceService;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +24,8 @@ import java.util.stream.Collectors;
 public class ServiceServiceImpl implements ServiceService {
 
     private final ServiceRepository serviceRepository;
+    private final ServiceOptionRepository serviceOptionRepository;
+    private final PricingRuleRepository pricingRuleRepository;
     private final DecimalFormat priceFormatter = new DecimalFormat("#,###");
 
     @Override
@@ -126,6 +132,21 @@ public class ServiceServiceImpl implements ServiceService {
         }
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public ServiceOptionsResponse getServiceOptions(Integer serviceId) {
+        return null;
+    }
+
+    private ServiceOptionData convertToServiceOptionData(ServiceOption serviceOption) {
+        return null;
+    }
+
+    private ServiceOptionChoiceData convertToServiceOptionChoiceData(ServiceOptionChoice choice) {
+
+        return null;
+    }
+
     private ServiceData convertToServiceData(Service service) {
         return new ServiceData(
                 service.getServiceId(),
@@ -182,5 +203,11 @@ public class ServiceServiceImpl implements ServiceService {
             int m = totalMinutes % 60;
             return h + " giờ " + m + " phút";
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CalculatePriceResponse calculatePrice(CalculatePriceRequest request) {
+        return null;
     }
 }
