@@ -66,4 +66,7 @@ public class Booking {
 
     @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<BookingDetail> bookingDetails;
+
+    @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Payment> payments;
 }

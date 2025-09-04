@@ -17,12 +17,11 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class BookingDetail {
-
     @Id
     @GeneratedValue(generator = "UUID")
-    @GenericGenerator(name = "UUID", strategy = "uuid2")
+    @GenericGenerator(name = "UUID", strategy = "org.hibernate.id.UUIDGenerator")
     @Column(name = "booking_detail_id")
-    private String bookingDetailId;
+    private String id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "booking_id", nullable = false)
@@ -32,7 +31,7 @@ public class BookingDetail {
     @JoinColumn(name = "service_id", nullable = false)
     private Service service;
 
-    @Column(name = "quantity")
+    @Column(name = "quantity", nullable = false)
     private Integer quantity = 1;
 
     @Column(name = "price_per_unit", precision = 10, scale = 2)

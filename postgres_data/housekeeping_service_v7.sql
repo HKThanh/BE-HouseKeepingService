@@ -294,7 +294,7 @@ CREATE TABLE payments (
     booking_id VARCHAR(36) NOT NULL REFERENCES bookings(booking_id),
     amount DECIMAL(10, 2) NOT NULL,
     payment_method VARCHAR(20) CHECK (payment_method IN ('CASH', 'TRANSFER', 'MOMO', 'VNPAY')),
-    payment_status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (payment_status IN ('PENDING', 'PAID', 'FAILED')),
+    payment_status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (payment_status IN ('PENDING', 'PAID', 'FAILED', 'CANCELLED', 'REFUNDED')),
     transaction_code VARCHAR(100),
     paid_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
