@@ -158,33 +158,34 @@ CREATE TABLE booking_details (
 CREATE TABLE service_options (
     option_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     service_id INT NOT NULL REFERENCES service(service_id) ON DELETE CASCADE,
-    label TEXT NOT NULL, -- Tên hiển thị của câu hỏi (thay cho option_name)
+    label TEXT NOT NULL,
     option_type VARCHAR(30) NOT NULL
      CHECK (option_type IN (
-                            'SINGLE_CHOICE_RADIO', -- Chọn 1 (hiển thị dạng radio)
-                            'SINGLE_CHOICE_DROPDOWN', -- Chọn 1 (hiển thị dạng dropdown)
-                            'MULTIPLE_CHOICE_CHECKBOX', -- Chọn nhiều (dạng checkbox)
-                            'QUANTITY_INPUT', -- Ô nhập số lượng
-                            'TEXT_INPUT' -- Ô nhập văn bản
+                            'SINGLE_CHOICE_RADIO',
+                            'SINGLE_CHOICE_DROPDOWN',
+                            'MULTIPLE_CHOICE_CHECKBOX',
+                            'QUANTITY_INPUT',
+                            'TEXT_INPUT'
          )),
     display_order INT,
     is_required BOOLEAN DEFAULT TRUE,
-
-    -- Cột cho logic điều kiện
-    parent_option_id INT REFERENCES service_options(option_id), -- Câu hỏi cha
-    parent_choice_id INT REFERENCES service_option_choices(choice_id), -- Câu trả lời kích hoạt
-
-    -- Cột cho validation
-    validation_rules JSONB -- Lưu các quy tắc (ví dụ: {"min": 1, "max": 5})
+    parent_option_id INT REFERENCES service_options(option_id),
+    parent_choice_id INT,
+    validation_rules JSONB
 );
 
 CREATE TABLE service_option_choices (
     choice_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     option_id INT NOT NULL REFERENCES service_options(option_id) ON DELETE CASCADE,
-    label TEXT NOT NULL, -- Tên hiển thị của lựa chọn (thay cho choice_name)
-    is_default BOOLEAN DEFAULT FALSE, -- Lựa chọn này có được chọn sẵn không
+    label TEXT NOT NULL,
+    is_default BOOLEAN DEFAULT FALSE,
     display_order INT
 );
+
+ALTER TABLE service_options
+ADD CONSTRAINT fk_parent_choice
+FOREIGN KEY (parent_choice_id)
+REFERENCES service_option_choices(choice_id);
 
 -- Tính toán giá tổng
 CREATE TABLE pricing_rules (
