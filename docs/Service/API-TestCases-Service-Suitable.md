@@ -310,7 +310,7 @@ Based on housekeeping_service_v7.sql:
   - Booking time is in the future.
 - **Input**:
   - **Method**: `GET`
-  - **URL**: `/api/v1/customer/services/suitable?serviceId=1&bookingTime=2025-09-05T10:00:00&district=Quận Tân Phú&city=TP. Hồ Chí Minh`
+  - **URL**: `/api/v1/customer/services/employee/suitable?serviceId=1&bookingTime=2025-09-05T10:00:00&district=Quận Tân Phú&city=TP. Hồ Chí Minh`
   - **Query Parameters**: 
     - `serviceId = 1`
     - `bookingTime = 2025-09-05T10:00:00`
@@ -386,7 +386,7 @@ Based on housekeeping_service_v7.sql:
   - No employees are available in the specified district and time.
 - **Input**:
   - **Method**: `GET`
-  - **URL**: `/api/v1/customer/services/suitable?serviceId=1&bookingTime=2025-09-05T02:00:00&district=Quận 12&city=TP. Hồ Chí Minh`
+  - **URL**: `/api/v1/customer/services/employee/suitable?serviceId=1&bookingTime=2025-09-05T02:00:00&district=Quận 12&city=TP. Hồ Chí Minh`
   - **Query Parameters**: 
     - `serviceId = 1`
     - `bookingTime = 2025-09-05T02:00:00`
@@ -425,7 +425,7 @@ Based on housekeeping_service_v7.sql:
   - Customer is authenticated with valid token.
 - **Input**:
   - **Method**: `GET`
-  - **URL**: `/api/v1/customer/services/suitable?serviceId=1`
+  - **URL**: `/api/v1/customer/services/employee/suitable?serviceId=1`
   - **Query Parameters**: 
     - `serviceId = 1` (missing bookingTime)
   - **Headers**: 
@@ -462,7 +462,7 @@ Based on housekeeping_service_v7.sql:
   - Service with ID 999 does not exist.
 - **Input**:
   - **Method**: `GET`
-  - **URL**: `/api/v1/customer/services/suitable?serviceId=999&bookingTime=2025-09-05T10:00:00&district=Quận Tân Phú&city=TP. Hồ Chí Minh`
+  - **URL**: `/api/v1/customer/services/employee/suitable?serviceId=999&bookingTime=2025-09-05T10:00:00&district=Quận Tân Phú&city=TP. Hồ Chí Minh`
   - **Query Parameters**: 
     - `serviceId = 999`
     - `bookingTime = 2025-09-05T10:00:00`
@@ -502,7 +502,7 @@ Based on housekeeping_service_v7.sql:
   - Service with ID 1 exists and is active.
 - **Input**:
   - **Method**: `GET`
-  - **URL**: `/api/v1/customer/services/suitable?serviceId=1&bookingTime=2024-09-01T10:00:00&district=Quận Tân Phú&city=TP. Hồ Chí Minh`
+  - **URL**: `/api/v1/customer/services/employee/suitable?serviceId=1&bookingTime=2024-09-01T10:00:00&district=Quận Tân Phú&city=TP. Hồ Chí Minh`
   - **Query Parameters**: 
     - `serviceId = 1`
     - `bookingTime = 2024-09-01T10:00:00` (past date)
@@ -542,7 +542,7 @@ Based on housekeeping_service_v7.sql:
 - **Preconditions**: None
 - **Input**:
   - **Method**: `GET`
-  - **URL**: `/api/v1/customer/services/suitable?serviceId=1&bookingTime=2025-09-05T10:00:00`
+  - **URL**: `/api/v1/customer/services/employee/suitable?serviceId=1&bookingTime=2025-09-05T10:00:00`
   - **Headers**: None
 - **Expected Output**:
   ```json
@@ -575,7 +575,7 @@ Based on housekeeping_service_v7.sql:
   - Customer is authenticated with valid token.
 - **Input**:
   - **Method**: `GET`
-  - **URL**: `/api/v1/customer/services/suitable?serviceId=1&bookingTime=invalid-date&district=Quận Tân Phú&city=TP. Hồ Chí Minh`
+  - **URL**: `/api/v1/customer/services/employee/suitable?serviceId=1&bookingTime=invalid-date&district=Quận Tân Phú&city=TP. Hồ Chí Minh`
   - **Query Parameters**: 
     - `serviceId = 1`
     - `bookingTime = invalid-date`

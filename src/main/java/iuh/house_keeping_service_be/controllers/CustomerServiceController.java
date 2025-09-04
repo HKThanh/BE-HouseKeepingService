@@ -1,15 +1,23 @@
 package iuh.house_keeping_service_be.controllers;
 
 import iuh.house_keeping_service_be.config.JwtUtil;
+import iuh.house_keeping_service_be.dtos.EmployeeSchedule.ApiResponse;
+import iuh.house_keeping_service_be.dtos.EmployeeSchedule.SuitableEmployeeRequest;
+import iuh.house_keeping_service_be.dtos.EmployeeSchedule.SuitableEmployeeResponse;
 import iuh.house_keeping_service_be.dtos.Service.*;
 import iuh.house_keeping_service_be.services.AdminService.PermissionService;
+import iuh.house_keeping_service_be.services.EmployeeScheduleService.EmployeeScheduleService;
 import iuh.house_keeping_service_be.services.ServiceService.ServiceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -20,6 +28,7 @@ public class CustomerServiceController {
 
     private final ServiceService serviceService;
     private final PermissionService permissionService;
+    private final EmployeeScheduleService employeeScheduleService;
     private final JwtUtil jwtUtil;
 
     @GetMapping
@@ -242,6 +251,30 @@ public class CustomerServiceController {
                             "Lỗi hệ thống khi tính toán giá",
                             null
                     ));
+        }
+    }
+
+    @GetMapping("/employee/suitable")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_CUSTOMER')")
+    public ResponseEntity<ApiResponse<List<SuitableEmployeeResponse>>> findSuitableEmployees(
+            @RequestParam Integer serviceId,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime bookingTime,
+            @RequestParam(required = false) String district,
+            @RequestParam(required = false) String city) {
+
+        log.info("Finding suitable employees for service: {}, booking time: {}, district: {}, city: {}",
+                serviceId, bookingTime, district, city);
+
+        try {
+            SuitableEmployeeRequest request = new SuitableEmployeeRequest(serviceId, bookingTime, district, city);
+            ApiResponse<List<SuitableEmployeeResponse>> response = employeeScheduleService.findSuitableEmployees(request);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error in findSuitableEmployees: ", e);
+            return ResponseEntity.internalServerError().body(
+                    new ApiResponse<>(false, "Internal server error: " + e.getMessage(), null)
+            );
         }
     }
 }
