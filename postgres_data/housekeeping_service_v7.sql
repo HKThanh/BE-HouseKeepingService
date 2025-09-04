@@ -616,4 +616,4 @@ INSERT INTO pricing_rules (service_id, rule_name, condition_logic, price_adjustm
     (2, 'Phụ thu nhà phố lớn', 'ALL', 250000, 1);
 
 -- Gán 2 điều kiện cho quy tắc trên (rule_id=1)
-INSERT INTO rule_conditions (rule_id, choice_id) VALUES (1, 2), (1, 5);
+INSERT INTO rule_conditions (rule_id, choice_id) VALUES (1, 2), (1, 4);

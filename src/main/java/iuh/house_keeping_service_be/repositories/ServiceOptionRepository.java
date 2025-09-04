@@ -10,5 +10,11 @@ import java.util.List;
 
 @Repository
 public interface ServiceOptionRepository extends JpaRepository<ServiceOption, Integer> {
+    @Query("SELECT DISTINCT so FROM ServiceOption so " +
+            "LEFT JOIN FETCH so.choices soc " +
+            "WHERE so.service.serviceId = :serviceId " +
+            "AND so.parentOption IS NULL " +
+            "ORDER BY so.displayOrder ASC")
+    List<ServiceOption> findByServiceIdWithChoices(@Param("serviceId") Integer serviceId);
 
 }

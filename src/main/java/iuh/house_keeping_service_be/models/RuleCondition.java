@@ -11,7 +11,6 @@ import org.hibernate.annotations.OnDeleteAction;
 @Entity
 @Table(name = "rule_conditions")
 public class RuleCondition {
-    @SequenceGenerator(name = "rule_conditions_id_gen", sequenceName = "pricing_rules_rule_id_seq", allocationSize = 1)
     @EmbeddedId
     private RuleConditionId id;
 

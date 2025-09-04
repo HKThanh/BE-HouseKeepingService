@@ -10,5 +10,6 @@ import java.util.List;
 
 @Repository
 public interface PricingRuleRepository extends JpaRepository<PricingRule, Integer> {
-
+    @Query("SELECT pr FROM PricingRule pr WHERE pr.service.id = :serviceId ORDER BY pr.priority DESC")
+    List<PricingRule> findByServiceIdOrderByPriorityDesc(@Param("serviceId") Integer serviceId);
 }
