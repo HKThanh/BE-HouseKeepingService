@@ -50,11 +50,6 @@ public class BookingDetail {
     @OneToMany(mappedBy = "bookingDetail", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Assignment> assignments = new ArrayList<>();
 
-    @PrePersist
-    protected void onCreate() {
-        this.id = UUID.randomUUID().toString();
-    }
-
     // Helper methods
     public void addAssignment(Assignment assignment) {
         assignments.add(assignment);

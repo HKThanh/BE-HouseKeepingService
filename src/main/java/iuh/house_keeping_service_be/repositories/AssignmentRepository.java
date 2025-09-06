@@ -98,6 +98,19 @@ package iuh.house_keeping_service_be.repositories;
 //                                                @Param("startTime") LocalDateTime startTime,
 //                                                @Param("endTime") LocalDateTime endTime);
 
+//    @Query(value = "SELECT a.* FROM assignments a " +
+//            "JOIN booking_details bd ON a.booking_detail_id = bd.booking_detail_id " +
+//            "JOIN bookings b ON bd.booking_id = b.booking_id " +
+//            "JOIN service s ON bd.service_id = s.service_id " +
+//            "WHERE a.employee_id = :employeeId " +
+//            "AND a.status NOT IN ('CANCELLED', 'COMPLETED') " +
+//            "AND b.booking_time < :endTime " +
+//            "AND (b.booking_time + make_interval(hours => s.estimated_duration_hours)) > :startTime",
+//            nativeQuery = true)
+//    List<Assignment> findConflictingAssignments(@Param("employeeId") String employeeId,
+//                                                @Param("startTime") LocalDateTime startTime,
+//                                                @Param("endTime") LocalDateTime endTime);
+
     @Query(value = "SELECT a.* FROM assignments a " +
             "JOIN booking_details bd ON a.booking_detail_id = bd.booking_detail_id " +
             "JOIN bookings b ON bd.booking_id = b.booking_id " +
@@ -105,7 +118,7 @@ package iuh.house_keeping_service_be.repositories;
             "WHERE a.employee_id = :employeeId " +
             "AND a.status NOT IN ('CANCELLED', 'COMPLETED') " +
             "AND b.booking_time < :endTime " +
-            "AND (b.booking_time + make_interval(hours => s.estimated_duration_hours)) > :startTime",
+            "AND (b.booking_time + (s.estimated_duration_hours * INTERVAL '1 hour')) > :startTime",
             nativeQuery = true)
     List<Assignment> findConflictingAssignments(@Param("employeeId") String employeeId,
                                                 @Param("startTime") LocalDateTime startTime,
