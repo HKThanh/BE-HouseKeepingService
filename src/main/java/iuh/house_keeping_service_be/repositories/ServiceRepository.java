@@ -26,4 +26,39 @@ public interface ServiceRepository extends JpaRepository<Service, Integer> {
 
     @Query("SELECT s FROM Service s WHERE s.category.categoryId = :categoryId AND s.isActive = true ORDER BY s.name ASC")
     List<Service> findActiveServicesByCategory(@Param("categoryId") Integer categoryId);
+
+        // Find active services ordered by name
+    List<Service> findByIsActiveTrueOrderByName();
+    
+    // Find by category
+    @Query("SELECT s FROM Service s WHERE s.category.categoryId = :categoryId AND s.isActive = true ORDER BY s.name")
+    List<Service> findByCategoryIdAndIsActiveOrderByName(@Param("categoryId") Integer categoryId);
+    
+    // Find service with options and choices
+    @Query("SELECT DISTINCT s FROM Service s " +
+           "LEFT JOIN FETCH s.serviceOptions so " +
+           "LEFT JOIN FETCH so.choices soc " +
+           "WHERE s.id = :serviceId AND s.isActive = true " +
+           "ORDER BY so.displayOrder, soc.displayOrder")
+    Optional<Service> findServiceWithOptions(@Param("serviceId") Integer serviceId);
+    
+    // Find services by IDs
+    @Query("SELECT s FROM Service s WHERE s.serviceId IN :serviceIds AND s.isActive = true")
+    List<Service> findActiveServicesByIds(@Param("serviceIds") List<Integer> serviceIds);
+    
+    // Check service availability for booking
+    @Query("SELECT s FROM Service s WHERE s.serviceId = :serviceId AND s.isActive = true")
+    Optional<Service> findBookableService(@Param("serviceId") Integer serviceId);
+    
+    // Get popular services with booking count
+    @Query("SELECT s, COUNT(bd) as bookingCount FROM Service s " +
+           "LEFT JOIN BookingDetail bd ON s.serviceId = bd.service.serviceId " +
+           "WHERE s.isActive = true " +
+           "GROUP BY s.serviceId " +
+           "ORDER BY bookingCount DESC")
+    List<Object[]> findPopularServices();
+    
+    // Find service with category information
+    @Query("SELECT s FROM Service s LEFT JOIN FETCH s.category WHERE s.serviceId = :serviceId")
+    Optional<Service> findServiceWithCategory(@Param("serviceId") Integer serviceId);
 }

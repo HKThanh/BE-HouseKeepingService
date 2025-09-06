@@ -67,4 +67,77 @@ package iuh.house_keeping_service_be.repositories;
 
         @Query("SELECT COUNT(a) FROM Assignment a WHERE a.employee.employeeId = :employeeId AND a.status = 'COMPLETED'")
         Integer countCompletedJobsByEmployee(@Param("employeeId") String employeeId);
+
+            // Find by employee ID
+    @Query("SELECT a FROM Assignment a WHERE a.employee.employeeId = :employeeId ORDER BY a.createdAt DESC")
+    List<Assignment> findByEmployeeIdOrderByCreatedAtDesc(@Param("employeeId") String employeeId);
+    
+    // Find by booking detail ID
+    @Query("SELECT a FROM Assignment a WHERE a.bookingDetail.id = :bookingDetailId")
+    List<Assignment> findByBookingDetailId(@Param("bookingDetailId") String bookingDetailId);
+    
+    // Find by status
+    List<Assignment> findByStatusOrderByCreatedAtDesc(AssignmentStatus status);
+    
+    // Check employee availability for time range (PostgreSQL specific)
+//    @Query("SELECT a FROM Assignment a " +
+//           "WHERE a.employee.id = :employeeId " +
+//           "AND a.status NOT IN (iuh.house_keeping_service_be.enums.AssignmentStatus.CANCELLED, iuh.house_keeping_service_be.enums.AssignmentStatus.COMPLETED) " +
+//           "AND a.bookingDetail.booking.bookingTime < :endTime " +
+//           "AND (a.bookingDetail.booking.bookingTime + (a.bookingDetail.service.estimatedDurationHours || ' hours')::INTERVAL) > :startTime")
+//    List<Assignment> findConflictingAssignments(@Param("employeeId") String employeeId,
+//                                               @Param("startTime") LocalDateTime startTime,
+//                                               @Param("endTime") LocalDateTime endTime);
+
+//    @Query("SELECT a FROM Assignment a " +
+//            "WHERE a.employee.employeeId = :employeeId " +
+//            "AND a.status NOT IN (iuh.house_keeping_service_be.enums.AssignmentStatus.CANCELLED, iuh.house_keeping_service_be.enums.AssignmentStatus.COMPLETED) " +
+//            "AND a.bookingDetail.booking.bookingTime < :endTime " +
+//            "AND (a.bookingDetail.booking.bookingTime + FUNCTION('INTERVAL', a.bookingDetail.service.estimatedDurationHours || ' HOUR')) > :startTime")
+//    List<Assignment> findConflictingAssignments(@Param("employeeId") String employeeId,
+//                                                @Param("startTime") LocalDateTime startTime,
+//                                                @Param("endTime") LocalDateTime endTime);
+
+    @Query(value = "SELECT a.* FROM assignments a " +
+            "JOIN booking_details bd ON a.booking_detail_id = bd.booking_detail_id " +
+            "JOIN bookings b ON bd.booking_id = b.booking_id " +
+            "JOIN service s ON bd.service_id = s.service_id " +
+            "WHERE a.employee_id = :employeeId " +
+            "AND a.status NOT IN ('CANCELLED', 'COMPLETED') " +
+            "AND b.booking_time < :endTime " +
+            "AND (b.booking_time + make_interval(hours => s.estimated_duration_hours)) > :startTime",
+            nativeQuery = true)
+    List<Assignment> findConflictingAssignments(@Param("employeeId") String employeeId,
+                                                @Param("startTime") LocalDateTime startTime,
+                                                @Param("endTime") LocalDateTime endTime);
+    
+    // Get employee workload for specific date (PostgreSQL DATE function)
+    @Query("SELECT COUNT(a) FROM Assignment a " +
+           "WHERE a.employee.employeeId = :employeeId " +
+           "AND DATE(a.bookingDetail.booking.bookingTime) = DATE(:date) " +
+           "AND a.status NOT IN (iuh.house_keeping_service_be.enums.AssignmentStatus.CANCELLED)")
+    long getEmployeeWorkloadForDate(@Param("employeeId") String employeeId,
+                                   @Param("date") LocalDateTime date);
+    
+    // Find assignments in date range
+    @Query("SELECT a FROM Assignment a " +
+           "WHERE a.bookingDetail.booking.bookingTime BETWEEN :startDate AND :endDate " +
+           "ORDER BY a.bookingDetail.booking.bookingTime")
+    List<Assignment> findAssignmentsByDateRange(@Param("startDate") LocalDateTime startDate,
+                                               @Param("endDate") LocalDateTime endDate);
+    
+    // Get employee assignment statistics
+    @Query("SELECT a.status, COUNT(a) FROM Assignment a " +
+           "WHERE a.employee.employeeId = :employeeId " +
+           "GROUP BY a.status")
+    List<Object[]> getEmployeeAssignmentStats(@Param("employeeId") String employeeId);
+    
+    // Find assignments with employee and booking details
+    @Query("SELECT a FROM Assignment a " +
+           "LEFT JOIN FETCH a.employee e " +
+           "LEFT JOIN FETCH a.bookingDetail bd " +
+           "LEFT JOIN FETCH bd.booking b " +
+           "LEFT JOIN FETCH bd.service s " +
+           "WHERE a.bookingDetail.id = :bookingDetailId")
+    List<Assignment> findAssignmentsWithDetailsByBookingDetail(@Param("bookingDetailId") String bookingDetailId);
   }
