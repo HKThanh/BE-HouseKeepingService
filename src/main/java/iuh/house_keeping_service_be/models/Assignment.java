@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.GenericGenerator;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
@@ -54,6 +55,11 @@ public class Assignment {
         updatedAt = LocalDateTime.now();
     }
 
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
+
     // Helper method to get booking time from booking detail
     public LocalDateTime getBookingTime() {
         return bookingDetail != null && bookingDetail.getBooking() != null
@@ -66,5 +72,20 @@ public class Assignment {
         return bookingDetail != null && bookingDetail.getService() != null
             ? bookingDetail.getService().getEstimatedDurationHours().doubleValue()
             : null;
+    }
+
+    // Helper methods for time range calculations
+    public LocalDateTime getStartTime() {
+        return bookingDetail.getBooking().getBookingTime();
+    }
+
+    public LocalDateTime getEndTime() {
+        LocalDateTime startTime = getStartTime();
+        BigDecimal duration = bookingDetail.getService().getEstimatedDurationHours();
+        if (duration != null) {
+            return startTime.plusHours(duration.longValue())
+                    .plusMinutes((long) ((duration.remainder(BigDecimal.ONE).doubleValue() * 60)));
+        }
+        return startTime.plusHours(2); // Default 2 hours
     }
 }

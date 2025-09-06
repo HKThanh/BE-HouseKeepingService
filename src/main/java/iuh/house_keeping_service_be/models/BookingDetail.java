@@ -8,7 +8,11 @@ import lombok.Setter;
 import org.hibernate.annotations.GenericGenerator;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "booking_details")
@@ -40,6 +44,44 @@ public class BookingDetail {
     @Column(name = "sub_total", precision = 10, scale = 2)
     private BigDecimal subTotal;
 
+    @Column(name = "selected_choice_ids", columnDefinition = "TEXT")
+    private String selectedChoiceIds;
+
     @OneToMany(mappedBy = "bookingDetail", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Assignment> assignments;
+    private List<Assignment> assignments = new ArrayList<>();
+
+    @PrePersist
+    protected void onCreate() {
+        this.id = UUID.randomUUID().toString();
+    }
+
+    // Helper methods
+    public void addAssignment(Assignment assignment) {
+        assignments.add(assignment);
+        assignment.setBookingDetail(this);
+    }
+
+    public List<Integer> getSelectedChoiceIdsList() {
+        if (selectedChoiceIds == null || selectedChoiceIds.trim().isEmpty()) {
+            return new ArrayList<>();
+        }
+        try {
+            return Arrays.stream(selectedChoiceIds.split(","))
+                    .map(String::trim)
+                    .map(Integer::parseInt)
+                    .collect(Collectors.toList());
+        } catch (NumberFormatException e) {
+            return new ArrayList<>();
+        }
+    }
+
+    public void setSelectedChoiceIdsList(List<Integer> choiceIds) {
+        if (choiceIds == null || choiceIds.isEmpty()) {
+            this.selectedChoiceIds = "";
+        } else {
+            this.selectedChoiceIds = choiceIds.stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(","));
+        }
+    }
 }

@@ -39,7 +39,7 @@ public class EmployeeUnavailability {
     private String reason;
 
     @Column(name = "is_approved", nullable = false)
-    private Boolean isApproved = true;
+    private Boolean isApproved;
 
     @CreationTimestamp
     @Column(name = "created_at")

@@ -50,4 +50,17 @@ public class Payment {
     @CreationTimestamp
     @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+     @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
+
+    // Helper method to generate transaction code
+    public void generateTransactionCode() {
+        if (this.transactionCode == null) {
+            this.transactionCode = "TXN" + System.currentTimeMillis() + 
+                                  String.format("%03d", (int)(Math.random() * 1000));
+        }
+    }
 }

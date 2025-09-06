@@ -13,6 +13,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Entity
 @Table(name = "bookings")
@@ -69,4 +70,35 @@ public class Booking {
 
     @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Payment> payments;
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+        // Generate booking code
+        this.bookingCode = generateBookingCode();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    private String generateBookingCode() {
+        // Generate unique booking code (e.g., BK + timestamp + random)
+        long timestamp = System.currentTimeMillis();
+        int random = (int) (Math.random() * 1000);
+        return String.format("BK%d%03d", timestamp % 100000, random);
+    }
+
+    // Helper methods
+    public void addBookingDetail(BookingDetail detail) {
+        bookingDetails.add(detail);
+        detail.setBooking(this);
+    }
+
+    public void addPayment(Payment payment) {
+        payments.add(payment);
+        payment.setBooking(this);
+    }
 }

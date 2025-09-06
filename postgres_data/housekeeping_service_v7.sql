@@ -154,6 +154,9 @@ CREATE TABLE booking_details (
     CONSTRAINT unique_booking_service UNIQUE (booking_id, service_id)
 );
 
+ALTER TABLE booking_details 
+ADD COLUMN selected_choice_ids TEXT;
+
 -- Các tuỳ chọn cho dịch vụ
 CREATE TABLE service_options (
     option_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
