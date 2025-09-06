@@ -11,4 +11,6 @@ import java.util.List;
 public interface RuleConditionRepository extends JpaRepository<RuleCondition, RuleConditionId> {
     @Query("SELECT rc.choice.id FROM RuleCondition rc WHERE rc.rule.id = :ruleId")
     List<Integer> findChoiceIdsByRuleId(@Param("ruleId") Integer ruleId);
+
+    RuleCondition findByChoice_Id(Integer choiceId);
 }
