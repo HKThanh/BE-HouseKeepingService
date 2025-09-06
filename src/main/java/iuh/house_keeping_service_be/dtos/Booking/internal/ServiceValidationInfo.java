@@ -1,6 +1,7 @@
 package iuh.house_keeping_service_be.dtos.Booking.internal;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -10,6 +11,7 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class ServiceValidationInfo {
     private Integer serviceId;
     private String serviceName;
@@ -21,4 +23,14 @@ public class ServiceValidationInfo {
     private BigDecimal calculatedPrice;
     private BigDecimal expectedPrice;
     private boolean priceMatches;
+    
+    public static ServiceValidationInfo invalid(Integer serviceId, String reason) {
+        return ServiceValidationInfo.builder()
+            .serviceId(serviceId)
+            .serviceName(reason)
+            .exists(false)
+            .active(false)
+            .priceMatches(false)
+            .build();
+    }
 }

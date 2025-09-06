@@ -15,6 +15,4 @@ public class SelectedChoiceInfo {
     private String optionName;
     private BigDecimal priceAdjustment;
     private String formattedPriceAdjustment;
-    private String adjustmentType; // FIXED, PERCENTAGE
-    private String description;
 }

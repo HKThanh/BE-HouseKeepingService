@@ -8,4 +8,13 @@ public class ResourceNotFoundException extends RuntimeException {
     public ResourceNotFoundException(String message) {
         super(message);
     }
+
+    public ResourceNotFoundException(String message, Throwable cause) {
+        super(message, cause);
+    }
+
+    // Static factory method cho clarity
+    public static ResourceNotFoundException withCustomMessage(String message) {
+        return new ResourceNotFoundException(message);
+    }
 }
