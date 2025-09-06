@@ -4,6 +4,8 @@ import iuh.house_keeping_service_be.dtos.Booking.request.BookingCreateRequest;
 import iuh.house_keeping_service_be.dtos.Booking.response.*;
 import iuh.house_keeping_service_be.dtos.Booking.internal.BookingValidationResult;
 import iuh.house_keeping_service_be.models.*;
+import iuh.house_keeping_service_be.repositories.RuleConditionRepository;
+import iuh.house_keeping_service_be.repositories.ServiceOptionChoiceRepository;
 import iuh.house_keeping_service_be.utils.BookingDTOFormatter;
 
 import org.springframework.stereotype.Component;
@@ -15,12 +17,14 @@ import java.util.stream.Collectors;
 @Component
 @RequiredArgsConstructor
 public class BookingMapper {
+    private final ServiceOptionChoiceRepository serviceOptionChoiceRepository;
+    private final RuleConditionRepository ruleConditionRepository;
 
     public Booking toEntity(BookingCreateRequest request, BookingValidationResult validation) {
         Booking booking = new Booking();
         booking.setBookingTime(request.bookingTime());
         booking.setNote(request.note());
-        booking.setTotalAmount(validation.calculatedTotalAmount());
+        booking.setTotalAmount(validation.getCalculatedTotalAmount());
         return booking;
     }
 
@@ -112,7 +116,26 @@ public class BookingMapper {
         
         // TODO: Implement logic to fetch choice details from selectedChoiceIds
         // You might need to inject ServiceOptionChoiceRepository here
-        return List.of();
+
+        String[] choiceIdStrs = detail.getSelectedChoiceIds().split(",");
+
+        List<Integer> choiceIds =
+            java.util.Arrays.stream(choiceIdStrs)
+                .map(String::trim)
+                .map(Integer::parseInt)
+                .collect(Collectors.toList());
+
+        List<ServiceOptionChoice> choices = serviceOptionChoiceRepository.findByIdIn(choiceIds);
+
+        return choices.stream()
+                .map(choice -> new SelectedChoiceInfo(
+                    choice.getId(),
+                        choice.getLabel(),
+                        choice.getOption().getLabel(),
+                        ruleConditionRepository.findByChoice_Id(choice.getId()).getRule().getPriceAdjustment(),
+                        BookingDTOFormatter.formatPrice(ruleConditionRepository.findByChoice_Id(choice.getId()).getRule().getPriceAdjustment())
+                ))
+                .collect(Collectors.toList());
     }
 
     public ServiceInfo toServiceInfo(Service service) {
