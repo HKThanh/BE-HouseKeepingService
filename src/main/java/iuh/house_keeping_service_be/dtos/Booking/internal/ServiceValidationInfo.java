@@ -23,14 +23,24 @@ public class ServiceValidationInfo {
     private BigDecimal calculatedPrice;
     private BigDecimal expectedPrice;
     private boolean priceMatches;
+    private String errorMessage;
     
-    public static ServiceValidationInfo invalid(Integer serviceId, String reason) {
+    public static ServiceValidationInfo invalid(Integer serviceId, String errorMessage) {
         return ServiceValidationInfo.builder()
             .serviceId(serviceId)
-            .serviceName(reason)
+            .serviceName("Unknown Service")
             .exists(false)
             .active(false)
             .priceMatches(false)
+            .errorMessage(errorMessage)
+            .calculatedPrice(BigDecimal.ZERO)
+            .expectedPrice(BigDecimal.ZERO)
+            .validChoiceIds(List.of())
+            .invalidChoiceIds(List.of())
             .build();
+    }
+    
+    public boolean isValid() {
+        return exists && active && priceMatches && (invalidChoiceIds == null || invalidChoiceIds.isEmpty());
     }
 }

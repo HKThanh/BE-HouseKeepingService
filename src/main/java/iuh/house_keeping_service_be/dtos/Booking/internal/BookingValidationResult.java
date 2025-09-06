@@ -34,6 +34,8 @@ public class BookingValidationResult {
             .valid(false)
             .errors(errors)
             .conflicts(List.of())
+            .calculatedTotalAmount(BigDecimal.ZERO)
+            .serviceValidations(List.of())
             .build();
     }
     
@@ -42,6 +44,8 @@ public class BookingValidationResult {
             .valid(false)
             .errors(List.of())
             .conflicts(conflicts)
+            .calculatedTotalAmount(BigDecimal.ZERO)
+            .serviceValidations(List.of())
             .build();
     }
 }
