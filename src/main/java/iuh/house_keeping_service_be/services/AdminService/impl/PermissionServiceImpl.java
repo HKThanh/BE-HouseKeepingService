@@ -27,7 +27,7 @@ public class PermissionServiceImpl implements PermissionService {
     @Override
     public RoleListResponse getAllManageableRoles() {
         try {
-            List<Role> roles = roleRepository.findNonAdminRoles();
+            List<Role> roles = roleRepository.findAllOrderById();
 
             List<RoleData> roleDataList = roles.stream()
                 .map(role -> new RoleData(role.getRoleId(), role.getRoleName().name()))

@@ -1,6 +1,7 @@
 package iuh.house_keeping_service_be.controllers;
 
 import iuh.house_keeping_service_be.config.JwtUtil;
+import iuh.house_keeping_service_be.dtos.Admin.UserPermission.response.PermissionManagementResponse;
 import iuh.house_keeping_service_be.dtos.Admin.UserPermission.response.UserPermissionsResponse;
 import iuh.house_keeping_service_be.dtos.Service.ServiceDetailResponse;
 import iuh.house_keeping_service_be.enums.RoleName;
@@ -82,7 +83,14 @@ public class EmployeeController {
 
             Account employeeAccount = employee.getAccount();
 
-            UserPermissionsResponse userPermissionsResponse = permissionService.getUserPermissions(employeeAccount.getUsername());
+//            UserPermissionsResponse userPermissionsResponse = permissionService.getUserPermissions(employeeAccount.getUsername());
+
+
+            PermissionManagementResponse userPermissionsResponse = permissionService.getRolePermissions(employeeAccount.getRoles().stream()
+                    .filter(role -> role.getRoleName() != RoleName.CUSTOMER)
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Nhân viên không có vai trò hợp lệ"))
+                    .getRoleId());
 
             return ResponseEntity.ok(Map.of(
                     "success", true,

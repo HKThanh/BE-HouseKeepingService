@@ -1,10 +1,12 @@
 package iuh.house_keeping_service_be.controllers;
 
 import iuh.house_keeping_service_be.config.JwtUtil;
+import iuh.house_keeping_service_be.dtos.Admin.UserPermission.response.PermissionManagementResponse;
 import iuh.house_keeping_service_be.dtos.Admin.UserPermission.response.UserPermissionData;
 import iuh.house_keeping_service_be.dtos.Admin.UserPermission.response.UserPermissionsResponse;
 import iuh.house_keeping_service_be.dtos.Service.ServiceDetailResponse;
 import iuh.house_keeping_service_be.enums.RoleName;
+import iuh.house_keeping_service_be.models.Account;
 import iuh.house_keeping_service_be.models.Customer;
 import iuh.house_keeping_service_be.services.AdminService.PermissionService;
 import iuh.house_keeping_service_be.services.CustomerService.CustomerService;
@@ -82,8 +84,16 @@ public class CustomerController {
                 );
             }
 
-            UserPermissionsResponse userPermissionsResponse = permissionService.getUserPermissions(customer.getAccount().getUsername());
+            Account customerAccount = customer.getAccount();
 
+//            UserPermissionsResponse userPermissionsResponse = permissionService.getUserPermissions(customer.getAccount().getUsername());
+
+            PermissionManagementResponse userPermissionsResponse = permissionService.getRolePermissions(customerAccount.getRoles().stream()
+                .filter(role -> role.getRoleName().equals(RoleName.CUSTOMER))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Khách hàng không có vai trò hợp lệ"))
+                .getRoleId()
+            );
             return ResponseEntity.ok(Map.of(
                 "success", true,
                 "data", userPermissionsResponse
