@@ -4,6 +4,7 @@ import iuh.house_keeping_service_be.dtos.Booking.request.BookingCreateRequest;
 import iuh.house_keeping_service_be.dtos.Booking.response.*;
 import iuh.house_keeping_service_be.dtos.Booking.internal.BookingValidationResult;
 import iuh.house_keeping_service_be.models.*;
+import iuh.house_keeping_service_be.repositories.PaymentMethodRepository;
 import iuh.house_keeping_service_be.repositories.RuleConditionRepository;
 import iuh.house_keeping_service_be.repositories.ServiceOptionChoiceRepository;
 import iuh.house_keeping_service_be.utils.BookingDTOFormatter;
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
 public class BookingMapper {
     private final ServiceOptionChoiceRepository serviceOptionChoiceRepository;
     private final RuleConditionRepository ruleConditionRepository;
+    private final PaymentMethodRepository paymentMethodRepository;
 
     public Booking toEntity(BookingCreateRequest request, BookingValidationResult validation) {
         Booking booking = new Booking();
@@ -178,10 +180,12 @@ public class BookingMapper {
     }
 
     public PaymentInfo toPaymentInfo(Payment payment) {
+        String paymentMethodName = paymentMethodRepository.findPaymentMethodNameByPaymentId(payment.getId());
+
         return new PaymentInfo(
             payment.getId(),
             payment.getAmount(),
-            payment.getPaymentMethod(),
+            paymentMethodName,
             payment.getPaymentStatus(),
             payment.getTransactionCode(),
             payment.getCreatedAt(),

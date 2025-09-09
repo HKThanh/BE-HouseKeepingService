@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 public record PaymentInfo(
         String paymentId,
         BigDecimal amount,
-        PaymentMethod paymentMethod,
+        String paymentMethod,
         PaymentStatus paymentStatus,
         String transactionCode,
 

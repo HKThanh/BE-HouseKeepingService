@@ -1,6 +1,6 @@
 package iuh.house_keeping_service_be.models;
 
-import iuh.house_keeping_service_be.enums.PaymentMethod;
+import iuh.house_keeping_service_be.models.PaymentMethod;
 import iuh.house_keeping_service_be.enums.PaymentStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -33,8 +33,8 @@ public class Payment {
     @Column(name = "amount", precision = 10, scale = 2, nullable = false)
     private BigDecimal amount;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "payment_method", length = 20)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "method_id")
     private PaymentMethod paymentMethod;
 
     @Enumerated(EnumType.STRING)
