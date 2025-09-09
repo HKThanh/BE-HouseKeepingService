@@ -1,8 +1,11 @@
 package iuh.house_keeping_service_be.services.PaymentService;
 
 import iuh.house_keeping_service_be.dtos.payment.CreatePaymentRequest;
+import iuh.house_keeping_service_be.dtos.payment.PaymentMethodResponse;
 import iuh.house_keeping_service_be.dtos.payment.PaymentResponse;
 import iuh.house_keeping_service_be.dtos.payment.UpdatePaymentStatusRequest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -33,5 +36,7 @@ public interface PaymentService {
      * @param customerId ID của khách hàng.
      * @return Danh sách các thanh toán.
      */
-    List<PaymentResponse> getPaymentHistoryByCustomerId(String customerId);
+    Page<PaymentResponse> getPaymentHistoryByCustomerId(String customerId, Pageable pageable);
+
+    List<PaymentMethodResponse> getAllActivePaymentMethods();
 }

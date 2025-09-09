@@ -17,7 +17,7 @@ public class PaymentResponse {
     private BigDecimal amount;
     private PaymentStatus status;
     private String paymentMethodName; // Tên phương thức thanh toán (ví dụ: "Ví điện tử Momo")
-    private String iconUrl; // URL icon của phương thức thanh toán
+//    private String iconUrl; // URL icon của phương thức thanh toán
     private String transactionCode;
     private LocalDateTime createdAt;
     private LocalDateTime paidAt;

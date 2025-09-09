@@ -4,6 +4,8 @@ import iuh.house_keeping_service_be.enums.PaymentMethodCode;
 import iuh.house_keeping_service_be.models.Payment;
 import iuh.house_keeping_service_be.enums.PaymentStatus;
 import iuh.house_keeping_service_be.enums.PaymentMethod;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -51,7 +53,11 @@ public interface PaymentRepository extends JpaRepository<Payment, String> {
            "ORDER BY p.createdAt DESC LIMIT 1")
     Optional<Payment> findLatestPaymentByBookingId(@Param("bookingId") String bookingId);
 
-    @Query("SELECT p FROM Payment p WHERE p.booking.customer.id = :customerId ORDER BY p.createdAt DESC")
+    @Query("SELECT p FROM Payment p WHERE p.booking.customer.customerId = :customerId")
+    Page<Payment> findByCustomerId(@Param("customerId") String customerId, Pageable pageable);
+
+
+    @Query("SELECT p FROM Payment p WHERE p.booking.customer.customerId = :customerId ORDER BY p.createdAt DESC")
     List<Payment> findByCustomerIdOrderByCreatedAtDesc(@Param("customerId") String customerId);
 
     List<Payment> findByPaymentMethod_MethodCode(PaymentMethodCode methodCode);

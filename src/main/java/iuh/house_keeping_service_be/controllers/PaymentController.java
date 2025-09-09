@@ -1,11 +1,17 @@
 package iuh.house_keeping_service_be.controllers; // Hoặc package tương ứng
 
 import iuh.house_keeping_service_be.dtos.payment.CreatePaymentRequest;
+import iuh.house_keeping_service_be.dtos.payment.PaymentMethodResponse;
 import iuh.house_keeping_service_be.dtos.payment.PaymentResponse;
 import iuh.house_keeping_service_be.dtos.payment.UpdatePaymentStatusRequest;
+import iuh.house_keeping_service_be.services.PaymentService.PaymentMethodService;
 import iuh.house_keeping_service_be.services.PaymentService.PaymentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -16,12 +22,13 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/v1/payments")
+@RequestMapping("/api/v1/customer/payments")
 @Slf4j
 @RequiredArgsConstructor
 public class PaymentController {
 
     private final PaymentService paymentService;
+    private final PaymentMethodService paymentMethodService;
 
     /**
      * API cho khách hàng tạo một yêu cầu thanh toán cho một lịch đặt.
@@ -49,13 +56,22 @@ public class PaymentController {
      */
     @GetMapping("/history/me")
     @PreAuthorize("hasAuthority('ROLE_CUSTOMER')")
-    public ResponseEntity<List<PaymentResponse>> getMyPaymentHistory() {
-        // Lấy thông tin người dùng đã xác thực từ SecurityContext
+    public ResponseEntity<Page<PaymentResponse>> getMyPaymentHistory(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String[] sort) {
+
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        log.info("Authenticated user: {}", authentication.getName());
         String customerId = authentication.getName();
-        List<PaymentResponse> history = paymentService.getPaymentHistoryByCustomerId(customerId);
-        return ResponseEntity.ok(history);
+
+        Sort.Direction direction = sort[1].equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC;
+        Sort.Order order = new Sort.Order(direction, sort[0]);
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(order));
+
+        Page<PaymentResponse> historyPage = paymentService.getPaymentHistoryByCustomerId(customerId, pageable);
+
+        return ResponseEntity.ok(historyPage);
     }
 
     /**
@@ -66,5 +82,11 @@ public class PaymentController {
         // TODO: Thêm logic xác thực request đến từ cổng thanh toán
         paymentService.updatePaymentStatus(request);
         return ResponseEntity.ok().build(); // Chỉ cần trả về 200 OK để xác nhận đã nhận
+    }
+
+    @GetMapping("/methods")
+    public ResponseEntity<List<PaymentMethodResponse>> getAvailablePaymentMethods() {
+        List<PaymentMethodResponse> methods = paymentMethodService.getAllActivePaymentMethods();
+        return ResponseEntity.ok(methods);
     }
 }

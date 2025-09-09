@@ -1,6 +1,7 @@
 package iuh.house_keeping_service_be.services.PaymentService.impl;
 
 import iuh.house_keeping_service_be.dtos.payment.CreatePaymentRequest;
+import iuh.house_keeping_service_be.dtos.payment.PaymentMethodResponse;
 import iuh.house_keeping_service_be.dtos.payment.PaymentResponse;
 import iuh.house_keeping_service_be.dtos.payment.UpdatePaymentStatusRequest;
 import iuh.house_keeping_service_be.models.Booking;
@@ -12,6 +13,8 @@ import iuh.house_keeping_service_be.repositories.PaymentMethodRepository;
 import iuh.house_keeping_service_be.repositories.PaymentRepository;
 import iuh.house_keeping_service_be.services.PaymentService.PaymentService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -75,9 +78,21 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<PaymentResponse> getPaymentHistoryByCustomerId(String customerId) {
-        return paymentRepository.findByCustomerIdOrderByCreatedAtDesc(customerId).stream()
-                .map(this::convertToPaymentResponse)
+    public Page<PaymentResponse> getPaymentHistoryByCustomerId(String customerId, Pageable pageable) {
+        // Gọi phương thức repository đã được cập nhật
+        Page<Payment> paymentPage = paymentRepository.findByCustomerId(customerId, pageable);
+
+        // Dùng hàm map của Page để chuyển đổi nội dung
+        return paymentPage.map(this::convertToPaymentResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PaymentMethodResponse> getAllActivePaymentMethods() {
+        List<PaymentMethod> methods = paymentMethodRepository.findAllActive();
+
+        return methods.stream()
+                .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
 
@@ -93,5 +108,15 @@ public class PaymentServiceImpl implements PaymentService {
                 .createdAt(payment.getCreatedAt())
                 .paidAt(payment.getPaidAt())
                 .build();
+    }
+
+    private PaymentMethodResponse convertToResponse(PaymentMethod method) {
+        // Giả sử bạn có DTO PaymentMethodResponse đã tạo trước đó
+        return new PaymentMethodResponse(
+                method.getMethodId(),
+                method.getMethodCode().name(), // Lấy tên từ Enum
+                method.getMethodName()
+//                method.getIconUrl()
+        );
     }
 }

@@ -555,10 +555,9 @@ INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status, 
 -- =================================================================================
 
 -- Thêm dữ liệu thanh toán
-INSERT INTO payments (payment_id, booking_id, amount, payment_method, payment_status, transaction_code, paid_at) VALUES
-('pay00001-0000-0000-0000-000000000001', 'b0000001-0000-0000-0000-000000000001', 380000.00, 'VNPAY', 'PAID', 'VNP123456789', '2025-08-20 13:05:00+07'),
-('pay00001-0000-0000-0000-000000000002', 'b0000001-0000-0000-0000-000000000002', 90000.00, 'MOMO', 'PENDING', NULL, NULL);
-
+INSERT INTO payments (payment_id, booking_id, amount, method_id, payment_status, transaction_code, paid_at) VALUES
+('pay00001-0000-0000-0000-000000000001', 'b0000001-0000-0000-0000-000000000001', 380000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'VNPAY'), 'PAID', 'VNP123456789', '2025-08-20 13:05:00+07'),
+('pay00001-0000-0000-0000-000000000002', 'b0000001-0000-0000-0000-000000000002', 90000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'MOMO'), 'PENDING', NULL, NULL);
 -- Thêm các tiêu chí đánh giá
 INSERT INTO review_criteria (criteria_name) VALUES
 ('Thái độ'),
@@ -639,4 +638,5 @@ INSERT INTO rule_conditions (rule_id, choice_id) VALUES (1, 2), (1, 4);
 INSERT INTO payment_methods (method_code, method_name, is_active) VALUES
     ('CASH', 'Thanh toán tiền mặt', TRUE),
     ('MOMO', 'Ví điện tử Momo', TRUE),
+    ('VNPAY', 'Cổng thanh toán VNPAY', TRUE),
     ('BANK_TRANSFER', 'Chuyển khoản ngân hàng', TRUE);
