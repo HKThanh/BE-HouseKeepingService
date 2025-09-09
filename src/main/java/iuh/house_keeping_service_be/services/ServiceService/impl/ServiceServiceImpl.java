@@ -382,21 +382,4 @@ public class ServiceServiceImpl implements ServiceService {
             return requiredChoiceIds.stream().anyMatch(selectedChoiceIds::contains);
         }
     }
-
-//    private String formatDuration(BigDecimal hours) {
-//        if (hours.compareTo(BigDecimal.ONE) < 0) {
-//            int minutes = hours.multiply(BigDecimal.valueOf(60)).intValue();
-//            return minutes + " phút";
-//        } else {
-//            int totalMinutes = hours.multiply(BigDecimal.valueOf(60)).intValue();
-//            int hrs = totalMinutes / 60;
-//            int mins = totalMinutes % 60;
-//
-//            if (mins == 0) {
-//                return hrs + " giờ";
-//            } else {
-//                return hrs + " giờ " + mins + " phút";
-//            }
-//        }
-//    }
 }

@@ -1,5 +1,6 @@
 package iuh.house_keeping_service_be.repositories;
 
+import iuh.house_keeping_service_be.enums.PaymentMethodCode;
 import iuh.house_keeping_service_be.models.Payment;
 import iuh.house_keeping_service_be.enums.PaymentStatus;
 import iuh.house_keeping_service_be.enums.PaymentMethod;
@@ -49,4 +50,11 @@ public interface PaymentRepository extends JpaRepository<Payment, String> {
     @Query("SELECT p FROM Payment p WHERE p.booking.bookingId = :bookingId " +
            "ORDER BY p.createdAt DESC LIMIT 1")
     Optional<Payment> findLatestPaymentByBookingId(@Param("bookingId") String bookingId);
+
+    @Query("SELECT p FROM Payment p WHERE p.booking.customer.id = :customerId ORDER BY p.createdAt DESC")
+    List<Payment> findByCustomerIdOrderByCreatedAtDesc(@Param("customerId") String customerId);
+
+    List<Payment> findByPaymentMethod_MethodCode(PaymentMethodCode methodCode);
+
+    List<Payment> findByCreatedAtBetween(LocalDateTime startDate, LocalDateTime endDate);
 }
