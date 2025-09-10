@@ -2,6 +2,7 @@ package iuh.house_keeping_service_be.repositories;
 
   import iuh.house_keeping_service_be.models.Assignment;
   import iuh.house_keeping_service_be.enums.AssignmentStatus;
+  import org.springframework.data.domain.Pageable;
   import org.springframework.data.jpa.repository.JpaRepository;
   import org.springframework.data.jpa.repository.Query;
   import org.springframework.data.repository.query.Param;
@@ -153,4 +154,36 @@ package iuh.house_keeping_service_be.repositories;
            "LEFT JOIN FETCH bd.service s " +
            "WHERE a.bookingDetail.id = :bookingDetailId")
     List<Assignment> findAssignmentsWithDetailsByBookingDetail(@Param("bookingDetailId") String bookingDetailId);
+
+    @Query("SELECT a FROM Assignment a " +
+            "LEFT JOIN FETCH a.bookingDetail bd " +
+            "LEFT JOIN FETCH bd.booking b " +
+            "LEFT JOIN FETCH bd.service s " +
+            "LEFT JOIN FETCH b.customer c " +
+            "LEFT JOIN FETCH b.address " +
+            "LEFT JOIN FETCH c.account " +
+            "WHERE a.employee.employeeId = :employeeId " +
+            "AND a.status = :status " +
+            "ORDER BY a.createdAt DESC")
+    List<Assignment> findByEmployeeIdAndStatusWithDetails(
+            @Param("employeeId") String employeeId,
+            @Param("status") AssignmentStatus status,
+            Pageable pageable);
+
+    @Query("SELECT a FROM Assignment a " +
+            "LEFT JOIN FETCH a.bookingDetail bd " +
+            "LEFT JOIN FETCH bd.booking b " +
+            "LEFT JOIN FETCH bd.service s " +
+            "LEFT JOIN FETCH b.customer c " +
+            "LEFT JOIN FETCH b.address " +
+            "LEFT JOIN FETCH c.account " +
+            "WHERE a.employee.employeeId = :employeeId " +
+            "ORDER BY a.createdAt DESC")
+    List<Assignment> findByEmployeeIdWithDetails(
+            @Param("employeeId") String employeeId,
+            Pageable pageable);
+
+    @Query("SELECT a FROM Assignment a " +
+            "WHERE a.bookingDetail.booking.bookingId = :bookingId")
+    List<Assignment> findByBookingIdWithStatus(@Param("bookingId") String bookingId);
   }
