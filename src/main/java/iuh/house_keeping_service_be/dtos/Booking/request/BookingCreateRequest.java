@@ -25,5 +25,7 @@ public record BookingCreateRequest(
 
         @NotEmpty(message = "Assignments cannot be empty")
         @Valid
-        List<AssignmentRequest> assignments
+        List<AssignmentRequest> assignments,
+
+        int paymentMethodId
 ) {}

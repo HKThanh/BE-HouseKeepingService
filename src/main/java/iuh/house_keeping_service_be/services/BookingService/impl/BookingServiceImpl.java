@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.rmi.NotBoundException;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -32,6 +33,7 @@ public class BookingServiceImpl implements BookingService {
     private final BookingRepository bookingRepository;
     private final BookingDetailRepository bookingDetailRepository;
     private final PaymentRepository paymentRepository;
+    private final PaymentMethodRepository paymentMethodRepository;
     private final AssignmentRepository assignmentRepository;
     private final AddressRepository addressRepository;
     private final EmployeeRepository employeeRepository;
@@ -68,7 +70,7 @@ public class BookingServiceImpl implements BookingService {
             List<Assignment> assignments = createAssignments(bookingDetails, request);
             
             // Step 6: Create payment record
-            Payment payment = createPaymentRecord(booking);
+            Payment payment = createPaymentRecord(booking, request.paymentMethodId());
             
             // Step 7: Save all entities
             Booking savedBooking = bookingRepository.save(booking);
@@ -477,11 +479,13 @@ public class BookingServiceImpl implements BookingService {
         return assignments;
     }
 
-    private Payment createPaymentRecord(Booking booking) {
+    private Payment createPaymentRecord(Booking booking, int paymentMethodId) {
         Payment payment = new Payment();
         payment.setBooking(booking);
         payment.setAmount(booking.getTotalAmount());
         payment.setPaymentStatus(PaymentStatus.PENDING);
+        payment.setPaymentMethod(paymentMethodRepository.findById(paymentMethodId)
+            .orElseThrow());
         
         // Generate simple transaction code
         payment.setTransactionCode("TXN_" + System.currentTimeMillis());

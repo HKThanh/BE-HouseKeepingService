@@ -1,12 +1,15 @@
 services:
   app:
-    build: .
-    restart: always
+    image: 21086351huynhkimthanh/house_keeping_app:latest
+    container_name: housekeeping_app
+    restart: on-failure
     ports:
       - "8080:8080"
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     environment:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/house_keeping
       - SPRING_DATASOURCE_USERNAME=postgres
@@ -35,6 +38,11 @@ services:
       - ./postgres_data/housekeeping_service_v8.sql:/docker-entrypoint-initdb.d/housekeeping_service_v8.sql
     networks:
       - house_keeping_network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d house_keeping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7
@@ -45,6 +53,11 @@ services:
       - redis_data:/data
     networks:
       - house_keeping_network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   postgres_data:
