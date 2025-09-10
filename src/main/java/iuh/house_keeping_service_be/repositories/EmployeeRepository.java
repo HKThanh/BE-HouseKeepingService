@@ -2,6 +2,8 @@ package iuh.house_keeping_service_be.repositories;
 
 import iuh.house_keeping_service_be.enums.EmployeeStatus;
 import iuh.house_keeping_service_be.models.Employee;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -131,4 +133,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, String> {
            "LEFT JOIN FETCH e.workingZones " +
            "WHERE e.employeeId = :employeeId")
     Optional<Employee> findEmployeeWithDetails(@Param("employeeId") String employeeId);
+
+    // Search and filter employees with pagination
+    Page<Employee> findAll(Pageable pageable);
 }

@@ -12,6 +12,9 @@ import iuh.house_keeping_service_be.services.EmployeeService.EmployeeService;
 import iuh.house_keeping_service_be.services.AuthorizationService.AuthorizationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -107,6 +110,34 @@ public class EmployeeController {
             return ResponseEntity.status(500).body(Map.of(
                     "success", false,
                     "message", "Đã xảy ra lỗi khi lấy thông tin nhân viên"
+            ));
+        }
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
+    public ResponseEntity<?> getAllEmployees(@RequestParam(defaultValue = "0") int page,
+                                             @RequestParam(defaultValue = "10") int size,
+                                             @RequestParam(defaultValue = "createdAt,desc") String[] sort) {
+        try {
+            Sort.Direction direction = sort[1].equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC;
+            Sort.Order order = new Sort.Order(direction, sort[0]);
+
+            Pageable pageable = PageRequest.of(page, size, Sort.by(order));
+            var employeesPage = employeeService.getAllEmployees(pageable);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "data", employeesPage.getContent(),
+                    "currentPage", employeesPage.getNumber(),
+                    "totalItems", employeesPage.getTotalElements(),
+                    "totalPages", employeesPage.getTotalPages()
+            ));
+        } catch (Exception e) {
+            log.error("Error fetching employees: {}", e.getMessage());
+            return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "message", "Đã xảy ra lỗi khi lấy danh sách nhân viên"
             ));
         }
     }
