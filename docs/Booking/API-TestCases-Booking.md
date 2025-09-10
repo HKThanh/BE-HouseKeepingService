@@ -243,7 +243,7 @@ Based on housekeeping_service_v8.sql:
     "paymentInfo": {
       "paymentId": "d2068e26-7333-43a4-a9e5-5a17b23ca7dc",
       "amount": 350000.00,
-      "paymentMethod": null,
+      "paymentMethod": "Thanh toán tiền mặt",
       "paymentStatus": "PENDING",
       "transactionCode": "TXN_1757169562581",
       "createdAt": "2025-09-06 14:39:22",

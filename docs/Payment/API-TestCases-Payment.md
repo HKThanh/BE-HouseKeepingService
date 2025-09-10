@@ -449,14 +449,24 @@ Based on housekeeping_service_v8.sql:
   ```json
   [
     {
-      "methodId": 1,
-      "methodCode": "MOMO",
-      "methodName": "Ví điện tử Momo"
+        "methodId": 1,
+        "methodCode": "CASH",
+        "methodName": "Thanh toán tiền mặt"
     },
     {
-      "methodId": 2,
-      "methodCode": "VNPAY",
-      "methodName": "Cổng thanh toán VNPAY"
+        "methodId": 2,
+        "methodCode": "MOMO",
+        "methodName": "Ví điện tử Momo"
+    },
+    {
+        "methodId": 3,
+        "methodCode": "VNPAY",
+        "methodName": "Cổng thanh toán VNPAY"
+    },
+    {
+        "methodId": 4,
+        "methodCode": "BANK_TRANSFER",
+        "methodName": "Chuyển khoản ngân hàng"
     }
   ]
   ```
