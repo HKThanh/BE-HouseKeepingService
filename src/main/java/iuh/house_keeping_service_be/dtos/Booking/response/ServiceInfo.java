@@ -9,6 +9,7 @@ public record ServiceInfo(
         BigDecimal basePrice,
         String unit,
         Double estimatedDurationHours,
+        String iconUrl,
         String categoryName,
         Boolean isActive
 ) {}

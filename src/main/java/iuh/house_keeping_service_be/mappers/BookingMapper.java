@@ -148,6 +148,7 @@ public class BookingMapper {
             service.getBasePrice(),
             service.getUnit(),
             service.getEstimatedDurationHours().doubleValue(),
+            service.getIconUrl(),
             service.getCategory() != null ? service.getCategory().getCategoryName() : null,
             service.getIsActive()
         );

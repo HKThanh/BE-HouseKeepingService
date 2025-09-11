@@ -46,33 +46,36 @@ Mỗi test case gồm:
   - **Method**: GET
   - **URL**: `/api/v1/customer/categories`
   - **Headers**: `Authorization: Bearer <valid_customer_token>`
-- **Expected Output**:
+- **Output**:
   ```json
   {
     "success": true,
     "message": "Lấy danh sách danh mục dịch vụ thành công",
     "data": [
-      {
-        "categoryId": 1,
-        "categoryName": "Dọn dẹp nhà",
-        "description": "Các dịch vụ liên quan đến vệ sinh, làm sạch nhà cửa",
-        "isActive": true,
-        "serviceCount": 4
-      },
-      {
-        "categoryId": 2,
-        "categoryName": "Giặt ủi",
-        "description": "Dịch vụ giặt sấy, ủi đồ chuyên nghiệp",
-        "isActive": true,
-        "serviceCount": 2
-      },
-      {
-        "categoryId": 3,
-        "categoryName": "Việc nhà khác",
-        "description": "Các dịch vụ tiện ích gia đình khác",
-        "isActive": true,
-        "serviceCount": 2
-      }
+        {
+            "categoryId": 1,
+            "categoryName": "Dọn dẹp nhà",
+            "description": "Các dịch vụ liên quan đến vệ sinh, làm sạch nhà cửa",
+            "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599581/house_cleaning_nob_umewqf.png",
+            "isActive": true,
+            "serviceCount": 4
+        },
+        {
+            "categoryId": 2,
+            "categoryName": "Giặt ủi",
+            "description": "Dịch vụ giặt sấy, ủi đồ chuyên nghiệp",
+            "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599717/washing_nz3cbw.png",
+            "isActive": true,
+            "serviceCount": 2
+        },
+        {
+            "categoryId": 3,
+            "categoryName": "Việc nhà khác",
+            "description": "Các dịch vụ tiện ích gia đình khác",
+            "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599722/other_services_ozqdxk.png",
+            "isActive": true,
+            "serviceCount": 2
+        }
     ]
   }
   ```
@@ -88,7 +91,7 @@ Mỗi test case gồm:
   - **Method**: GET
   - **URL**: `/api/v1/customer/categories`
   - **Headers**: `Authorization: Bearer <token_without_service_permission>`
-- **Expected Output**:
+- **Output**:
   ```json
   {
     "success": false,
@@ -110,53 +113,58 @@ Mỗi test case gồm:
   - **Method**: GET
   - **URL**: `/api/v1/customer/categories/1/services`
   - **Headers**: `Authorization: Bearer <valid_customer_token>`
-- **Expected Output**:
+- **Output**:
   ```json
   {
     "success": true,
     "message": "Lấy thông tin danh mục và dịch vụ thành công",
     "data": {
-      "categoryId": 1,
-      "categoryName": "Dọn dẹp nhà",
-      "description": "Các dịch vụ liên quan đến vệ sinh, làm sạch nhà cửa",
-      "services": [
-        {
-          "serviceId": 1,
-          "name": "Dọn dẹp theo giờ",
-          "description": "Lau dọn, hút bụi, làm sạch các bề mặt cơ bản trong nhà. Phù hợp cho nhu cầu duy trì vệ sinh hàng tuần.",
-          "basePrice": 50000,
-          "unit": "Giờ",
-          "estimatedDurationHours": 2.0,
-          "isActive": true
-        },
-        {
-          "serviceId": 2,
-          "name": "Tổng vệ sinh",
-          "description": "Làm sạch sâu toàn diện, bao gồm các khu vực khó tiếp cận, trần nhà, lau cửa kính. Thích hợp cho nhà mới hoặc dọn dẹp theo mùa.",
-          "basePrice": 400000,
-          "unit": "Gói",
-          "estimatedDurationHours": 4.0,
-          "isActive": true
-        },
-        {
-          "serviceId": 3,
-          "name": "Vệ sinh Sofa - Nệm - Rèm",
-          "description": "Giặt sạch và khử khuẩn Sofa, Nệm, Rèm cửa bằng máy móc chuyên dụng.",
-          "basePrice": 300000,
-          "unit": "Gói",
-          "estimatedDurationHours": 3.0,
-          "isActive": true
-        },
-        {
-          "serviceId": 4,
-          "name": "Vệ sinh máy lạnh",
-          "description": "Bảo trì, làm sạch dàn nóng và dàn lạnh, bơm gas nếu cần.",
-          "basePrice": 150000,
-          "unit": "Máy",
-          "estimatedDurationHours": 1.0,
-          "isActive": true
-        }
-      ]
+        "categoryId": 1,
+        "categoryName": "Dọn dẹp nhà",
+        "description": "Các dịch vụ liên quan đến vệ sinh, làm sạch nhà cửa",
+        "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599581/house_cleaning_nob_umewqf.png",
+        "services": [
+            {
+                "serviceId": 1,
+                "name": "Dọn dẹp theo giờ",
+                "description": "Lau dọn, hút bụi, làm sạch các bề mặt cơ bản trong nhà. Phù hợp cho nhu cầu duy trì vệ sinh hàng tuần.",
+                "basePrice": 50000.00,
+                "unit": "Giờ",
+                "estimatedDurationHours": 2.00,
+                "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599899/Cleaning_Clock_z29juh.png",
+                "isActive": true
+            },
+            {
+                "serviceId": 2,
+                "name": "Tổng vệ sinh",
+                "description": "Làm sạch sâu toàn diện, bao gồm các khu vực khó tiếp cận, trần nhà, lau cửa kính. Thích hợp cho nhà mới hoặc dọn dẹp theo mùa.",
+                "basePrice": 100000.00,
+                "unit": "Gói",
+                "estimatedDurationHours": 2.00,
+                "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599581/house_cleaning_nob_umewqf.png",
+                "isActive": true
+            },
+            {
+                "serviceId": 4,
+                "name": "Vệ sinh máy lạnh",
+                "description": "Bảo trì, làm sạch dàn nóng và dàn lạnh, bơm gas nếu cần.",
+                "basePrice": 150000.00,
+                "unit": "Máy",
+                "estimatedDurationHours": 1.00,
+                "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757600733/cooler_rnyppn.png",
+                "isActive": true
+            },
+            {
+                "serviceId": 3,
+                "name": "Vệ sinh Sofa - Nệm - Rèm",
+                "description": "Giặt sạch và khử khuẩn Sofa, Nệm, Rèm cửa bằng máy móc chuyên dụng.",
+                "basePrice": 300000.00,
+                "unit": "Gói",
+                "estimatedDurationHours": 3.00,
+                "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757600057/sofa_bed_vkkjz8.png",
+                "isActive": true
+            }
+        ]
     }
   }
   ```
@@ -172,7 +180,7 @@ Mỗi test case gồm:
   - **Method**: GET
   - **URL**: `/api/v1/customer/categories/999/services`
   - **Headers**: `Authorization: Bearer <valid_customer_token>`
-- **Expected Output**:
+- **Output**:
   ```json
   {
     "success": false,
@@ -194,7 +202,7 @@ Mỗi test case gồm:
   - **Method**: GET
   - **URL**: `/api/v1/customer/categories/1/count`
   - **Headers**: `Authorization: Bearer <valid_customer_token>`
-- **Expected Output**:
+- **Output**:
   ```json
   {
     "success": true,
@@ -217,7 +225,7 @@ Mỗi test case gồm:
   - **Method**: GET
   - **URL**: `/api/v1/customer/categories`
   - **Headers**: Không có Authorization
-- **Expected Output**:
+- **Output**:
   ```json
   {
     "success": false,
@@ -238,7 +246,7 @@ Mỗi test case gồm:
   - **URL**: `/api/v1/customer/categories`
   - **Headers**: `Authorization: Bearer <valid_customer_token>`
   - **Simulation**: Lỗi DB
-- **Expected Output**:
+- **Output**:
   ```json
   {
     "success": false,

@@ -9,6 +9,7 @@ public record ServiceDetailData(
     BigDecimal basePrice,
     String unit,
     BigDecimal estimatedDurationHours,
+    String iconUrl,
     Boolean isActive,
     String formattedPrice,
     String formattedDuration

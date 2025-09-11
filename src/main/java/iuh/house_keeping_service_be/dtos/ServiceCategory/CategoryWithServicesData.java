@@ -8,6 +8,7 @@ public record CategoryWithServicesData(
     Integer categoryId,
     String categoryName,
     String description,
+    String iconUrl,
     List<ServiceData> services
 ) {}
 

@@ -1,7 +1,8 @@
 services:
   app:
-    image: 21086351huynhkimthanh/house_keeping_app:latest
-    container_name: housekeeping_app
+    build: .
+#    image: 21086351huynhkimthanh/house_keeping_app:latest
+    container_name: be_housekeeping_app
     restart: on-failure
     ports:
       - "8080:8080"

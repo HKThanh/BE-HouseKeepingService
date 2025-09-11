@@ -74,6 +74,7 @@ public class ServiceCategoryServiceImpl implements ServiceCategoryService {
                     category.getCategoryId(),
                     category.getCategoryName(),
                     category.getDescription(),
+                    category.getIconUrl(),
                     serviceDataList
             );
 
@@ -111,6 +112,7 @@ public class ServiceCategoryServiceImpl implements ServiceCategoryService {
                 category.getCategoryId(),
                 category.getCategoryName(),
                 category.getDescription(),
+                category.getIconUrl(),
                 category.getIsActive(),
                 serviceCount.intValue()
         );
@@ -124,6 +126,7 @@ public class ServiceCategoryServiceImpl implements ServiceCategoryService {
                 service.getBasePrice(),
                 service.getUnit(),
                 service.getEstimatedDurationHours(),
+                service.getIconUrl(),
                 service.getIsActive()
         );
     }

@@ -4,6 +4,7 @@ public record ServiceCategoryData(
     Integer categoryId,
     String categoryName,
     String description,
+    String iconUrl,
     Boolean isActive,
     Integer serviceCount
 ) {}
