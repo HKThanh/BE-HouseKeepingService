@@ -631,6 +631,71 @@ INSERT INTO service_options (service_id, label, option_type, display_order, pare
 INSERT INTO service_options (service_id, label, option_type, display_order) VALUES (2, 'Diện tích dọn dẹp?', 'SINGLE_CHOICE_DROPDOWN', 3);
 INSERT INTO service_option_choices (option_id, label) VALUES (3, 'Dưới 80m²'), (3, 'Trên 80m²');
 
+-- Câu hỏi cho dịch vụ 'Dọn dẹp theo giờ'
+-- Câu hỏi 1: Số phòng ngủ
+INSERT INTO service_options (service_id, label, option_type, display_order)
+VALUES (1, 'Số phòng ngủ cần dọn?', 'QUANTITY_INPUT', 1);
+
+-- Câu hỏi 2: Công việc thêm
+INSERT INTO service_options (service_id, label, option_type, display_order)
+VALUES (1, 'Bạn có yêu cầu thêm công việc nào?', 'MULTIPLE_CHOICE_CHECKBOX', 2);
+INSERT INTO service_option_choices (option_id, label, display_order) VALUES
+(5, 'Giặt chăn ga', 1),
+(5, 'Rửa chén', 2),
+(5, 'Lau cửa kính', 3);
+
+-- Câu hỏi cho dịch vụ 'Vệ sinh Sofa - Nệm - Rèm'
+INSERT INTO service_options (service_id, label, option_type, display_order)
+VALUES (3, 'Hạng mục cần vệ sinh?', 'SINGLE_CHOICE_RADIO', 1);
+INSERT INTO service_option_choices (option_id, label, display_order) VALUES
+(6, 'Sofa', 1),
+(6, 'Nệm', 2),
+(6, 'Rèm', 3);
+
+-- Câu hỏi cho dịch vụ 'Vệ sinh máy lạnh'
+INSERT INTO service_options (service_id, label, option_type, display_order)
+VALUES (4, 'Loại máy lạnh?', 'SINGLE_CHOICE_DROPDOWN', 1);
+INSERT INTO service_option_choices (option_id, label, display_order) VALUES
+(7, 'Treo tường', 1),
+(7, 'Âm trần/Cassette', 2),
+(7, 'Tủ đứng', 3);
+INSERT INTO service_options (service_id, label, option_type, display_order)
+VALUES (4, 'Số lượng máy?', 'QUANTITY_INPUT', 2);
+
+-- Câu hỏi cho dịch vụ 'Giặt sấy theo kg'
+INSERT INTO service_options (service_id, label, option_type, display_order)
+VALUES (5, 'Có cần gấp quần áo sau khi giặt?', 'SINGLE_CHOICE_RADIO', 1);
+INSERT INTO service_option_choices (option_id, label, display_order) VALUES
+(9, 'Có', 1),
+(9, 'Không', 2);
+
+-- Câu hỏi cho dịch vụ 'Giặt hấp cao cấp'
+INSERT INTO service_options (service_id, label, option_type, display_order)
+VALUES (6, 'Loại trang phục giặt hấp?', 'SINGLE_CHOICE_DROPDOWN', 1);
+INSERT INTO service_option_choices (option_id, label, display_order) VALUES
+(10, 'Vest', 1),
+(10, 'Áo dài', 2),
+(10, 'Đầm', 3);
+
+-- Câu hỏi cho dịch vụ 'Nấu ăn gia đình'
+INSERT INTO service_options (service_id, label, option_type, display_order)
+VALUES (7, 'Số người ăn?', 'QUANTITY_INPUT', 1);
+INSERT INTO service_options (service_id, label, option_type, display_order)
+VALUES (7, 'Bạn có cần chúng tôi mua nguyên liệu?', 'SINGLE_CHOICE_RADIO', 2);
+INSERT INTO service_option_choices (option_id, label, display_order) VALUES
+(12, 'Có', 1),
+(12, 'Không', 2);
+INSERT INTO service_options (service_id, label, option_type, display_order, parent_choice_id)
+VALUES (7, 'Ngân sách thực phẩm (VNĐ)?', 'QUANTITY_INPUT', 3, 19);
+
+-- Câu hỏi cho dịch vụ 'Đi chợ hộ'
+INSERT INTO service_options (service_id, label, option_type, display_order)
+VALUES (8, 'Thời gian giao hàng mong muốn?', 'SINGLE_CHOICE_DROPDOWN', 1);
+INSERT INTO service_option_choices (option_id, label, display_order) VALUES
+(14, 'Trong ngày', 1),
+(14, 'Ngày hôm sau', 2);
+
+
 INSERT INTO pricing_rules (service_id, rule_name, condition_logic, price_adjustment, staff_adjustment) VALUES
     (2, 'Phụ thu nhà phố lớn', 'ALL', 250000, 1);
 
