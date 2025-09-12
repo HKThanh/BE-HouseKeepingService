@@ -707,16 +707,74 @@ INSERT INTO pricing_rules (service_id, rule_name, condition_logic, priority, pri
     (7, 'Mua nguyên liệu nấu ăn', 'ALL', 5, 30000, 0, 1.0);
 
 -- Gán điều kiện cho các quy tắc trên
-INSERT INTO rule_conditions (rule_id, choice_id) VALUES
-    (1, 2), (1, 4),
-    (2, 5),
-    (3, 6),
-    (4, 7),
-    (5, 9),
-    (6, 10),
-    (7, 12),
-    (8, 14),
-    (9, 19);
+-- Phụ thu nhà phố lớn: yêu cầu nhà phố và diện tích trên 80m²
+INSERT INTO rule_conditions (rule_id, choice_id)
+VALUES (
+           (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu nhà phố lớn'),
+           (SELECT choice_id FROM service_option_choices WHERE option_id = 1 AND label = 'Nhà phố')
+       );
+
+INSERT INTO rule_conditions (rule_id, choice_id)
+VALUES (
+           (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu nhà phố lớn'),
+           (SELECT choice_id FROM service_option_choices WHERE option_id = 3 AND label = 'Trên 80m²')
+       );
+
+-- Giặt chăn ga
+INSERT INTO rule_conditions (rule_id, choice_id)
+VALUES (
+           (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Giặt chăn ga'),
+           (SELECT choice_id FROM service_option_choices WHERE option_id = 5 AND label = 'Giặt chăn ga')
+       );
+
+-- Rửa chén
+INSERT INTO rule_conditions (rule_id, choice_id)
+VALUES (
+           (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Rửa chén'),
+           (SELECT choice_id FROM service_option_choices WHERE option_id = 5 AND label = 'Rửa chén')
+       );
+
+-- Lau cửa kính
+INSERT INTO rule_conditions (rule_id, choice_id)
+VALUES (
+           (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Lau cửa kính'),
+           (SELECT choice_id FROM service_option_choices WHERE option_id = 5 AND label = 'Lau cửa kính')
+       );
+
+-- Vệ sinh nệm
+INSERT INTO rule_conditions (rule_id, choice_id)
+VALUES (
+           (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Vệ sinh nệm'),
+           (SELECT choice_id FROM service_option_choices WHERE option_id = 6 AND label = 'Nệm')
+       );
+
+-- Vệ sinh rèm
+INSERT INTO rule_conditions (rule_id, choice_id)
+VALUES (
+           (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Vệ sinh rèm'),
+           (SELECT choice_id FROM service_option_choices WHERE option_id = 6 AND label = 'Rèm')
+       );
+
+-- Máy lạnh âm trần
+INSERT INTO rule_conditions (rule_id, choice_id)
+VALUES (
+           (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Máy lạnh âm trần'),
+           (SELECT choice_id FROM service_option_choices WHERE option_id = 7 AND label = 'Âm trần/Cassette')
+       );
+
+-- Gấp quần áo
+INSERT INTO rule_conditions (rule_id, choice_id)
+VALUES (
+           (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Gấp quần áo'),
+           (SELECT choice_id FROM service_option_choices WHERE option_id = 9 AND label = 'Có')
+       );
+
+-- Mua nguyên liệu nấu ăn
+INSERT INTO rule_conditions (rule_id, choice_id)
+VALUES (
+           (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Mua nguyên liệu nấu ăn'),
+           (SELECT choice_id FROM service_option_choices WHERE option_id = 12 AND label = 'Có')
+       );
 
 INSERT INTO payment_methods (method_code, method_name, is_active) VALUES
     ('CASH', 'Thanh toán tiền mặt', TRUE),
