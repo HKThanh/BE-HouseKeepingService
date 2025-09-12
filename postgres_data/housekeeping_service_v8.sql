@@ -695,12 +695,28 @@ INSERT INTO service_option_choices (option_id, label, display_order) VALUES
 (14, 'Trong ngày', 1),
 (14, 'Ngày hôm sau', 2);
 
+INSERT INTO pricing_rules (service_id, rule_name, condition_logic, priority, price_adjustment, staff_adjustment, duration_adjustment_hours) VALUES
+    (2, 'Phụ thu nhà phố lớn', 'ALL', 10, 250000, 1, 2.0),
+    (1, 'Giặt chăn ga', 'ALL', 5, 30000, 0, 0.5),
+    (1, 'Rửa chén', 'ALL', 5, 15000, 0, 0.5),
+    (1, 'Lau cửa kính', 'ALL', 5, 40000, 0, 1.0),
+    (3, 'Vệ sinh nệm', 'ALL', 5, 150000, 0, 1.0),
+    (3, 'Vệ sinh rèm', 'ALL', 5, 100000, 0, 1.0),
+    (4, 'Máy lạnh âm trần', 'ALL', 5, 50000, 0, 0.5),
+    (5, 'Gấp quần áo', 'ALL', 5, 10000, 0, 1.0),
+    (7, 'Mua nguyên liệu nấu ăn', 'ALL', 5, 30000, 0, 1.0);
 
-INSERT INTO pricing_rules (service_id, rule_name, condition_logic, price_adjustment, staff_adjustment) VALUES
-    (2, 'Phụ thu nhà phố lớn', 'ALL', 250000, 1);
-
--- Gán 2 điều kiện cho quy tắc trên (rule_id=1)
-INSERT INTO rule_conditions (rule_id, choice_id) VALUES (1, 2), (1, 4);
+-- Gán điều kiện cho các quy tắc trên
+INSERT INTO rule_conditions (rule_id, choice_id) VALUES
+    (1, 2), (1, 4),
+    (2, 5),
+    (3, 6),
+    (4, 7),
+    (5, 9),
+    (6, 10),
+    (7, 12),
+    (8, 14),
+    (9, 19);
 
 INSERT INTO payment_methods (method_code, method_name, is_active) VALUES
     ('CASH', 'Thanh toán tiền mặt', TRUE),
