@@ -27,20 +27,30 @@ All endpoints require:
 ---
 
 ## Database Test Data
-Based on housekeeping_service_v6.sql:
-- **Services**: 
-  - Service ID 1: "Dọn dẹp theo giờ" (50,000đ/hour, 2.0 hours)
-  - Service ID 2: "Tổng vệ sinh" (400,000đ/package, 4.0 hours)
-- **Service Options**: 
-  - Option ID 1: "Loại phòng" (required, single choice)
-  - Option ID 2: "Dịch vụ bổ sung" (optional, multiple choice)
-- **Service Option Choices**:
-  - Choice ID 1: "Phòng khách" (Option 1)
-  - Choice ID 2: "Phòng ngủ" (Option 1)
-  - Choice ID 3: "Giặt ủi" (Option 2, +50,000đ, +1 giờ)
-  - Choice ID 4: "Lau kính" (Option 2, +30,000đ, +0.5 giờ)
-- **Pricing Rules**: Applied based on selected choices
-- **Permissions**: "service.view" permission required for all endpoints
+Based on `housekeeping_service_v8.sql`:
+- **Services**:
+  - Service ID 1: "Dọn dẹp theo giờ" (50,000đ/Giờ, 2.0 giờ)
+  - Service ID 2: "Tổng vệ sinh" (100,000đ/Gói, 2.0 giờ)
+- **Service Options**:
+  - **Service 2**:
+    - Option ID 1: "Loại hình nhà ở?" (SINGLE_CHOICE_RADIO)
+      - Choice ID 1: "Căn hộ"
+      - Choice ID 2: "Nhà phố"
+    - Option ID 2: "Nhà bạn có mấy tầng (bao gồm trệt)?" (QUANTITY_INPUT, phụ thuộc Choice ID 2)
+    - Option ID 3: "Diện tích dọn dẹp?" (SINGLE_CHOICE_DROPDOWN)
+      - Choice ID 3: "Dưới 80m²"
+      - Choice ID 4: "Trên 80m²"
+  - **Service 1**:
+    - Option ID 4: "Số phòng ngủ cần dọn?" (QUANTITY_INPUT)
+    - Option ID 5: "Bạn có yêu cầu thêm công việc nào?" (MULTIPLE_CHOICE_CHECKBOX)
+      - Choice ID 5: "Giặt chăn ga"
+      - Choice ID 6: "Rửa chén"
+      - Choice ID 7: "Lau cửa kính"
+- **Pricing Rules**:
+  - "Phụ thu nhà phố lớn": áp dụng khi chọn Choice ID 2 và 4 (+250,000đ, +1 nhân viên, +2.0 giờ)
+  - "Giặt chăn ga": Choice ID 5 (+30,000đ, +0.5 giờ)
+  - "Rửa chén": Choice ID 6 (+15,000đ, +0.5 giờ)
+  - "Lau cửa kính": Choice ID 7 (+40,000đ, +1.0 giờ)
 
 ---
 
@@ -170,12 +180,12 @@ Based on housekeeping_service_v6.sql:
 
 ---
 
-### Test Case 4: Service Options with No Options Configured
+### Test Case 4: Successfully Get Service Options (Service 2)
 - **Test Case ID**: TC_SERVICE_OPTIONS_004
-- **Description**: Verify response when service exists but has no options configured.
+- **Description**: Verify that a customer can retrieve options for service ID 2.
 - **Preconditions**:
-  - Customer is authenticated with valid token.
-  - Service exists but has no options configured.
+  - Customer has "service.view" permission.
+  - Service with ID 2 exists and has options configured.
 - **Input**:
   - **Method**: `GET`
   - **URL**: `/api/v1/customer/services/2/options`
@@ -184,15 +194,54 @@ Based on housekeeping_service_v6.sql:
     ```
     Authorization: Bearer <valid_customer_token>
     ```
-- **Expected Output**:
+- **Output**:
   ```json
   {
     "success": true,
-    "message": "Lấy tùy chọn dịch vụ thành công",
+        "message": "Lấy thông tin dịch vụ và tùy chọn thành công",
     "data": {
       "serviceId": 2,
       "serviceName": "Tổng vệ sinh",
-      "options": []
+      "description": "Làm sạch sâu toàn diện, bao gồm các khu vực khó tiếp cận, trần nhà, lau cửa kính. Thích hợp cho nhà mới hoặc dọn dẹp theo mùa.",
+      "basePrice": 100000.00,
+      "unit": "Gói",
+      "estimatedDurationHours": 2.00,
+      "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599581/house_cleaning_nob_umewqf.png",
+      "formattedPrice": "100,000đ/Gói",
+      "formattedDuration": "2 giờ 0 phút",
+      "options": [
+        {
+          "optionId": 1,
+          "optionName": "Loại hình nhà ở?",
+          "optionType": "SINGLE_CHOICE_RADIO",
+          "displayOrder": 1,
+          "isRequired": true,
+          "choices": [
+            {"choiceId": 1, "choiceName": "Căn hộ", "displayOrder": 1, "isDefault": false},
+            {"choiceId": 2, "choiceName": "Nhà phố", "displayOrder": 2, "isDefault": false}
+          ]
+        },
+        {
+          "optionId": 2,
+          "optionName": "Nhà bạn có mấy tầng (bao gồm trệt)?",
+          "optionType": "QUANTITY_INPUT",
+          "displayOrder": 2,
+          "isRequired": false,
+          "parentChoiceId": 2,
+          "choices": []
+        },
+        {
+          "optionId": 3,
+          "optionName": "Diện tích dọn dẹp?",
+          "optionType": "SINGLE_CHOICE_DROPDOWN",
+          "displayOrder": 3,
+          "isRequired": true,
+          "choices": [
+            {"choiceId": 3, "choiceName": "Dưới 80m²", "displayOrder": 1, "isDefault": false},
+            {"choiceId": 4, "choiceName": "Trên 80m²", "displayOrder": 2, "isDefault": false}
+          ]
+        }
+      ]
     }
   }
   ```
@@ -567,9 +616,51 @@ Based on housekeeping_service_v6.sql:
 
 ---
 
+### Test Case 15: Calculate Price - House Type and Area (Service 2)
+- **Test Case ID**: TC_CALCULATE_PRICE_011
+- **Description**: Verify price calculation for service 2 when selecting house type and area triggering pricing rules.
+- **Preconditions**:
+  - Customer is authenticated with valid token.
+  - Service with ID 2 exists.
+  - Choice IDs 2 and 4 exist with pricing rules.
+- **Input**:
+  - **Method**: `POST`
+  - **URL**: `/api/v1/customer/services/calculate-price`
+  - **Headers**:
+    ```
+    Authorization: Bearer <valid_customer_token>
+    Content-Type: application/json
+    ```
+  - **Body**:
+    ```json
+    {
+      "serviceId": 2,
+      "selectedChoiceIds": [2, 4]
+    }
+    ```
+- **Expected Output**:
+  ```json
+  {
+    "success": true,
+    "message": "Tính toán giá thành công",
+    "data": {
+      "serviceId": 2,
+      "serviceName": "Tổng vệ sinh",
+      "finalPrice": 350000,
+      "suggestedStaff": 2,
+      "estimatedDuration": 4.0,
+      "formattedPrice": "350,000đ/gói",
+      "formattedDuration": "4 giờ"
+    }
+  }
+  ```
+- **Status Code**: `200 OK`
+
+---
+
 ## Integration Test Scenarios
 
-### Test Case 15: End-to-End: Get Options then Calculate Price
+### Test Case 16: End-to-End: Get Options then Calculate Price
 - **Test Case ID**: TC_INTEGRATION_001
 - **Description**: Verify complete workflow from getting service options to calculating price.
 - **Preconditions**:
@@ -594,8 +685,62 @@ Based on housekeeping_service_v6.sql:
 
 ---
 
+## Integration Flow
+1. **GET Service Options**
+  - **Request**: `GET /api/v1/customer/services/2/options`
+  - **Response**:
+    ```json
+    {
+      "success": true,
+      "message": "Lấy thông tin dịch vụ và tùy chọn thành công",
+      "data": {
+        "serviceId": 2,
+        "serviceName": "Tổng vệ sinh",
+        "options": [
+          {"optionId": 1, "optionName": "Loại hình nhà ở?", "choices": [{"choiceId":1,"choiceName":"Căn hộ"},{"choiceId":2,"choiceName":"Nhà phố"}]},
+          {"optionId": 2, "optionName": "Nhà bạn có mấy tầng (bao gồm trệt)?", "choices": []},
+          {"optionId": 3, "optionName": "Diện tích dọn dẹp?", "choices": [{"choiceId":3,"choiceName":"Dưới 80m²"},{"choiceId":4,"choiceName":"Trên 80m²"}]}
+        ]
+      }
+    }
+    ```
+2. **Select Options**
+  - Customer chooses `choiceId` 2 ("Nhà phố") and `choiceId` 4 ("Trên 80m²").
+  - **Selection JSON**:
+    ```json
+    {
+      "selectedChoiceIds": [2, 4]
+    }
+    ```
+3. **POST Calculate Price**
+  - **Request**: `POST /api/v1/customer/services/calculate-price`
+    ```json
+    {
+      "serviceId": 2,
+      "selectedChoiceIds": [2, 4]
+    }
+    ```
+  - **Response**:
+    ```json
+    {
+      "success": true,
+      "message": "Tính toán giá thành công",
+      "data": {
+        "serviceId": 2,
+        "serviceName": "Tổng vệ sinh",
+        "finalPrice": 350000,
+        "suggestedStaff": 2,
+        "estimatedDuration": 4.0,
+        "formattedPrice": "350,000đ/gói",
+        "formattedDuration": "4 giờ"
+      }
+    }
+    ```
+    
+---
+
 ## Notes
-- **Test Environment**: Database should be configured with test data including services, service options, choices, and pricing rules from housekeeping_service_v6.sql.
+- **Test Environment**: Database should be configured with test data including services, service options, choices, and pricing rules from housekeeping_service_v8.sql.
 - **Authentication**: All endpoints require valid JWT tokens.
 - **Permission**: Users must have "service.view" permission to access these endpoints.
 - **Service Status**: Only active services can have their options retrieved or prices calculated.
