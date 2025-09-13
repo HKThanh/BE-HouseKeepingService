@@ -3,6 +3,7 @@ package iuh.house_keeping_service_be.controllers;
 import iuh.house_keeping_service_be.config.JwtUtil;
 import iuh.house_keeping_service_be.dtos.Admin.UserPermission.response.PermissionManagementResponse;
 import iuh.house_keeping_service_be.dtos.Admin.UserPermission.response.UserPermissionsResponse;
+import iuh.house_keeping_service_be.dtos.Employee.UpdateEmployeeRequest;
 import iuh.house_keeping_service_be.dtos.Service.ServiceDetailResponse;
 import iuh.house_keeping_service_be.enums.RoleName;
 import iuh.house_keeping_service_be.models.Account;
@@ -57,6 +58,31 @@ public class EmployeeController {
             return ResponseEntity.status(500).body(Map.of(
                     "success", false,
                     "message", "Đã xảy ra lỗi khi lấy thông tin nhân viên"
+            ));
+        }
+    }
+
+    @PutMapping("/{employeeId}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_EMPLOYEE')")
+    public ResponseEntity<?> updateEmployee(@PathVariable String employeeId,
+                                            @RequestBody UpdateEmployeeRequest request) {
+        try {
+            Employee updated = employeeService.updateEmployee(employeeId, request);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "data", updated
+            ));
+        } catch (IllegalArgumentException e) {
+            log.error("Error updating employee: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            log.error("Error updating employee: {}", e.getMessage());
+            return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "message", "Đã xảy ra lỗi khi cập nhật thông tin nhân viên"
             ));
         }
     }

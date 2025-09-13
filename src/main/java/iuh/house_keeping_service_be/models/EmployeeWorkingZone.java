@@ -1,5 +1,6 @@
 package iuh.house_keeping_service_be.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -20,6 +21,7 @@ public class EmployeeWorkingZone {
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("employeeId")
     @JoinColumn(name = "employee_id")
+    @JsonIgnore
     private Employee employee;
 
     @Column(name = "district", insertable = false, updatable = false)

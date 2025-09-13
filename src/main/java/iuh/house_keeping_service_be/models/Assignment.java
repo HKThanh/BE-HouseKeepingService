@@ -1,5 +1,6 @@
 package iuh.house_keeping_service_be.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import iuh.house_keeping_service_be.enums.AssignmentStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -31,6 +32,7 @@ public class Assignment {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id", nullable = false)
+    @JsonIgnore
     private Employee employee;
 
     @Enumerated(EnumType.STRING)

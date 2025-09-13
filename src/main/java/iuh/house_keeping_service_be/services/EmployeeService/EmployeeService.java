@@ -1,5 +1,6 @@
 package iuh.house_keeping_service_be.services.EmployeeService;
 
+import iuh.house_keeping_service_be.dtos.Employee.UpdateEmployeeRequest;
 import iuh.house_keeping_service_be.models.Employee;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -16,4 +17,6 @@ public interface EmployeeService {
     Employee findById(String id);
 
     Page<Employee> getAllEmployees(Pageable pageable);
+
+    Employee updateEmployee(String employeeId, UpdateEmployeeRequest request);
 }

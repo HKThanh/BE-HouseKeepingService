@@ -1,5 +1,6 @@
 package iuh.house_keeping_service_be.models;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.vladmihalcea.hibernate.type.array.ListArrayType;
 import iuh.house_keeping_service_be.enums.EmployeeStatus;
 import iuh.house_keeping_service_be.enums.Rating;
@@ -73,12 +74,15 @@ public class Employee {
 
     // Relationships
     @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<EmployeeUnavailability> unavailabilities;
 
     @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Assignment> assignments;
 
     @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<EmployeeWorkingZone> workingZones;
 
     @PrePersist
