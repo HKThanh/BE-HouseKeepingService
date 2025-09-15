@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -258,10 +259,24 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
 
             // Tính thời gian kết thúc dựa trên estimated_duration_hours
             LocalDateTime startTime = request.bookingTime();
-            LocalDateTime endTime = startTime.plusHours(service.getEstimatedDurationHours().longValue());
+
+            if (startTime == null) {
+                return new ApiResponse<>(false, "Thời gian đặt dịch vụ không hợp lệ", null);
+            }
+            if (startTime.isBefore(LocalDateTime.now())) {
+                return new ApiResponse<>(false, "Thời gian đặt dịch vụ phải ở tương lai", null);
+            }
+
+            // Validate service duration
+            BigDecimal estimatedDuration = service.getEstimatedDurationHours();
+            if (estimatedDuration == null) {
+                return new ApiResponse<>(false, "Dịch vụ không có thời lượng dự kiến", null);
+            }
+
+            LocalDateTime endTime = startTime.plusHours(estimatedDuration.longValue());
 
             log.info("Service duration: {} hours, calculated end time: {}",
-                    service.getEstimatedDurationHours(), endTime);
+                    estimatedDuration, endTime);
 
             // 2. Lọc nhân viên theo khu vực làm việc
             List<Employee> potentialEmployees = filterEmployeesByWorkingZone(request.district(), request.city());

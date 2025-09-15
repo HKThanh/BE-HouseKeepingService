@@ -44,13 +44,6 @@ public class BookingController {
             String token = authHeader.substring(7);
             String username = jwtUtil.extractUsername(token);
 
-            // Kiểm tra quyền xem chi tiết dịch vụ
-            if (!permissionService.hasPermission(username, "booking.create")) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
-                        new ServiceDetailResponse(false, "Không có quyền đặt dịch vụ", null)
-                );
-            }
-
             if (username == null || !jwtUtil.validateToken(token, username)) {
                 return ResponseEntity.status(401).body(
                         Map.of(

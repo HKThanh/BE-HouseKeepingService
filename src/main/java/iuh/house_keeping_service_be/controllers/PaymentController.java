@@ -4,6 +4,7 @@ import iuh.house_keeping_service_be.dtos.payment.CreatePaymentRequest;
 import iuh.house_keeping_service_be.dtos.payment.PaymentMethodResponse;
 import iuh.house_keeping_service_be.dtos.payment.PaymentResponse;
 import iuh.house_keeping_service_be.dtos.payment.UpdatePaymentStatusRequest;
+import iuh.house_keeping_service_be.repositories.BookingRepository;
 import iuh.house_keeping_service_be.services.PaymentService.PaymentMethodService;
 import iuh.house_keeping_service_be.services.PaymentService.PaymentService;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ public class PaymentController {
 
     private final PaymentService paymentService;
     private final PaymentMethodService paymentMethodService;
+    private final BookingRepository bookingRepository;
 
     /**
      * API cho khách hàng tạo một yêu cầu thanh toán cho một lịch đặt.
@@ -37,6 +39,14 @@ public class PaymentController {
     @PreAuthorize("hasAuthority('ROLE_CUSTOMER')")
     public ResponseEntity<PaymentResponse> createPayment(@RequestBody CreatePaymentRequest request) {
         // TODO: Thêm logic để kiểm tra xem bookingId có thuộc về người dùng đang đăng nhập không
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String customerId = authentication.getName();
+
+        boolean ownsBooking = bookingRepository.existsByBookingIdAndCustomer_CustomerId(request.getBookingId(), customerId);
+        if (!ownsBooking) {
+            return new ResponseEntity<>(HttpStatus.FORBIDDEN);
+        }
+
         PaymentResponse response = paymentService.createPayment(request);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }

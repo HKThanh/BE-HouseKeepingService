@@ -32,7 +32,6 @@ public class ServiceServiceImpl implements ServiceService {
     private final ServiceOptionRepository serviceOptionRepository;
     private final PricingRuleRepository pricingRuleRepository;
     private final RuleConditionRepository ruleConditionRepository;
-    private final DecimalFormat priceFormatter = new DecimalFormat("#,###");
 
     @Override
     @Transactional(readOnly = true)
@@ -258,6 +257,7 @@ public class ServiceServiceImpl implements ServiceService {
     private String formatPrice(BigDecimal price, String unit) {
         if (price == null) return "Liên hệ";
 
+        DecimalFormat priceFormatter = new DecimalFormat("#,###");
         String formattedPrice = priceFormatter.format(price.longValue()) + "đ";
 
         return switch (unit.toLowerCase()) {

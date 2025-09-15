@@ -125,13 +125,22 @@ public class BookingServiceImpl implements BookingService {
             
             // Apply promotion if provided
             BigDecimal finalAmount = applyPromotion(request.promoCode(), calculatedTotalAmount, customer, errors);
-            
-            // Validate employee assignments
-            validateEmployeeAssignments(request.assignments(), request.bookingTime(), conflicts);
+
+            int requiredEmployees = calculateRequiredEmployees(request.bookingDetails());
+            long assignedEmployees = request.assignments().stream()
+                    .map(AssignmentRequest::employeeId)
+                    .distinct()
+                    .count();
+            if (requiredEmployees != assignedEmployees) {
+                errors.add("Total employees assigned (" + assignedEmployees + ") does not match required employees (" + requiredEmployees + ")");
+            }
             
             if (!errors.isEmpty()) {
                 return BookingValidationResult.error(errors);
             }
+
+            // Validate employee assignments
+            validateEmployeeAssignments(request.assignments(), request.bookingTime(), conflicts);
             
             if (!conflicts.isEmpty()) {
                 return BookingValidationResult.conflict(conflicts);
@@ -275,6 +284,10 @@ public class BookingServiceImpl implements BookingService {
             log.error("Error calculating price for service {}: {}", detail.serviceId(), e.getMessage());
             return detail.expectedPrice(); // Fallback to expected price
         }
+    }
+
+    private int calculateRequiredEmployees(List<BookingDetailRequest> details) {
+        return details.stream().mapToInt(BookingDetailRequest::quantity).sum();
     }
 
     private BigDecimal applyPromotion(String promoCode, BigDecimal amount, Customer customer, List<String> errors) {

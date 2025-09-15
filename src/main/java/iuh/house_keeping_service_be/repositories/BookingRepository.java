@@ -92,4 +92,6 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
            "LEFT JOIN FETCH b.promotion p " +
            "WHERE b.bookingId = :bookingId")
     Optional<Booking> findBookingWithDetails(@Param("bookingId") String bookingId);
+
+    boolean existsByBookingIdAndCustomer_CustomerId(String bookingId, String customerId);
 }
