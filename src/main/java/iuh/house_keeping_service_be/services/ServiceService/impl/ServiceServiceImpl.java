@@ -326,7 +326,11 @@ public class ServiceServiceImpl implements ServiceService {
                 finalPrice = finalPrice.multiply(BigDecimal.valueOf(request.quantity()));
             }
 
-            Integer suggestedStaff = Math.max(1, 1 + totalStaffAdjustment);
+            int baseRecommendedStaff = service.getRecommendedStaff() != null
+                    ? service.getRecommendedStaff()
+                    : 1;
+
+            Integer suggestedStaff = Math.max(1, baseRecommendedStaff + totalStaffAdjustment);
 
             BigDecimal estimatedDuration = service.getEstimatedDurationHours() != null
                 ? service.getEstimatedDurationHours().add(totalDurationAdjustment)

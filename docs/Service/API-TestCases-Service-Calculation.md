@@ -28,10 +28,11 @@ All endpoints require:
 ---
 
 ## Database Test Data
-Based on housekeeping_service_v7.sql:
-- **Services**: 
-  - Service ID 1: "Dọn dẹp theo giờ" (50,000đ/hour, 2.0 hours)
-  - Service ID 2: "Tổng vệ sinh" (400,000đ/package, 4.0 hours)
+Based on `housekeeping_service_v8.sql`:
+- **Services**:
+  - Service ID 1: "Dọn dẹp theo giờ" (50,000đ/hour, 2.0 hours, recommended 1 staff)
+  - Service ID 2: "Tổng vệ sinh" (400,000đ/package, 4.0 hours, recommended 3 staff)
+  - Service ID 3: "Vệ sinh Sofa - Nệm - Rèm" (300,000đ/package, 3.0 hours, recommended 2 staff)
 - **Service Options**: Various option choices with pricing rules
 - **Pricing Rules**: Rules that adjust price based on selected choices
 - **Rule Conditions**: Conditions that trigger specific pricing rules
@@ -376,7 +377,7 @@ Based on housekeeping_service_v7.sql:
       "basePrice": 400000,
       "totalAdjustment": 50000,
       "finalPrice": 450000,
-      "suggestedStaff": 2,
+      "suggestedStaff": 4,
       "estimatedDurationHours": 5.0,
       "formattedPrice": "450,000đ",
       "formattedDuration": "5 giờ"
@@ -396,7 +397,7 @@ Based on housekeeping_service_v7.sql:
       "basePrice": 400000,
       "totalAdjustment": 50000,
       "finalPrice": 450000,
-      "suggestedStaff": 2,
+      "suggestedStaff": 4,
       "estimatedDurationHours": 5.0,
       "formattedPrice": "450,000đ",
       "formattedDuration": "5 giờ"
@@ -542,7 +543,7 @@ Based on housekeeping_service_v7.sql:
 ---
 
 ## Notes
-- **Test Environment**: Database should be configured with test data including services, service options, pricing rules from housekeeping_service_v7.sql.
+- **Test Environment**: Database should be configured with test data including services, service options, pricing rules from housekeeping_service_v8.sql.
 - **Authentication**: All endpoints require valid JWT tokens.
 - **Token Validation**: JWT tokens are validated for format, expiration, and user existence.
 - **Price Calculation**: Complex calculation includes base price, option adjustments, quantity multiplier, and pricing rules.

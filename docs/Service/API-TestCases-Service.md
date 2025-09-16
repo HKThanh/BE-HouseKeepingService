@@ -29,8 +29,8 @@ All endpoints require:
 ## Database Test Data
 Based on housekeeping_service_v5.sql:
 - **Services**: 
-  - Service ID 1: "Dọn dẹp theo giờ" (50,000đ/hour, 2.0 hours)
-  - Service ID 2: "Tổng vệ sinh" (400,000đ/package, 4.0 hours)
+  - Service ID 1: "Dọn dẹp theo giờ" (50,000đ/hour, 2.0 hours, recommended 1 staff)
+  - Service ID 2: "Tổng vệ sinh" (400,000đ/package, 4.0 hours, recommended 2 staff)
 - **Units**: hour, m2, package
 - **Status**: Only active services are returned
 - **Permissions**: "service.view" permission required for all endpoints
@@ -365,7 +365,7 @@ Based on housekeeping_service_v5.sql:
 ---
 
 ## Notes
-- **Test Environment**: Database should be configured with test data including services from housekeeping_service_v5.sql.
+- **Test Environment**: Database should be configured with test data including services from housekeeping_service_v8.sql.
 - **Authentication**: All endpoints require valid JWT tokens.
 - **Permission**: Users must have "service.view" permission to access these endpoints.
 - **Service Status**: Only active services (isActive = true) are returned.

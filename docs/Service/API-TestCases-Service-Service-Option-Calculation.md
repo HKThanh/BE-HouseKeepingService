@@ -29,8 +29,8 @@ All endpoints require:
 ## Database Test Data
 Based on `housekeeping_service_v8.sql`:
 - **Services**:
-  - Service ID 1: "Dọn dẹp theo giờ" (50,000đ/Giờ, 2.0 giờ)
-  - Service ID 2: "Tổng vệ sinh" (100,000đ/Gói, 2.0 giờ)
+  - Service ID 1: "Dọn dẹp theo giờ" (50,000đ/Giờ, 2.0 giờ, recommended 1 staff)
+  - Service ID 2: "Tổng vệ sinh" (100,000đ/Gói, 2.0 giờ, recommended 3 staff)
 - **Service Options**:
   - **Service 2**:
     - Option ID 1: "Loại hình nhà ở?" (SINGLE_CHOICE_RADIO)
