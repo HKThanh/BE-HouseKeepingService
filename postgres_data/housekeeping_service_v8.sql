@@ -141,7 +141,7 @@ CREATE TABLE bookings (
     booking_time TIMESTAMP WITH TIME ZONE NOT NULL, -- Thời gian khách hàng muốn thực hiện
     note TEXT,
     total_amount DECIMAL(10, 2),
-    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')),
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'AWAITING_EMPLOYEE', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -781,3 +781,91 @@ INSERT INTO payment_methods (method_code, method_name, is_active) VALUES
     ('MOMO', 'Ví điện tử Momo', TRUE),
     ('VNPAY', 'Cổng thanh toán VNPAY', TRUE),
     ('BANK_TRANSFER', 'Chuyển khoản ngân hàng', TRUE);
+
+-- Add more bookings with their corresponding booking details and assignments
+-- Each booking will have exactly 1 booking detail
+
+-- Booking 3: Mary Jones - Pending status
+INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status) VALUES
+('b0000001-0000-0000-0000-000000000003', 'c1000001-0000-0000-0000-000000000002', 'adrs0001-0000-0000-0000-000000000002', 'BK000003', '2025-08-30 10:00:00+07', 'Cần vệ sinh máy lạnh trong phòng ngủ.', 150000.00, 'PENDING');
+
+INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
+('bd000001-0000-0000-0000-000000000003', 'b0000001-0000-0000-0000-000000000003', (SELECT service_id FROM service WHERE name = 'Vệ sinh máy lạnh'), 1, 150000.00, 150000.00);
+
+-- Booking 4: John Doe - Confirmed status with assignment
+INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status) VALUES
+('b0000001-0000-0000-0000-000000000004', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000001', 'BK000004', '2025-09-01 08:00:00+07', 'Giặt vest cho buổi họp quan trọng.', 120000.00, 'CONFIRMED');
+
+INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
+('bd000001-0000-0000-0000-000000000004', 'b0000001-0000-0000-0000-000000000004', (SELECT service_id FROM service WHERE name = 'Giặt hấp cao cấp'), 1, 120000.00, 120000.00);
+
+INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status) VALUES
+('as000001-0000-0000-0000-000000000003', 'bd000001-0000-0000-0000-000000000004', 'e1000001-0000-0000-0000-000000000002', 'ASSIGNED');
+
+-- Booking 5: Jane Smith Customer - In Progress
+INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status) VALUES
+('b0000001-0000-0000-0000-000000000005', 'c1000001-0000-0000-0000-000000000003', 'adrs0001-0000-0000-0000-000000000003', 'BK000005', '2025-08-25 15:00:00+07', 'Nấu cơm tối cho gia đình 4 người.', 150000.00, 'IN_PROGRESS');
+
+INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
+('bd000001-0000-0000-0000-000000000005', 'b0000001-0000-0000-0000-000000000005', (SELECT service_id FROM service WHERE name = 'Nấu ăn gia đình'), 2, 60000.00, 120000.00);
+
+INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status, check_in_time) VALUES
+('as000001-0000-0000-0000-000000000004', 'bd000001-0000-0000-0000-000000000005', 'e1000001-0000-0000-0000-000000000001', 'IN_PROGRESS', '2025-08-25 15:00:00+07');
+
+-- Booking 6: Mary Jones - Cancelled
+INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status) VALUES
+('b0000001-0000-0000-0000-000000000006', 'c1000001-0000-0000-0000-000000000002', 'adrs0001-0000-0000-0000-000000000002', 'BK000006', '2025-08-22 14:00:00+07', 'Hủy do thay đổi lịch trình.', 60000.00, 'CANCELLED');
+
+INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
+('bd000001-0000-0000-0000-000000000006', 'b0000001-0000-0000-0000-000000000006', (SELECT service_id FROM service WHERE name = 'Giặt sấy theo kg'), 2, 30000.00, 60000.00);
+
+-- Booking 7: John Doe - Awaiting Employee (no assignment yet)
+INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status, promotion_id) VALUES
+('b0000001-0000-0000-0000-000000000007', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000001', 'BK000007', '2025-09-05 09:00:00+07', 'Vệ sinh sofa phòng khách.', 270000.00, 'AWAITING_EMPLOYEE', (SELECT promotion_id FROM promotions WHERE promo_code = 'GIAM20K'));
+
+INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
+('bd000001-0000-0000-0000-000000000007', 'b0000001-0000-0000-0000-000000000007', (SELECT service_id FROM service WHERE name = 'Vệ sinh Sofa - Nệm - Rèm'), 1, 300000.00, 300000.00);
+
+-- Booking 8: Jane Smith Customer - Completed with assignment
+INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status) VALUES
+('b0000001-0000-0000-0000-000000000008', 'c1000001-0000-0000-0000-000000000003', 'adrs0001-0000-0000-0000-000000000003', 'BK000008', '2025-08-18 11:00:00+07', 'Đi chợ mua thực phẩm cho tuần.', 40000.00, 'COMPLETED');
+
+INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
+('bd000001-0000-0000-0000-000000000008', 'b0000001-0000-0000-0000-000000000008', (SELECT service_id FROM service WHERE name = 'Đi chợ hộ'), 1, 40000.00, 40000.00);
+
+INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status, check_in_time, check_out_time) VALUES
+('as000001-0000-0000-0000-000000000005', 'bd000001-0000-0000-0000-000000000008', 'e1000001-0000-0000-0000-000000000001', 'COMPLETED', '2025-08-18 11:00:00+07', '2025-08-18 12:30:00+07');
+
+-- Booking 9: Mary Jones - Awaiting Employee
+INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status) VALUES
+('b0000001-0000-0000-0000-000000000009', 'c1000001-0000-0000-0000-000000000002', 'adrs0001-0000-0000-0000-000000000002', 'BK000009', '2025-09-03 16:00:00+07', 'Dọn dẹp nhà cửa 3 giờ.', 150000.00, 'AWAITING_EMPLOYEE');
+
+INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
+('bd000001-0000-0000-0000-000000000009', 'b0000001-0000-0000-0000-000000000009', (SELECT service_id FROM service WHERE name = 'Dọn dẹp theo giờ'), 3, 50000.00, 150000.00);
+
+-- Booking 10: John Doe - Confirmed
+INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status, promotion_id) VALUES
+('b0000001-0000-0000-0000-000000000010', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000001', 'BK000010', '2025-09-02 13:00:00+07', 'Tổng vệ sinh nhà phố 2 tầng.', 630000.00, 'CONFIRMED', (SELECT promotion_id FROM promotions WHERE promo_code = 'KHAITRUONG10'));
+
+INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total, selected_choice_ids) VALUES
+('bd000001-0000-0000-0000-000000000010', 'b0000001-0000-0000-0000-000000000010', (SELECT service_id FROM service WHERE name = 'Tổng vệ sinh'), 1, 700000.00, 700000.00, '2,4'); -- Nhà phố, Trên 80m²
+
+INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status) VALUES
+('as000001-0000-0000-0000-000000000006', 'bd000001-0000-0000-0000-000000000010', 'e1000001-0000-0000-0000-000000000002', 'ASSIGNED'),
+('as000001-0000-0000-0000-000000000007', 'bd000001-0000-0000-0000-000000000010', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED');
+
+-- Add corresponding payments for the new bookings
+INSERT INTO payments (payment_id, booking_id, amount, method_id, payment_status, transaction_code, paid_at) VALUES
+('pay00001-0000-0000-0000-000000000003', 'b0000001-0000-0000-0000-000000000004', 120000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'CASH'), 'PAID', NULL, '2025-09-01 08:30:00+07'),
+('pay00001-0000-0000-0000-000000000004', 'b0000001-0000-0000-0000-000000000005', 150000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'MOMO'), 'PENDING', NULL, NULL),
+('pay00001-0000-0000-0000-000000000005', 'b0000001-0000-0000-0000-000000000008', 40000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'CASH'), 'PAID', NULL, '2025-08-18 12:30:00+07'),
+('pay00001-0000-0000-0000-000000000006', 'b0000001-0000-0000-0000-000000000010', 630000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'VNPAY'), 'PENDING', NULL, NULL);
+
+-- Add reviews for completed bookings
+INSERT INTO review (booking_id, customer_id, employee_id, comment) VALUES
+('b0000001-0000-0000-0000-000000000008', 'c1000001-0000-0000-0000-000000000003', 'e1000001-0000-0000-0000-000000000001', 'Nhân viên mua đúng yêu cầu và giao hàng nhanh chóng.');
+
+INSERT INTO review_details (review_id, criteria_id, rating) VALUES
+(2, (SELECT criteria_id FROM review_criteria WHERE criteria_name = 'Thái độ'), 4.5),
+(2, (SELECT criteria_id FROM review_criteria WHERE criteria_name = 'Đúng giờ'), 5.0),
+(2, (SELECT criteria_id FROM review_criteria WHERE criteria_name = 'Chất lượng công việc'), 4.0);

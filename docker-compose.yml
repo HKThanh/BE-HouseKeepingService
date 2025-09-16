@@ -22,6 +22,8 @@ services:
       - JWT_SECRET=81474ce734be3de9043102e50fa88519a6f3bc67d75e7efded4602f33062fb40
       - JWT_ACCESS_EXPIRATION=3600000
       - JWT_REFRESH_EXPIRATION=86400000
+      - TZ=Asia/Ho_Chi_Minh
+      - SPRING_JACKSON_TIME_ZONE=Asia/Ho_Chi_Minh
     networks:
       - house_keeping_network
 

@@ -11,10 +11,16 @@ spring:
     hibernate:
       ddl-auto: validate
     show-sql: true
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: Asia/Ho_Chi_Minh
   data:
     redis:
       host: localhost
       port: 6379
+  jackson:
+    time-zone: Asia/Ho_Chi_Minh
 
 jwt:
   secret: 81474ce734be3de9043102e50fa88519a6f3bc67d75e7efded4602f33062fb40

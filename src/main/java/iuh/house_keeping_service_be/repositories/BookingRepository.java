@@ -2,6 +2,8 @@ package iuh.house_keeping_service_be.repositories;
 
 import iuh.house_keeping_service_be.enums.BookingStatus;
 import iuh.house_keeping_service_be.models.Booking;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -93,5 +95,17 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
            "WHERE b.bookingId = :bookingId")
     Optional<Booking> findBookingWithDetails(@Param("bookingId") String bookingId);
 
+    // Find bookings awaiting employee with no assignments
+    @Query("SELECT b FROM Booking b WHERE b.status = :status " +
+            "AND NOT EXISTS (SELECT a FROM Assignment a WHERE a.bookingDetail.booking = b)")
+    Page<Booking> findByStatusWithoutAssignments(@Param("status") BookingStatus status, Pageable pageable);
+
     boolean existsByBookingIdAndCustomer_CustomerId(String bookingId, String customerId);
+
+    @Query("SELECT DISTINCT b FROM Booking b " +
+            "LEFT JOIN b.bookingDetails bd " +
+            "LEFT JOIN bd.assignments a " +
+            "WHERE b.status = iuh.house_keeping_service_be.enums.BookingStatus.AWAITING_EMPLOYEE " +
+            "AND a IS NULL")
+    List<Booking> findAwaitingEmployeeBookings(Pageable pageable);
 }

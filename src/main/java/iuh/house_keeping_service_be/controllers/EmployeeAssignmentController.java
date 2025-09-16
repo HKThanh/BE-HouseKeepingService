@@ -2,6 +2,7 @@ package iuh.house_keeping_service_be.controllers;
 
 import iuh.house_keeping_service_be.dtos.Assignment.request.AssignmentCancelRequest;
 import iuh.house_keeping_service_be.dtos.Assignment.response.AssignmentDetailResponse;
+import iuh.house_keeping_service_be.dtos.Assignment.response.BookingSummary;
 import iuh.house_keeping_service_be.services.AssignmentService.AssignmentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -82,6 +83,59 @@ public class EmployeeAssignmentController {
             return ResponseEntity.status(500).body(Map.of(
                     "success", false,
                     "message", "Lỗi khi hủy công việc: " + e.getMessage()
+            ));
+        }
+    }
+
+
+    @GetMapping("/available-bookings")
+    @PreAuthorize("hasAuthority('ROLE_EMPLOYEE')")
+    public ResponseEntity<?> getAvailableBookings(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        try {
+            List<BookingSummary> bookings = assignmentService.getAvailableBookings(page, size);
+
+            String message = bookings.isEmpty() ? "Không có booking chờ" : "Lấy danh sách booking chờ thành công";
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", message,
+                    "data", bookings,
+                    "totalItems", bookings.size()
+            ));
+        } catch (Exception e) {
+            log.error("Error fetching available bookings: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "message", "Lỗi khi lấy danh sách booking chờ: " + e.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/booking-details/{detailId}/accept")
+    @PreAuthorize("hasAuthority('ROLE_EMPLOYEE')")
+    public ResponseEntity<?> acceptBookingDetail(
+            @PathVariable String detailId,
+            @RequestParam String employeeId) {
+
+        try {
+            AssignmentDetailResponse response = assignmentService.acceptBookingDetail(detailId, employeeId);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Nhận công việc thành công",
+                    "data", response
+            ));
+        } catch (IllegalStateException | IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            log.error("Error accepting booking detail: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "message", "Lỗi khi nhận booking: " + e.getMessage()
             ));
         }
     }

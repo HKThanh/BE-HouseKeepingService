@@ -23,7 +23,6 @@ public record BookingCreateRequest(
         @Valid
         List<BookingDetailRequest> bookingDetails,
 
-        @NotEmpty(message = "Assignments cannot be empty")
         @Valid
         List<AssignmentRequest> assignments,
 

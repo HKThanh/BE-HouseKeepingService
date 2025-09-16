@@ -42,6 +42,8 @@ Based on housekeeping_service_v8.sql:
 ## API Endpoints Covered
 1. **GET /{employeeId}/assignments** - Get Employee Assignments
 2. **POST /assignments/{assignmentId}/cancel** - Cancel Assignment
+3. **GET /available-bookings** - Get Available Bookings
+4. **POST /booking-details/{detailId}/accept** - Accept Booking Detail
 
 ---
 
@@ -372,7 +374,7 @@ Based on housekeeping_service_v8.sql:
 - **Input**:
   - **Method**: `GET`
   - **URL**: `/api/v1/employee/e1000001-0000-0000-0000-000000000001/assignments`
-  - **Headers**: 
+  - **Headers**:
     ```
     Authorization: Bearer invalid_or_expired_token
     ```
@@ -394,7 +396,7 @@ Based on housekeeping_service_v8.sql:
 - **Input**:
   - **Method**: `GET`
   - **URL**: `/api/v1/employee/e1000001-0000-0000-0000-000000000001/assignments`
-  - **Headers**: 
+  - **Headers**:
     ```
     Authorization: Bearer <valid_customer_token>
     ```
@@ -416,7 +418,7 @@ Based on housekeeping_service_v8.sql:
 - **Input**:
   - **Method**: `GET`
   - **URL**: `/api/v1/employee/e1000001-0000-0000-0000-000000000001/assignments`
-  - **Headers**: 
+  - **Headers**:
     ```
     Authorization: Bearer <valid_admin_token>
     ```
@@ -452,22 +454,202 @@ Based on housekeeping_service_v8.sql:
 
 ---
 
+## GET /available-bookings - Get Available Bookings
+
+### Test Case 13: Successfully Get Available Bookings
+- **Test Case ID**: TC_ASSIGNMENT_013
+- **Description**: Verify that an employee can retrieve available bookings waiting for assignment.
+- **Preconditions**: Employee is authenticated with valid token.
+- **Input**:
+  - **Method**: `GET`
+  - **URL**: `/api/v1/employee/available-bookings?page=0&size=10`
+  - **Headers**: 
+    ```
+    Authorization: Bearer <valid_employee_token>
+    ```
+- **Expected Output**:
+  ```json
+  {
+    "success": true,
+    "message": "Lấy danh sách booking chờ thành công",
+    "data": [
+      {
+        "detailId": "bd000001-0000-0000-0000-000000000003",
+        "bookingCode": "BK000003",
+        "serviceName": "Dọn dẹp theo giờ",
+        "serviceAddress": "789 Nguyễn Văn Cừ, Quận 5, TP. Hồ Chí Minh",
+        "bookingTime": "2025-09-20 10:00:00",
+        "estimatedDurationHours": 2.0,
+        "quantity": 1
+      }
+    ],
+    "totalItems": 1
+  }
+  ```
+- **Status Code**: `200 OK`
+
+---
+
+### Test Case 14: Successfully Get Available Bookings
+- **Test Case ID**: TC_ASSIGNMENT_014
+- **Description**: Verify that an employee can retrieve available bookings waiting for assignment.
+- **Preconditions**: Employee is authenticated with valid token.
+- **Input**:
+  - **Method**: `GET`
+  - **URL**: `/api/v1/employee/available-bookings?page=0&size=10`
+  - **Headers**:
+    ```
+    Authorization: Bearer <valid_employee_token>
+    ```
+- **Expected Output**:
+  ```json
+  {
+    "success": true,
+    "message": "Không có booking chờ",
+    "data": [],
+    "totalItems": 0
+  }
+  ```
+- **Status Code**: `200 OK`
+
+---
+
+### Test Case 15: Get Available Bookings - Customer Role Access
+- **Test Case ID**: TC_ASSIGNMENT_015
+- **Description**: Verify that customer role cannot access available bookings endpoint.
+- **Preconditions**: Customer is authenticated with valid token.
+- **Input**:
+  - **Method**: `GET`
+  - **URL**: `/api/v1/employee/available-bookings`
+  - **Headers**: 
+    ```
+    Authorization: Bearer <valid_customer_token>
+    ```
+- **Expected Output**:
+  ```json
+  {
+    "error": "Forbidden",
+    "message": "Access denied. Required role: EMPLOYEE"
+  }
+  ```
+- **Status Code**: `403 Forbidden`
+
+---
+
+## POST /booking-details/{detailId}/accept - Accept Booking Detail
+
+### Test Case 16: Successfully Accept Booking Detail
+- **Test Case ID**: TC_ASSIGNMENT_016
+- **Description**: Verify that an employee can accept an available booking detail.
+- **Preconditions**:
+  - Employee is authenticated with valid token.
+  - Booking detail exists and is available for assignment.
+  - Employee is not already assigned to this booking detail.
+- **Input**:
+  - **Method**: `POST`
+  - **URL**: `/api/v1/employee/booking-details/bd000001-0000-0000-0000-000000000003/accept?employeeId=e1000001-0000-0000-0000-000000000001`
+  - **Headers**: 
+    ```
+    Authorization: Bearer <valid_employee_token>
+    Content-Type: application/json
+    ```
+- **Expected Output**:
+  ```json
+  {
+    "success": true,
+    "message": "Nhận công việc thành công",
+    "data": {
+      "assignmentId": "assg0004-0000-0000-0000-000000000004",
+      "bookingCode": "BK000003",
+      "serviceName": "Dọn dẹp theo giờ",
+      "customerName": "Nguyễn Thị B",
+      "customerPhone": "0912345678",
+      "serviceAddress": "789 Nguyễn Văn Cừ, Quận 5, TP. Hồ Chí Minh",
+      "bookingTime": "2025-09-20 10:00:00",
+      "estimatedDurationHours": 2.0,
+      "pricePerUnit": 50000.00,
+      "quantity": 1,
+      "totalAmount": 50000.00,
+      "status": "ASSIGNED",
+      "assignedAt": "2025-09-15 15:30:00",
+      "checkInTime": null,
+      "checkOutTime": null,
+      "note": "Cần dọn dẹp kỹ lưỡng"
+    }
+  }
+  ```
+- **Status Code**: `200 OK`
+
+---
+
+### Test Case 17: Accept Booking Detail - Already Fully Assigned
+- **Test Case ID**: TC_ASSIGNMENT_017
+- **Description**: Verify error handling when booking detail already has enough employees assigned.
+- **Preconditions**:
+  - Employee is authenticated with valid token.
+  - Booking detail already has the required number of employees assigned.
+- **Input**:
+  - **Method**: `POST`
+  - **URL**: `/api/v1/employee/booking-details/bd000001-0000-0000-0000-000000000001/accept?employeeId=e1000001-0000-0000-0000-000000000002`
+  - **Headers**: 
+    ```
+    Authorization: Bearer <valid_employee_token>
+    Content-Type: application/json
+    ```
+- **Expected Output**:
+  ```json
+  {
+    "success": false,
+    "message": "Chi tiết dịch vụ đã có đủ nhân viên"
+  }
+  ```
+- **Status Code**: `400 Bad Request`
+
+---
+
+### Test Case 18: Accept Booking Detail - Not Found
+- **Test Case ID**: TC_ASSIGNMENT_018
+- **Description**: Verify error handling when booking detail ID does not exist.
+- **Preconditions**: Employee is authenticated with valid token.
+- **Input**:
+  - **Method**: `POST`
+  - **URL**: `/api/v1/employee/booking-details/non-existent-detail/accept?employeeId=e1000001-0000-0000-0000-000000000001`
+  - **Headers**: 
+    ```
+    Authorization: Bearer <valid_employee_token>
+    Content-Type: application/json
+    ```
+- **Expected Output**:
+  ```json
+  {
+    "success": false,
+    "message": "Không tìm thấy dịch vụ"
+  }
+  ```
+- **Status Code**: `400 Bad Request`
+
+---
+
 ## Notes
 - **Test Environment**: Database should be configured with test data from housekeeping_service_v8.sql.
-- **Authentication**: All endpoints require valid JWT tokens with EMPLOYEE or ADMIN roles.
+- **Authentication**: All endpoints require valid JWT tokens with appropriate roles.
 - **Authorization**: 
   - Employee assignment retrieval: EMPLOYEE or ADMIN role required
   - Assignment cancellation: EMPLOYEE or ADMIN role required
+  - Available bookings: EMPLOYEE role required
+  - Accept booking detail: EMPLOYEE role required
 - **Transaction Management**: Assignment operations are wrapped in database transactions.
 - **Error Handling**: Service layer catches exceptions and returns appropriate error responses.
 - **Security**: JWT tokens are validated for format, expiration, and role authorization.
-- **Pagination**: Assignment listing supports standard Spring Boot pagination with customizable page size and sorting.
+- **Pagination**: Assignment listing and available bookings support standard Spring Boot pagination.
 - **Status Filtering**: Assignments can be filtered by status (ASSIGNED, IN_PROGRESS, COMPLETED, CANCELLED).
 - **Business Rules**: 
   - Only ASSIGNED assignments can be cancelled
   - Assignments cannot be cancelled within 2 hours of start time
   - Assignment cancellation triggers customer notification
   - If all assignments for a booking are cancelled, booking status is updated to CANCELLED
+  - Booking details can only be accepted if they don't already have enough employees
+  - When all booking details are fully assigned, booking status changes to CONFIRMED
 - **Validation**: Assignment cancellation requires a valid reason (not blank).
 - **Crisis Management**: Assignment cancellations trigger crisis notifications to customers and admin monitoring.
 - **Time Management**: Assignment times are managed in the system timezone with proper formatting.

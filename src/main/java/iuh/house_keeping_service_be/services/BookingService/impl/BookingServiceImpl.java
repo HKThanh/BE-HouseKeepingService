@@ -56,26 +56,38 @@ public class BookingServiceImpl implements BookingService {
             if (!validation.isValid()) {
                 throw BookingValidationException.withErrors(validation.getErrors());
             }
-            
-            // Step 2: Re-validate employee availability (double-check for conflicts)
-            validateEmployeeAvailabilityFinal(request);
+
+            boolean hasAssignments = request.assignments() != null && !request.assignments().isEmpty();
+
+            // Step 2: Re-validate employee availability (double-check for conflicts) if assignments provided
+            if (hasAssignments) {
+                validateEmployeeAvailabilityFinal(request);
+            }
             
             // Step 3: Create booking entity
             Booking booking = createBookingEntity(request, validation);
+
+            if (!hasAssignments) {
+                booking.setStatus(BookingStatus.AWAITING_EMPLOYEE);
+            }
             
             // Step 4: Create booking details
             List<BookingDetail> bookingDetails = createBookingDetails(booking, request, validation);
-            
-            // Step 5: Create assignments
-            List<Assignment> assignments = createAssignments(bookingDetails, request);
-            
+
+            // Step 5: Create assignments if provided
+            List<Assignment> assignments = hasAssignments
+                    ? createAssignments(bookingDetails, request)
+                    : Collections.emptyList();
+
             // Step 6: Create payment record
             Payment payment = createPaymentRecord(booking, request.paymentMethodId());
             
             // Step 7: Save all entities
             Booking savedBooking = bookingRepository.save(booking);
             List<BookingDetail> savedDetails = bookingDetailRepository.saveAll(bookingDetails);
-            List<Assignment> savedAssignments = assignmentRepository.saveAll(assignments);
+            List<Assignment> savedAssignments = hasAssignments
+                    ? assignmentRepository.saveAll(assignments)
+                    : Collections.emptyList();
             Payment savedPayment = paymentRepository.save(payment);
             
             log.info("Booking created successfully with ID: {}", savedBooking.getBookingId());
@@ -126,24 +138,46 @@ public class BookingServiceImpl implements BookingService {
             // Apply promotion if provided
             BigDecimal finalAmount = applyPromotion(request.promoCode(), calculatedTotalAmount, customer, errors);
 
-            int requiredEmployees = calculateRequiredEmployees(request.bookingDetails());
-            long assignedEmployees = request.assignments().stream()
-                    .map(AssignmentRequest::employeeId)
-                    .distinct()
-                    .count();
-            if (requiredEmployees != assignedEmployees) {
-                errors.add("Total employees assigned (" + assignedEmployees + ") does not match required employees (" + requiredEmployees + ")");
-            }
+//            int requiredEmployees = calculateRequiredEmployees(request.bookingDetails());
+//            long assignedEmployees = request.assignments().stream()
+//                    .map(AssignmentRequest::employeeId)
+//                    .distinct()
+//                    .count();
+//            if (requiredEmployees != assignedEmployees) {
+//                errors.add("Total employees assigned (" + assignedEmployees + ") does not match required employees (" + requiredEmployees + ")");
+//            }
             
             if (!errors.isEmpty()) {
                 return BookingValidationResult.error(errors);
             }
 
             // Validate employee assignments
-            validateEmployeeAssignments(request.assignments(), request.bookingTime(), conflicts);
-            
-            if (!conflicts.isEmpty()) {
-                return BookingValidationResult.conflict(conflicts);
+//            validateEmployeeAssignments(request.assignments(), request.bookingTime(), conflicts);
+//
+//            if (!conflicts.isEmpty()) {
+//                return BookingValidationResult.conflict(conflicts);
+//            }
+
+            if (request.assignments() != null && !request.assignments().isEmpty()) {
+                int requiredEmployees = calculateRequiredEmployees(request.bookingDetails());
+                long assignedEmployees = request.assignments().stream()
+                        .map(AssignmentRequest::employeeId)
+                        .distinct()
+                        .count();
+                if (requiredEmployees != assignedEmployees) {
+                    errors.add("Total employees assigned (" + assignedEmployees + ") does not match required employees (" + requiredEmployees + ")");
+                }
+
+                if (!errors.isEmpty()) {
+                    return BookingValidationResult.error(errors);
+                }
+
+                // Validate employee assignments
+                validateEmployeeAssignments(request.assignments(), request.bookingTime(), conflicts);
+
+                if (!conflicts.isEmpty()) {
+                    return BookingValidationResult.conflict(conflicts);
+                }
             }
             
             return BookingValidationResult.success(finalAmount, serviceValidations);

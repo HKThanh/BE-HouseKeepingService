@@ -2,13 +2,17 @@ package iuh.house_keeping_service_be.services.AssignmentService.impl;
 
 import iuh.house_keeping_service_be.dtos.Assignment.request.AssignmentCancelRequest;
 import iuh.house_keeping_service_be.dtos.Assignment.response.AssignmentDetailResponse;
+import iuh.house_keeping_service_be.dtos.Assignment.response.BookingSummary;
 import iuh.house_keeping_service_be.enums.AssignmentStatus;
 import iuh.house_keeping_service_be.enums.BookingStatus;
 import iuh.house_keeping_service_be.models.Assignment;
 import iuh.house_keeping_service_be.models.BookingDetail;
 import iuh.house_keeping_service_be.models.Booking;
+import iuh.house_keeping_service_be.models.Employee;
 import iuh.house_keeping_service_be.repositories.AssignmentRepository;
+import iuh.house_keeping_service_be.repositories.BookingDetailRepository;
 import iuh.house_keeping_service_be.repositories.BookingRepository;
+import iuh.house_keeping_service_be.repositories.EmployeeRepository;
 import iuh.house_keeping_service_be.services.AssignmentService.AssignmentService;
 //import iuh.house_keeping_service_be.services.NotificationService.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +34,8 @@ public class AssignmentServiceImpl implements AssignmentService {
 
     private final AssignmentRepository assignmentRepository;
     private final BookingRepository bookingRepository;
+    private final BookingDetailRepository bookingDetailRepository;
+    private final EmployeeRepository employeeRepository;
 //    private final NotificationService notificationService;
 
     @Override
@@ -53,6 +59,59 @@ public class AssignmentServiceImpl implements AssignmentService {
         return assignments.stream()
                 .map(this::mapToAssignmentDetailResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<BookingSummary> getAvailableBookings(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "bookingTime"));
+        List<Booking> bookings = bookingRepository.findAwaitingEmployeeBookings(pageable);
+
+        return bookings.stream()
+                .flatMap(b -> b.getBookingDetails().stream()
+                        .filter(bd -> bd.getAssignments().isEmpty())
+                        .map(bd -> new BookingSummary(
+                                bd.getId(),
+                                b.getBookingCode(),
+                                bd.getService().getName(),
+                                b.getAddress().getFullAddress(),
+                                b.getBookingTime(),
+                                bd.getService().getEstimatedDurationHours(),
+                                bd.getQuantity()
+                        )))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public AssignmentDetailResponse acceptBookingDetail(String detailId, String employeeId) {
+        BookingDetail bookingDetail = bookingDetailRepository.findById(detailId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy dịch vụ"));
+
+        if (bookingDetail.getAssignments().size() >= bookingDetail.getQuantity()) {
+            throw new IllegalStateException("Chi tiết dịch vụ đã có đủ nhân viên");
+        }
+
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nhân viên"));
+
+        Assignment assignment = new Assignment();
+        assignment.setBookingDetail(bookingDetail);
+        assignment.setEmployee(employee);
+        assignment.setStatus(AssignmentStatus.ASSIGNED);
+        assignmentRepository.save(assignment);
+
+        bookingDetail.getAssignments().add(assignment);
+
+        Booking booking = bookingDetail.getBooking();
+        boolean allAssigned = booking.getBookingDetails().stream()
+                .allMatch(bd -> bd.getAssignments().size() >= bd.getQuantity());
+        if (allAssigned && booking.getStatus() == BookingStatus.AWAITING_EMPLOYEE) {
+            booking.setStatus(BookingStatus.CONFIRMED);
+            booking.setUpdatedAt(LocalDateTime.now());
+            bookingRepository.save(booking);
+        }
+
+        return mapToAssignmentDetailResponse(assignment);
     }
 
     @Override
