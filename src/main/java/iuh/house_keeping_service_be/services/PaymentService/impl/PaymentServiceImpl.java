@@ -61,7 +61,7 @@ public class PaymentServiceImpl implements PaymentService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy giao dịch với mã: " + request.getTransactionCode()));
 
         payment.setPaymentStatus(request.getStatus());
-        if (request.getStatus() == PaymentStatus.COMPLETED) {
+        if (request.getStatus() == PaymentStatus.PAID) {
             payment.setPaidAt(LocalDateTime.now());
         }
 

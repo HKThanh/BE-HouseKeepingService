@@ -9,6 +9,7 @@ public record ServiceData(
     BigDecimal basePrice,
     String unit,
     BigDecimal estimatedDurationHours,
+    Integer recommendedStaff,
     String iconUrl,
     Boolean isActive
 ) {}

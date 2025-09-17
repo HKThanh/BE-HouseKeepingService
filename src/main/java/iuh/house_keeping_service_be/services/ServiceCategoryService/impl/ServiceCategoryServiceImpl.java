@@ -126,6 +126,7 @@ public class ServiceCategoryServiceImpl implements ServiceCategoryService {
                 service.getBasePrice(),
                 service.getUnit(),
                 service.getEstimatedDurationHours(),
+                service.getRecommendedStaff(),
                 service.getIconUrl(),
                 service.getIsActive()
         );

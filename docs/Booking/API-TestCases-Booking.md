@@ -178,7 +178,7 @@ Based on housekeeping_service_v8.sql:
     "bookingId": "7a35373e-20c6-43a2-aab2-1486fb6c89e5",
     "bookingCode": "BK62589569",
     "status": "PENDING",
-    "totalAmount": 600000.00,
+    "totalAmount": 700000.00,
     "formattedTotalAmount": "600,000đ",
     "bookingTime": "2025-09-20T10:00:00",
     "createdAt": "2025-09-15T14:39:22.589451644",
@@ -193,40 +193,44 @@ Based on housekeeping_service_v8.sql:
       "isDefault": true
     },
     "serviceDetails": [
-      {
-        "bookingDetailId": "eb5fdc71-eeda-4588-9c56-e2ac72bbd859",
-        "service": {
-          "serviceId": 2,
-          "name": "Tổng vệ sinh",
-          "description": "Làm sạch sâu toàn diện, bao gồm các khu vực khó tiếp cận, trần nhà, lau cửa kính. Thích hợp cho nhà mới hoặc dọn dẹp theo mùa.",
-          "basePrice": 100000.00,
-          "unit": "Gói",
-          "estimatedDurationHours": 2.0,
-          "categoryName": "Dọn dẹp nhà",
-          "isActive": true
-        },
-        "quantity": 1,
-        "pricePerUnit": 600000,
-        "formattedPricePerUnit": "600,000đ",
-        "subTotal": 600000.00,
-        "formattedSubTotal": "600,000đ",
-        "selectedChoices": [
-          {
-            "choiceId": 2,
-            "choiceName": "Nhà phố",
-            "optionName": "Loại hình nhà ở?",
-            "priceAdjustment": 250000.00,
-            "formattedPriceAdjustment": "250,000đ"
-          },
-          {
-            "choiceId": 4,
-            "choiceName": "Trên 80m²",
-            "optionName": "Diện tích dọn dẹp?",
-            "priceAdjustment": 250000.00,
-            "formattedPriceAdjustment": "250,000đ"
-          }
-        ]
-      }
+        {
+            "bookingDetailId": "5bbc2de4-e9b9-4fc1-8ff1-28d64e6d19c3",
+            "service": {
+                "serviceId": 2,
+                "name": "Tổng vệ sinh",
+                "description": "Làm sạch sâu toàn diện, bao gồm các khu vực khó tiếp cận, trần nhà, lau cửa kính. Thích hợp cho nhà mới hoặc dọn dẹp theo mùa.",
+                "basePrice": 500000.00,
+                "unit": "Gói",
+                "estimatedDurationHours": 2.0,
+                "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599581/house_cleaning_nob_umewqf.png",
+                "categoryName": "Dọn dẹp nhà",
+                "isActive": true
+            },
+            "quantity": 1,
+            "pricePerUnit": 700000,
+            "formattedPricePerUnit": "700,000đ",
+            "subTotal": 700000.00,
+            "formattedSubTotal": "700,000đ",
+            "selectedChoices": [
+                {
+                    "choiceId": 2,
+                    "choiceName": "Nhà phố",
+                    "optionName": "Loại hình nhà ở?",
+                    "priceAdjustment": 200000.00,
+                    "formattedPriceAdjustment": "200,000đ"
+                },
+                {
+                    "choiceId": 4,
+                    "choiceName": "Trên 80m²",
+                    "optionName": "Diện tích dọn dẹp?",
+                    "priceAdjustment": 200000.00,
+                    "formattedPriceAdjustment": "200,000đ"
+                }
+            ],
+            "assignments": [],
+            "duration": "2 giờ",
+            "formattedDuration": "2 giờ"
+        }
     ],
     "paymentInfo": {
       "paymentId": "d2068e26-7333-43a4-a9e5-5a17b23ca7dc",
@@ -1061,6 +1065,7 @@ Based on housekeeping_service_v8.sql:
           "basePrice": 100000.00,
           "unit": "Gói",
           "estimatedDurationHours": 2.0,
+          "recommendedStaff": 3,
           "categoryName": "Dọn dẹp nhà",
           "isActive": true
         },
@@ -1385,6 +1390,124 @@ Based on housekeeping_service_v8.sql:
   ```
 - **Status Code**: `200 OK`
 
+---
+
+### Test Case 25: Successfully Create Booking
+- **Test Case ID**: TC_BOOKING_025
+- **Description**: Verify that a customer can successfully create a new booking with valid data.
+- **Preconditions**:
+  - Customer is authenticated with valid token.
+  - Valid address ID exists for customer.
+  - Selected employees are available at booking time.
+  - Payment method exists and is active.
+- **Input**:
+  - **Method**: `POST`
+  - **URL**: `/api/v1/customer/bookings`
+  - **Headers**:
+    ```
+    Authorization: Bearer <valid_customer_token>
+    Content-Type: application/json
+    ```
+  - **Body**:
+    ```json
+    {
+    "addressId": "adrs0001-0000-0000-0000-000000000001",
+    "bookingTime": "2025-09-20T10:00:00",
+    "note": "Cần dọn dẹp kỹ lưỡng phòng khách và bếp",
+    "promoCode": null,
+    "bookingDetails": [
+        {
+            "serviceId": 2,
+            "quantity": 1,
+            "expectedPrice": 700000,
+            "expectedPricePerUnit": 700000,
+            "selectedChoiceIds": [
+                2,
+                4
+            ]
+        }
+    ],
+    "assignments": [],
+    "paymentMethodId": 1
+    }
+    ```
+- **Expected Output**:
+  ```json
+  {
+    "bookingId": "827eb307-64bd-47ba-894a-88bb8085beeb",
+    "bookingCode": "BK65574301",
+    "status": "AWAITING_EMPLOYEE",
+    "totalAmount": 700000.00,
+    "formattedTotalAmount": "700,000đ",
+    "bookingTime": "2025-09-20T10:00:00",
+    "createdAt": "2025-09-17T20:49:25.642672",
+    "customerInfo": {
+        "addressId": "adrs0001-0000-0000-0000-000000000001",
+        "fullAddress": "123 Lê Trọng Tấn, Tây Thạnh, Tân Phú, TP. Hồ Chí Minh",
+        "ward": "Phường Tây Thạnh",
+        "district": "Quận Tân Phú",
+        "city": "TP. Hồ Chí Minh",
+        "latitude": null,
+        "longitude": null,
+        "isDefault": true
+    },
+    "serviceDetails": [
+        {
+            "bookingDetailId": "5bbc2de4-e9b9-4fc1-8ff1-28d64e6d19c3",
+            "service": {
+                "serviceId": 2,
+                "name": "Tổng vệ sinh",
+                "description": "Làm sạch sâu toàn diện, bao gồm các khu vực khó tiếp cận, trần nhà, lau cửa kính. Thích hợp cho nhà mới hoặc dọn dẹp theo mùa.",
+                "basePrice": 500000.00,
+                "unit": "Gói",
+                "estimatedDurationHours": 2.0,
+                "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599581/house_cleaning_nob_umewqf.png",
+                "categoryName": "Dọn dẹp nhà",
+                "isActive": true
+            },
+            "quantity": 1,
+            "pricePerUnit": 700000,
+            "formattedPricePerUnit": "700,000đ",
+            "subTotal": 700000.00,
+            "formattedSubTotal": "700,000đ",
+            "selectedChoices": [
+                {
+                    "choiceId": 2,
+                    "choiceName": "Nhà phố",
+                    "optionName": "Loại hình nhà ở?",
+                    "priceAdjustment": 200000.00,
+                    "formattedPriceAdjustment": "200,000đ"
+                },
+                {
+                    "choiceId": 4,
+                    "choiceName": "Trên 80m²",
+                    "optionName": "Diện tích dọn dẹp?",
+                    "priceAdjustment": 200000.00,
+                    "formattedPriceAdjustment": "200,000đ"
+                }
+            ],
+            "assignments": [],
+            "duration": "2 giờ",
+            "formattedDuration": "2 giờ"
+        }
+    ],
+    "paymentInfo": {
+        "paymentId": "d7b35dc4-54ea-44c9-91ac-4305c6ee0c4b",
+        "amount": 700000.00,
+        "paymentMethod": "Thanh toán tiền mặt",
+        "paymentStatus": "PENDING",
+        "transactionCode": "TXN_1758116965567",
+        "createdAt": "2025-09-17 20:49:25",
+        "paidAt": null
+    },
+    "promotionApplied": null,
+    "assignedEmployees": [],
+    "totalServices": 1,
+    "totalEmployees": 0,
+    "estimatedDuration": "2 hours 0 minutes",
+    "hasPromotion": false
+    }
+  ```
 ---
 
 ## Notes

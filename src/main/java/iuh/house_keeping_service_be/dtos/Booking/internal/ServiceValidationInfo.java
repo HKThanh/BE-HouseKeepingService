@@ -23,6 +23,7 @@ public class ServiceValidationInfo {
     private BigDecimal calculatedPrice;
     private BigDecimal expectedPrice;
     private boolean priceMatches;
+    private Integer recommendedStaff;
     private String errorMessage;
     
     public static ServiceValidationInfo invalid(Integer serviceId, String errorMessage) {
@@ -37,6 +38,7 @@ public class ServiceValidationInfo {
             .expectedPrice(BigDecimal.ZERO)
             .validChoiceIds(List.of())
             .invalidChoiceIds(List.of())
+            .recommendedStaff(0)
             .build();
     }
     

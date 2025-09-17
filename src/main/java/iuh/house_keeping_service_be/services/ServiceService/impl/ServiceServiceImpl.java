@@ -169,6 +169,7 @@ public class ServiceServiceImpl implements ServiceService {
                     service.getBasePrice(),
                     service.getUnit(),
                     service.getEstimatedDurationHours(),
+                    service.getRecommendedStaff(),
                     service.getIconUrl(),
                     formatPrice(service.getBasePrice(), service.getUnit()),
                     formatDuration(service.getEstimatedDurationHours()),
@@ -231,6 +232,7 @@ public class ServiceServiceImpl implements ServiceService {
                 service.getBasePrice(),
                 service.getUnit(),
                 service.getEstimatedDurationHours(),
+                service.getRecommendedStaff(),
                 service.getIconUrl(),
                 service.getIsActive()
         );
@@ -247,6 +249,7 @@ public class ServiceServiceImpl implements ServiceService {
                 service.getBasePrice(),
                 service.getUnit(),
                 service.getEstimatedDurationHours(),
+                service.getRecommendedStaff(),
                 service.getIconUrl(),
                 service.getIsActive(),
                 formattedPrice,

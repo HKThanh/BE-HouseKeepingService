@@ -30,7 +30,7 @@ All endpoints require:
 Based on housekeeping_service_v5.sql:
 - **Services**: 
   - Service ID 1: "Dọn dẹp theo giờ" (50,000đ/hour, 2.0 hours, recommended 1 staff)
-  - Service ID 2: "Tổng vệ sinh" (400,000đ/package, 4.0 hours, recommended 2 staff)
+  - Service ID 2: "Tổng vệ sinh" (400,000đ/package, 4.0 hours, recommended 3 staff)
 - **Units**: hour, m2, package
 - **Status**: Only active services are returned
 - **Permissions**: "service.view" permission required for all endpoints
@@ -66,6 +66,7 @@ Based on housekeeping_service_v5.sql:
             "basePrice": 40000.00,
             "unit": "Lần",
             "estimatedDurationHours": 1.00,
+            "recommendedStaff": 1,
             "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757601712/shopping_etf5iz.png",
             "isActive": true
         },
@@ -76,6 +77,7 @@ Based on housekeeping_service_v5.sql:
             "basePrice": 50000.00,
             "unit": "Giờ",
             "estimatedDurationHours": 2.00,
+            "recommendedStaff": 1,
             "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599899/Cleaning_Clock_z29juh.png",
             "isActive": true
         },
@@ -86,6 +88,7 @@ Based on housekeeping_service_v5.sql:
             "basePrice": 120000.00,
             "unit": "Bộ",
             "estimatedDurationHours": 48.00,
+            "recommendedStaff": 1,
             "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757601414/vest_2_kfigzg.png",
             "isActive": true
         },
@@ -96,6 +99,7 @@ Based on housekeeping_service_v5.sql:
             "basePrice": 30000.00,
             "unit": "Kg",
             "estimatedDurationHours": 24.00,
+            "recommendedStaff": 1,
             "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757601210/shirt_nmee0d.png",
             "isActive": true
         },
@@ -106,6 +110,7 @@ Based on housekeeping_service_v5.sql:
             "basePrice": 60000.00,
             "unit": "Giờ",
             "estimatedDurationHours": 2.50,
+            "recommendedStaff": 2,
             "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757601546/pan_ysmoql.png",
             "isActive": true
         },
@@ -116,6 +121,7 @@ Based on housekeeping_service_v5.sql:
             "basePrice": 100000.00,
             "unit": "Gói",
             "estimatedDurationHours": 2.00,
+            "recommendedStaff": 3,
             "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599581/house_cleaning_nob_umewqf.png",
             "isActive": true
         },
@@ -126,6 +132,7 @@ Based on housekeeping_service_v5.sql:
             "basePrice": 150000.00,
             "unit": "Máy",
             "estimatedDurationHours": 1.00,
+            "recommendedStaff": 1,
             "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757600733/cooler_rnyppn.png",
             "isActive": true
         },
@@ -136,6 +143,7 @@ Based on housekeeping_service_v5.sql:
             "basePrice": 300000.00,
             "unit": "Gói",
             "estimatedDurationHours": 3.00,
+            "recommendedStaff": 2,
             "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757600057/sofa_bed_vkkjz8.png",
             "isActive": true
         }
@@ -277,6 +285,7 @@ Based on housekeeping_service_v5.sql:
             "basePrice": 50000.00,
             "unit": "Giờ",
             "estimatedDurationHours": 2.00,
+            "recommendedStaff": 1,
             "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599899/Cleaning_Clock_z29juh.png",
             "isActive": true
         }

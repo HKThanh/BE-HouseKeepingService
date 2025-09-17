@@ -32,7 +32,7 @@ All endpoints require:
 Based on housekeeping_service_v8.sql:
 - **Services**:
   - Service ID 1: "Dọn dẹp theo giờ" (50,000đ/hour, 2.0 hours, recommended staff: 1)
-  - Service ID 2: "Tổng vệ sinh" (400,000đ/package, 4.0 hours, recommended staff: 2)
+  - Service ID 2: "Tổng vệ sinh" (400,000đ/package, 4.0 hours, recommended staff: 3)
 - **Service Options**: Various option types (RADIO, CHECKBOX, SELECT) with choices
 - **Employees**: 
   - Jane Smith (ID: e1000001-0000-0000-0000-000000000001) - Skills: Cleaning, Organizing
@@ -70,6 +70,7 @@ Based on housekeeping_service_v8.sql:
       "basePrice": 50000,
       "unit": "hour",
       "estimatedDurationHours": 2.0,
+      "recommendedStaff": 1,
       "formattedPrice": "50,000đ/giờ",
       "formattedDuration": "2 giờ",
       "options": [
@@ -107,7 +108,7 @@ Based on housekeeping_service_v8.sql:
 - **Description**: Verify behavior when requesting options for a service that has no configured options.
 - **Preconditions**:
   - Customer is authenticated with valid token.
-  - Service with ID 2 exists but has no options configured (recommended staff: 2).
+  - Service with ID 2 exists but has no options configured (recommended staff: 3).
 - **Input**:
   - **Method**: `GET`
   - **URL**: `/api/v1/customer/services/2/options`
@@ -128,6 +129,7 @@ Based on housekeeping_service_v8.sql:
       "basePrice": 400000,
       "unit": "package",
       "estimatedDurationHours": 4.0,
+      "recommendedStaff": 3,
       "formattedPrice": "400,000đ/gói",
       "formattedDuration": "4 giờ",
       "options": []

@@ -10,6 +10,7 @@ public record ServiceOptionsData(
     BigDecimal basePrice,
     String unit,
     BigDecimal estimatedDurationHours,
+    Integer recommendedStaff,
     String iconUrl,
     String formattedPrice,
     String formattedDuration,
