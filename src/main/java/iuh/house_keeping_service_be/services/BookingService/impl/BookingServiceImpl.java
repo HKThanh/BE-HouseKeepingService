@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.rmi.NotBoundException;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -54,7 +55,15 @@ public class BookingServiceImpl implements BookingService {
             // Step 1: Validate booking request
             BookingValidationResult validation = validateBooking(request);
             if (!validation.isValid()) {
-                throw BookingValidationException.withErrors(validation.getErrors());
+                if (validation.getErrors() != null && !validation.getErrors().isEmpty()) {
+                    throw BookingValidationException.withErrors(validation.getErrors());
+                }
+
+                if (validation.getConflicts() != null && !validation.getConflicts().isEmpty()) {
+                    throw EmployeeConflictException.withConflicts(validation.getConflicts());
+                }
+
+                throw BookingValidationException.withErrors(List.of("Booking validation failed"));
             }
 
             boolean hasAssignments = request.assignments() != null && !request.assignments().isEmpty();
@@ -159,7 +168,7 @@ public class BookingServiceImpl implements BookingService {
 //            }
 
             if (request.assignments() != null && !request.assignments().isEmpty()) {
-                int requiredEmployees = calculateRequiredEmployees(request.bookingDetails());
+                int requiredEmployees = calculateRequiredEmployees(request.bookingDetails(), serviceValidations);
                 long assignedEmployees = request.assignments().stream()
                         .map(AssignmentRequest::employeeId)
                         .distinct()
@@ -291,6 +300,7 @@ public class BookingServiceImpl implements BookingService {
             .calculatedPrice(calculatedPrice)
             .expectedPrice(detail.expectedPrice())
             .priceMatches(priceMatches)
+            .recommendedStaff(service.getRecommendedStaff() != null ? service.getRecommendedStaff() : 1)
             .build();
     }
 
@@ -320,8 +330,22 @@ public class BookingServiceImpl implements BookingService {
         }
     }
 
-    private int calculateRequiredEmployees(List<BookingDetailRequest> details) {
-        return details.stream().mapToInt(BookingDetailRequest::quantity).sum();
+    private int calculateRequiredEmployees(List<BookingDetailRequest> details,
+                                           List<ServiceValidationInfo> serviceValidations) {
+        Map<Integer, Integer> requiredStaffByService = serviceValidations.stream()
+                .filter(ServiceValidationInfo::isValid)
+                .collect(Collectors.toMap(
+                        ServiceValidationInfo::getServiceId,
+                        info -> info.getRecommendedStaff() != null ? info.getRecommendedStaff() : 1,
+                        (existing, replacement) -> existing
+                ));
+
+        int totalRequiredEmployees = 0;
+        for (BookingDetailRequest detail : details) {
+            int recommendedStaff = requiredStaffByService.getOrDefault(detail.serviceId(), 1);
+            totalRequiredEmployees += recommendedStaff * detail.quantity();
+        }
+        return totalRequiredEmployees;
     }
 
     private BigDecimal applyPromotion(String promoCode, BigDecimal amount, Customer customer, List<String> errors) {

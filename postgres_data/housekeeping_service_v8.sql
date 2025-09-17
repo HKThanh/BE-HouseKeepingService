@@ -539,12 +539,12 @@ INSERT INTO promotions (promo_code, description, discount_type, discount_value, 
 -- Một lịch đã HOÀN THÀNH của khách hàng 'John Doe'
 -- Một lịch đã XÁC NHẬN của khách hàng 'Jane Smith Customer'
 INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status, promotion_id) VALUES
-('b0000001-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000001', 'BK000001', '2025-08-20 09:00:00+07', 'Nhà có trẻ nhỏ, vui lòng lau dọn kỹ khu vực phòng khách.', 380000.00, 'COMPLETED', (SELECT promotion_id FROM promotions WHERE promo_code = 'GIAM20K')),
+('b0000001-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000001', 'BK000001', '2025-08-20 09:00:00+07', 'Nhà có trẻ nhỏ, vui lòng lau dọn kỹ khu vực phòng khách.', 80000.00, 'COMPLETED', (SELECT promotion_id FROM promotions WHERE promo_code = 'GIAM20K')),
 ('b0000001-0000-0000-0000-000000000002', 'c1000001-0000-0000-0000-000000000003', 'adrs0001-0000-0000-0000-000000000003', 'BK000002', '2025-08-28 14:00:00+07', 'Vui lòng đến đúng giờ.', 90000.00, 'CONFIRMED', (SELECT promotion_id FROM promotions WHERE promo_code = 'KHAITRUONG10'));
 
 -- Thêm chi tiết dịch vụ cho các lịch đặt
 INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
-('bd000001-0000-0000-0000-000000000001', 'b0000001-0000-0000-0000-000000000001', (SELECT service_id FROM service WHERE name = 'Tổng vệ sinh'), 1, 400000.00, 400000.00),
+('bd000001-0000-0000-0000-000000000001', 'b0000001-0000-0000-0000-000000000001', (SELECT service_id FROM service WHERE name = 'Tổng vệ sinh'), 1, 100000.00, 100000.00),
 ('bd000001-0000-0000-0000-000000000002', 'b0000001-0000-0000-0000-000000000002', (SELECT service_id FROM service WHERE name = 'Dọn dẹp theo giờ'), 2, 50000.00, 100000.00);
 
 -- Phân công nhân viên cho các lịch đặt
@@ -557,7 +557,7 @@ INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status, 
 
 -- Thêm dữ liệu thanh toán
 INSERT INTO payments (payment_id, booking_id, amount, method_id, payment_status, transaction_code, paid_at) VALUES
-('pay00001-0000-0000-0000-000000000001', 'b0000001-0000-0000-0000-000000000001', 380000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'VNPAY'), 'PAID', 'VNP123456789', '2025-08-20 13:05:00+07'),
+('pay00001-0000-0000-0000-000000000001', 'b0000001-0000-0000-0000-000000000001', 80000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'VNPAY'), 'PAID', 'VNP123456789', '2025-08-20 13:05:00+07'),
 ('pay00001-0000-0000-0000-000000000002', 'b0000001-0000-0000-0000-000000000002', 90000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'MOMO'), 'PENDING', NULL, NULL);
 -- Thêm các tiêu chí đánh giá
 INSERT INTO review_criteria (criteria_name) VALUES
@@ -868,3 +868,113 @@ INSERT INTO review_details (review_id, criteria_id, rating) VALUES
 (2, (SELECT criteria_id FROM review_criteria WHERE criteria_name = 'Thái độ'), 4.5),
 (2, (SELECT criteria_id FROM review_criteria WHERE criteria_name = 'Đúng giờ'), 5.0),
 (2, (SELECT criteria_id FROM review_criteria WHERE criteria_name = 'Chất lượng công việc'), 4.0);
+
+UPDATE service SET base_price = 60000 WHERE name = 'Dọn dẹp theo giờ';
+UPDATE service SET base_price = 500000 WHERE name = 'Tổng vệ sinh';
+UPDATE service SET base_price = 350000 WHERE name = 'Vệ sinh Sofa - Nệm - Rèm';
+UPDATE service SET base_price = 200000 WHERE name = 'Vệ sinh máy lạnh';
+UPDATE service SET base_price = 25000 WHERE name = 'Giặt sấy theo kg';
+UPDATE service SET base_price = 150000 WHERE name = 'Giặt hấp cao cấp';
+UPDATE service SET base_price = 80000 WHERE name = 'Nấu ăn gia đình';
+UPDATE service SET base_price = 50000 WHERE name = 'Đi chợ hộ';
+
+-- Update pricing rules to reflect realistic market adjustments
+UPDATE pricing_rules SET price_adjustment = 200000 WHERE rule_name = 'Phụ thu nhà phố lớn';
+UPDATE pricing_rules SET price_adjustment = 25000 WHERE rule_name = 'Giặt chăn ga';
+UPDATE pricing_rules SET price_adjustment = 20000 WHERE rule_name = 'Rửa chén';
+UPDATE pricing_rules SET price_adjustment = 35000 WHERE rule_name = 'Lau cửa kính';
+UPDATE pricing_rules SET price_adjustment = 100000 WHERE rule_name = 'Vệ sinh nệm';
+UPDATE pricing_rules SET price_adjustment = 80000 WHERE rule_name = 'Vệ sinh rèm';
+UPDATE pricing_rules SET price_adjustment = 100000 WHERE rule_name = 'Máy lạnh âm trần';
+UPDATE pricing_rules SET price_adjustment = 15000 WHERE rule_name = 'Gấp quần áo';
+UPDATE pricing_rules SET price_adjustment = 40000 WHERE rule_name = 'Mua nguyên liệu nấu ăn';
+
+-- Update existing booking details to reflect new pricing
+UPDATE booking_details SET
+    price_per_unit = 500000,
+    sub_total = 500000
+WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000001';
+
+UPDATE booking_details SET
+    price_per_unit = 60000,
+    sub_total = 120000
+WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000002';
+
+UPDATE booking_details SET
+    price_per_unit = 200000,
+    sub_total = 200000
+WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000003';
+
+UPDATE booking_details SET
+    price_per_unit = 150000,
+    sub_total = 150000
+WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000004';
+
+UPDATE booking_details SET
+    price_per_unit = 80000,
+    sub_total = 160000
+WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000005';
+
+UPDATE booking_details SET
+    price_per_unit = 25000,
+    sub_total = 50000
+WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000006';
+
+UPDATE booking_details SET
+    price_per_unit = 350000,
+    sub_total = 350000
+WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000007';
+
+UPDATE booking_details SET
+    price_per_unit = 50000,
+    sub_total = 50000
+WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000008';
+
+UPDATE booking_details SET
+    price_per_unit = 60000,
+    sub_total = 180000
+WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000009';
+
+UPDATE booking_details SET
+    price_per_unit = 700000,
+    sub_total = 700000
+WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000010';
+
+-- Update booking total amounts accordingly
+UPDATE bookings SET total_amount = 480000 WHERE booking_id = 'b0000001-0000-0000-0000-000000000001'; -- 500k - 20k promotion
+UPDATE bookings SET total_amount = 108000 WHERE booking_id = 'b0000001-0000-0000-0000-000000000002'; -- 120k - 10% promotion (max 12k)
+UPDATE bookings SET total_amount = 200000 WHERE booking_id = 'b0000001-0000-0000-0000-000000000003';
+UPDATE bookings SET total_amount = 150000 WHERE booking_id = 'b0000001-0000-0000-0000-000000000004';
+UPDATE bookings SET total_amount = 200000 WHERE booking_id = 'b0000001-0000-0000-0000-000000000005'; -- 160k + 40k for buying ingredients
+UPDATE bookings SET total_amount = 50000 WHERE booking_id = 'b0000001-0000-0000-0000-000000000006';
+UPDATE bookings SET total_amount = 330000 WHERE booking_id = 'b0000001-0000-0000-0000-000000000007'; -- 350k - 20k promotion
+UPDATE bookings SET total_amount = 50000 WHERE booking_id = 'b0000001-0000-0000-0000-000000000008';
+UPDATE bookings SET total_amount = 180000 WHERE booking_id = 'b0000001-0000-0000-0000-000000000009';
+UPDATE bookings SET total_amount = 630000 WHERE booking_id = 'b0000001-0000-0000-0000-000000000010'; -- 700k - 10% (70k discount)
+
+-- Update payment amounts to match new booking totals
+UPDATE payments SET amount = 480000 WHERE payment_id = 'pay00001-0000-0000-0000-000000000001';
+UPDATE payments SET amount = 108000 WHERE payment_id = 'pay00001-0000-0000-0000-000000000002';
+UPDATE payments SET amount = 150000 WHERE payment_id = 'pay00001-0000-0000-0000-000000000003';
+UPDATE payments SET amount = 200000 WHERE payment_id = 'pay00001-0000-0000-0000-000000000004';
+UPDATE payments SET amount = 50000 WHERE payment_id = 'pay00001-0000-0000-0000-000000000005';
+UPDATE payments SET amount = 630000 WHERE payment_id = 'pay00001-0000-0000-0000-000000000006';
+
+-- Add new pricing rules for quantity-based services
+INSERT INTO pricing_rules (service_id, rule_name, condition_logic, priority, price_adjustment, staff_adjustment, duration_adjustment_hours) VALUES
+((SELECT service_id FROM service WHERE name = 'Vệ sinh máy lạnh'), 'Phụ thu máy tủ đứng', 'ALL', 8, 150000, 0, 1.0),
+((SELECT service_id FROM service WHERE name = 'Giặt hấp cao cấp'), 'Phụ thu áo dài', 'ALL', 5, 50000, 0, 0.5),
+((SELECT service_id FROM service WHERE name = 'Giặt hấp cao cấp'), 'Phụ thu đầm dạ hội', 'ALL', 5, 100000, 0, 1.0);
+
+-- Add rule conditions for new pricing rules
+INSERT INTO rule_conditions (rule_id, choice_id) VALUES
+((SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu máy tủ đứng'),
+ (SELECT choice_id FROM service_option_choices WHERE option_id = 7 AND label = 'Tủ đứng'));
+
+INSERT INTO rule_conditions (rule_id, choice_id) VALUES
+((SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu áo dài'),
+ (SELECT choice_id FROM service_option_choices WHERE option_id = 10 AND label = 'Áo dài'));
+
+INSERT INTO rule_conditions (rule_id, choice_id) VALUES
+((SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu đầm dạ hội'),
+ (SELECT choice_id FROM service_option_choices WHERE option_id = 10 AND label = 'Đầm'));
