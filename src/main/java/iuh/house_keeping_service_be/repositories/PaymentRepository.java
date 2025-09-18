@@ -49,9 +49,7 @@ public interface PaymentRepository extends JpaRepository<Payment, String> {
                                        @Param("endDate") LocalDateTime endDate);
     
     // Find latest payment for booking
-    @Query("SELECT p FROM Payment p WHERE p.booking.bookingId = :bookingId " +
-           "ORDER BY p.createdAt DESC LIMIT 1")
-    Optional<Payment> findLatestPaymentByBookingId(@Param("bookingId") String bookingId);
+    Optional<Payment> findFirstByBooking_BookingIdOrderByCreatedAtDesc(String bookingId);
 
     @Query("SELECT p FROM Payment p WHERE p.booking.customer.customerId = :customerId")
     Page<Payment> findByCustomerId(@Param("customerId") String customerId, Pageable pageable);

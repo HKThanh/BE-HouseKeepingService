@@ -35,16 +35,18 @@ Based on housekeeping_service_v8.sql:
 - **Sample Employee**: jane_smith (ID: a1000001-0000-0000-0000-000000000002)
 - **Sample Booking**: booking_001 with amount 500000 VND
 - **Payment Methods**: 
-  - Method ID 1: "MOMO" (Ví điện tử Momo)
-  - Method ID 2: "VNPAY" (Cổng thanh toán VNPAY)
-- **Payment Statuses**: PENDING, COMPLETED, FAILED, CANCELED, REFUNDED
+  - Method ID 1: "CASH" (Thanh toán tiền mặt)
+  - Method ID 2: "MOMO" (Ví điện tử Momo)
+  - Method ID 3: "VNPAY" (Cổng thanh toán VNPAY)
+  - Method ID 4: "BANK_TRANSFER" (Chuyển khoản ngân hàng)
+- **Payment Statuses**: PENDING, PAID, FAILED, CANCELED, REFUNDED
 
 ---
 
 ## API Endpoints Covered
 1. **POST /** - Create Payment
 2. **GET /booking/{bookingId}** - Get Payment for Booking  
-3. **GET /history/me** - Get My Payment History
+3. **GET /history/{customerId}** - Get Payment History by Customer ID
 4. **POST /webhook/update-status** - Payment Webhook
 5. **GET /methods** - Get Available Payment Methods
 
@@ -70,20 +72,20 @@ Based on housekeeping_service_v8.sql:
   - **Request Body**:
     ```json
     {
-      "bookingId": "booking_001",
-      "methodId": 1
+      "bookingId": "b0000001-0000-0000-0000-000000000001",
+      "methodId": 2
     }
     ```
 - **Expected Output**:
   ```json
   {
-    "paymentId": "payment_001",
-    "bookingCode": "BK20250109001",
-    "amount": 500000,
+    "paymentId": "pay00001-0000-0000-0000-000000000001",
+    "bookingCode": "BK000001",
+    "amount": 480000,
     "status": "PENDING",
     "paymentMethodName": "Ví điện tử Momo",
     "transactionCode": null,
-    "createdAt": "2025-01-15T10:30:00.000+00:00",
+    "createdAt": "2025-01-15T10:30:00.000",
     "paidAt": null
   }
   ```
@@ -107,7 +109,7 @@ Based on housekeeping_service_v8.sql:
     ```json
     {
       "bookingId": "non_existent_booking",
-      "methodId": 1
+      "methodId": 2
     }
     ```
 - **Expected Output**:
@@ -117,7 +119,7 @@ Based on housekeeping_service_v8.sql:
     "message": "Không tìm thấy Booking với ID: non_existent_booking"
   }
   ```
-- **Status Code**: `400 Bad Request`
+- **Status Code**: `500 Internal Server Error`
 
 ---
 
@@ -136,7 +138,7 @@ Based on housekeeping_service_v8.sql:
   - **Request Body**:
     ```json
     {
-      "bookingId": "booking_001",
+      "bookingId": "b0000001-0000-0000-0000-000000000001",
       "methodId": 999
     }
     ```
@@ -147,21 +149,45 @@ Based on housekeeping_service_v8.sql:
     "message": "Không tìm thấy Payment Method với ID: 999"
   }
   ```
-- **Status Code**: `400 Bad Request`
+- **Status Code**: `500 Internal Server Error`
+
+---
+
+### Test Case 4: Customer Tries to Create Payment for Other Customer's Booking
+- **Test Case ID**: TC_PAYMENT_004
+- **Description**: Verify that a customer cannot create payment for booking that doesn't belong to them.
+- **Preconditions**: Customer is authenticated with valid token.
+- **Input**:
+  - **Method**: `POST`
+  - **URL**: `/api/v1/customer/payments`
+  - **Headers**: 
+    ```
+    Authorization: Bearer <valid_customer_token>
+    Content-Type: application/json
+    ```
+  - **Request Body**:
+    ```json
+    {
+      "bookingId": "b0000001-0000-0000-0000-000000000002",
+      "methodId": 2
+    }
+    ```
+- **Expected Output**: HTTP 403 Forbidden (no response body)
+- **Status Code**: `403 Forbidden`
 
 ---
 
 ## GET /booking/{bookingId} - Get Payment for Booking
 
-### Test Case 4: Successfully Get Payment for Booking
-- **Test Case ID**: TC_PAYMENT_004
+### Test Case 5: Successfully Get Payment for Booking
+- **Test Case ID**: TC_PAYMENT_005
 - **Description**: Verify that an authorized user can retrieve payment information for a booking.
 - **Preconditions**:
   - User is authenticated with valid token (CUSTOMER, EMPLOYEE, or ADMIN).
   - Booking exists with payment.
 - **Input**:
   - **Method**: `GET`
-  - **URL**: `/api/v1/customer/payments/booking/booking_001`
+  - **URL**: `/api/v1/customer/payments/booking/b0000001-0000-0000-0000-000000000001`
   - **Headers**: 
     ```
     Authorization: Bearer <valid_customer_token>
@@ -169,22 +195,22 @@ Based on housekeeping_service_v8.sql:
 - **Expected Output**:
   ```json
   {
-    "paymentId": "payment_001",
-    "bookingCode": "BK20250109001",
-    "amount": 500000,
-    "status": "COMPLETED",
-    "paymentMethodName": "Ví điện tử Momo",
-    "transactionCode": "MOMO_TXN_123456789",
-    "createdAt": "2025-01-15T10:30:00.000+00:00",
-    "paidAt": "2025-01-15T10:35:00.000+00:00"
+    "paymentId": "pay00001-0000-0000-0000-000000000001",
+    "bookingCode": "BK000001",
+    "amount": 480000,
+    "status": "PAID",
+    "paymentMethodName": "Cổng thanh toán VNPAY",
+    "transactionCode": "VNP123456789",
+    "createdAt": "2025-01-15T10:30:00.000",
+    "paidAt": "2025-01-15T10:35:00.000"
   }
   ```
 - **Status Code**: `200 OK`
 
 ---
 
-### Test Case 5: Get Payment for Non-Existent Booking
-- **Test Case ID**: TC_PAYMENT_005
+### Test Case 6: Get Payment for Non-Existent Booking
+- **Test Case ID**: TC_PAYMENT_006
 - **Description**: Verify error handling when no payment exists for booking ID.
 - **Preconditions**: User is authenticated with valid token.
 - **Input**:
@@ -201,19 +227,19 @@ Based on housekeeping_service_v8.sql:
     "message": "Không tìm thấy thanh toán cho Booking ID: non_existent_booking"
   }
   ```
-- **Status Code**: `400 Bad Request`
+- **Status Code**: `500 Internal Server Error`
 
 ---
 
-## GET /history/me - Get My Payment History
+## GET /history/{customerId} - Get Payment History by Customer ID
 
-### Test Case 6: Successfully Get Customer Payment History
-- **Test Case ID**: TC_PAYMENT_006
+### Test Case 7: Successfully Get Customer Payment History (Own Data)
+- **Test Case ID**: TC_PAYMENT_007
 - **Description**: Verify that a customer can retrieve their own payment history with pagination.
 - **Preconditions**: Customer is authenticated and has payment history.
 - **Input**:
   - **Method**: `GET`
-  - **URL**: `/api/v1/customer/payments/history/me?page=0&size=10&sort=createdAt,desc`
+  - **URL**: `/api/v1/customer/payments/history/c1000001-0000-0000-0000-000000000001?page=0&size=10&sort=createdAt,desc`
   - **Headers**: 
     ```
     Authorization: Bearer <valid_customer_token_john_doe>
@@ -223,24 +249,24 @@ Based on housekeeping_service_v8.sql:
   {
     "content": [
       {
-        "paymentId": "payment_002",
-        "bookingCode": "BK20250109002",
-        "amount": 750000,
-        "status": "COMPLETED",
-        "paymentMethodName": "Cổng thanh toán VNPAY",
-        "transactionCode": "VNPAY_TXN_987654321",
-        "createdAt": "2025-01-15T14:30:00.000+00:00",
-        "paidAt": "2025-01-15T14:32:00.000+00:00"
+        "paymentId": "pay00001-0000-0000-0000-000000000003",
+        "bookingCode": "BK000004",
+        "amount": 150000,
+        "status": "PAID",
+        "paymentMethodName": "Thanh toán tiền mặt",
+        "transactionCode": null,
+        "createdAt": "2025-01-15T14:30:00.000",
+        "paidAt": "2025-01-15T14:32:00.000"
       },
       {
-        "paymentId": "payment_001",
-        "bookingCode": "BK20250109001",
-        "amount": 500000,
-        "status": "COMPLETED",
-        "paymentMethodName": "Ví điện tử Momo",
-        "transactionCode": "MOMO_TXN_123456789",
-        "createdAt": "2025-01-15T10:30:00.000+00:00",
-        "paidAt": "2025-01-15T10:35:00.000+00:00"
+        "paymentId": "pay00001-0000-0000-0000-000000000001",
+        "bookingCode": "BK000001",
+        "amount": 480000,
+        "status": "PAID",
+        "paymentMethodName": "Cổng thanh toán VNPAY",
+        "transactionCode": "VNP123456789",
+        "createdAt": "2025-01-15T10:30:00.000",
+        "paidAt": "2025-01-15T10:35:00.000"
       }
     ],
     "pageable": {
@@ -261,43 +287,74 @@ Based on housekeeping_service_v8.sql:
 
 ---
 
-### Test Case 7: Get Payment History with Custom Pagination
-- **Test Case ID**: TC_PAYMENT_007
-- **Description**: Verify pagination works correctly with different page sizes.
-- **Preconditions**: Customer is authenticated and has payment history.
+### Test Case 8: Admin Access to Any Customer Payment History
+- **Test Case ID**: TC_PAYMENT_008
+- **Description**: Verify that admin can access any customer's payment history.
+- **Preconditions**: Admin is authenticated.
 - **Input**:
   - **Method**: `GET`
-  - **URL**: `/api/v1/customer/payments/history/me?page=1&size=5&sort=amount,asc`
+  - **URL**: `/api/v1/customer/payments/history/c1000001-0000-0000-0000-000000000002?page=0&size=5&sort=amount,asc`
+  - **Headers**: 
+    ```
+    Authorization: Bearer <valid_admin_token>
+    ```
+- **Expected Output**: Payment history for the specified customer with pagination
+- **Status Code**: `200 OK`
+
+---
+
+### Test Case 9: Customer Tries to Access Other Customer's Payment History
+- **Test Case ID**: TC_PAYMENT_009
+- **Description**: Verify that a customer cannot access another customer's payment history.
+- **Preconditions**: Customer is authenticated.
+- **Input**:
+  - **Method**: `GET`
+  - **URL**: `/api/v1/customer/payments/history/c1000001-0000-0000-0000-000000000002`
+  - **Headers**: 
+    ```
+    Authorization: Bearer <valid_customer_token_john_doe>
+    ```
+- **Expected Output**: HTTP 403 Forbidden (no response body)
+- **Status Code**: `403 Forbidden`
+
+---
+
+### Test Case 10: Get Payment History for Non-Existent Customer
+- **Test Case ID**: TC_PAYMENT_010
+- **Description**: Verify error handling when customer ID does not exist.
+- **Preconditions**: User is authenticated.
+- **Input**:
+  - **Method**: `GET`
+  - **URL**: `/api/v1/customer/payments/history/non_existent_customer`
   - **Headers**: 
     ```
     Authorization: Bearer <valid_customer_token>
     ```
-- **Expected Output**:
-  ```json
-  {
-    "content": [],
-    "pageable": {
-      "pageNumber": 1,
-      "pageSize": 5,
-      "sort": {
-        "sorted": true,
-        "ascending": true
-      }
-    },
-    "totalElements": 2,
-    "totalPages": 1,
-    "last": true,
-    "first": false
-  }
-  ```
+- **Expected Output**: HTTP 404 Not Found (no response body)
+- **Status Code**: `404 Not Found`
+
+---
+
+### Test Case 11: Get Payment History with Invalid Sort Parameter
+- **Test Case ID**: TC_PAYMENT_011
+- **Description**: Verify that invalid sort parameters default to createdAt,desc.
+- **Preconditions**: Customer is authenticated.
+- **Input**:
+  - **Method**: `GET`
+  - **URL**: `/api/v1/customer/payments/history/c1000001-0000-0000-0000-000000000001?page=0&size=10&sort=invalidField,invalidDirection`
+  - **Headers**: 
+    ```
+    Authorization: Bearer <valid_customer_token_john_doe>
+    ```
+- **Expected Output**: Payment history sorted by createdAt DESC (default behavior)
 - **Status Code**: `200 OK`
 
 ---
 
 ## POST /webhook/update-status - Payment Webhook
 
-### Test Case 8: Successfully Update Payment Status via Webhook
-- **Test Case ID**: TC_PAYMENT_008
+### Test Case 12: Successfully Update Payment Status via Webhook
+- **Test Case ID**: TC_PAYMENT_012
 - **Description**: Verify that payment gateways can update payment status via webhook.
 - **Preconditions**: Payment exists with transaction code.
 - **Input**:
@@ -310,9 +367,9 @@ Based on housekeeping_service_v8.sql:
   - **Request Body**:
     ```json
     {
-      "transactionCode": "MOMO_TXN_123456789",
-      "status": "COMPLETED",
-      "paidAt": "2025-01-15T10:35:00.000+00:00"
+      "transactionCode": "VNP123456789",
+      "status": "PAID",
+      "paidAt": "2025-01-15T10:35:00.000"
     }
     ```
 - **Expected Output**: No response body (HTTP 200 OK acknowledgment)
@@ -320,8 +377,8 @@ Based on housekeeping_service_v8.sql:
 
 ---
 
-### Test Case 9: Update Status for Non-Existent Transaction
-- **Test Case ID**: TC_PAYMENT_009
+### Test Case 13: Update Status for Non-Existent Transaction
+- **Test Case ID**: TC_PAYMENT_013
 - **Description**: Verify error handling when transaction code does not exist.
 - **Input**:
   - **Method**: `POST`
@@ -344,18 +401,16 @@ Based on housekeeping_service_v8.sql:
     "message": "Không tìm thấy giao dịch với mã: NON_EXISTENT_TXN"
   }
   ```
-- **Status Code**: `400 Bad Request`
+- **Status Code**: `500 Internal Server Error`
 
 ---
 
-## Error Scenarios
-
-### Test Case 10: Unauthorized Access - Missing Token
-- **Test Case ID**: TC_PAYMENT_010
-- **Description**: Verify that requests fail when Authorization header is missing.
+### Test Case 14: Update Payment Status to FAILED
+- **Test Case ID**: TC_PAYMENT_014
+- **Description**: Verify webhook can update payment status to FAILED.
 - **Input**:
   - **Method**: `POST`
-  - **URL**: `/api/v1/customer/payments`
+  - **URL**: `/api/v1/customer/payments/webhook/update-status`
   - **Headers**: 
     ```
     Content-Type: application/json
@@ -363,82 +418,19 @@ Based on housekeeping_service_v8.sql:
   - **Request Body**:
     ```json
     {
-      "bookingId": "booking_001",
-      "methodId": 1
+      "transactionCode": "VNP123456789",
+      "status": "FAILED"
     }
     ```
-- **Expected Output**:
-  ```json
-  {
-    "timestamp": "2025-01-15T10:30:00.000+00:00",
-    "status": 401,
-    "error": "Unauthorized",
-    "path": "/api/v1/customer/payments"
-  }
-  ```
-- **Status Code**: `401 Unauthorized`
-
----
-
-### Test Case 11: Invalid Token
-- **Test Case ID**: TC_PAYMENT_011
-- **Description**: Verify that requests fail when token is invalid or expired.
-- **Input**:
-  - **Method**: `GET`
-  - **URL**: `/api/v1/customer/payments/history/me`
-  - **Headers**: 
-    ```
-    Authorization: Bearer invalid_token_here
-    ```
-- **Expected Output**:
-  ```json
-  {
-    "timestamp": "2025-01-15T10:30:00.000+00:00",
-    "status": 401,
-    "error": "Unauthorized",
-    "path": "/api/v1/customer/payments/history/me"
-  }
-  ```
-- **Status Code**: `401 Unauthorized`
-
----
-
-### Test Case 12: Role Authorization - Employee Access to Customer Payment Creation
-- **Test Case ID**: TC_PAYMENT_012
-- **Description**: Verify that employee role cannot create payments (customer-only endpoint).
-- **Preconditions**: Employee is authenticated with valid token.
-- **Input**:
-  - **Method**: `POST`
-  - **URL**: `/api/v1/customer/payments`
-  - **Headers**: 
-    ```
-    Authorization: Bearer <valid_employee_token>
-    Content-Type: application/json
-    ```
-  - **Request Body**:
-    ```json
-    {
-      "bookingId": "booking_001",
-      "methodId": 1
-    }
-    ```
-- **Expected Output**:
-  ```json
-  {
-    "timestamp": "2025-01-15T10:30:00.000+00:00",
-    "status": 403,
-    "error": "Forbidden",
-    "path": "/api/v1/customer/payments"
-  }
-  ```
-- **Status Code**: `403 Forbidden`
+- **Expected Output**: No response body (HTTP 200 OK acknowledgment)
+- **Status Code**: `200 OK`
 
 ---
 
 ## GET /methods - Get Available Payment Methods
 
-### Test Case 13: Successfully Get Available Payment Methods
-- **Test Case ID**: TC_PAYMENT_013
+### Test Case 15: Successfully Get Available Payment Methods
+- **Test Case ID**: TC_PAYMENT_015
 - **Description**: Verify that users can retrieve all available payment methods.
 - **Preconditions**: None (public endpoint).
 - **Input**:
@@ -474,18 +466,160 @@ Based on housekeeping_service_v8.sql:
 
 ---
 
+## Error Scenarios
+
+### Test Case 16: Unauthorized Access - Missing Token
+- **Test Case ID**: TC_PAYMENT_016
+- **Description**: Verify that requests fail when Authorization header is missing.
+- **Input**:
+  - **Method**: `POST`
+  - **URL**: `/api/v1/customer/payments`
+  - **Headers**: 
+    ```
+    Content-Type: application/json
+    ```
+  - **Request Body**:
+    ```json
+    {
+      "bookingId": "b0000001-0000-0000-0000-000000000001",
+      "methodId": 2
+    }
+    ```
+- **Expected Output**:
+  ```json
+  {
+    "timestamp": "2025-01-15T10:30:00.000+00:00",
+    "status": 401,
+    "error": "Unauthorized",
+    "path": "/api/v1/customer/payments"
+  }
+  ```
+- **Status Code**: `401 Unauthorized`
+
+---
+
+### Test Case 17: Invalid Token
+- **Test Case ID**: TC_PAYMENT_017
+- **Description**: Verify that requests fail when token is invalid or expired.
+- **Input**:
+  - **Method**: `GET`
+  - **URL**: `/api/v1/customer/payments/history/c1000001-0000-0000-0000-000000000001`
+  - **Headers**: 
+    ```
+    Authorization: Bearer invalid_token_here
+    ```
+- **Expected Output**:
+  ```json
+  {
+    "timestamp": "2025-01-15T10:30:00.000+00:00",
+    "status": 401,
+    "error": "Unauthorized",
+    "path": "/api/v1/customer/payments/history/c1000001-0000-0000-0000-000000000001"
+  }
+  ```
+- **Status Code**: `401 Unauthorized`
+
+---
+
+### Test Case 18: Role Authorization - Employee Access to Customer Payment Creation
+- **Test Case ID**: TC_PAYMENT_018
+- **Description**: Verify that employee role cannot create payments (customer-only endpoint).
+- **Preconditions**: Employee is authenticated with valid token.
+- **Input**:
+  - **Method**: `POST`
+  - **URL**: `/api/v1/customer/payments`
+  - **Headers**: 
+    ```
+    Authorization: Bearer <valid_employee_token>
+    Content-Type: application/json
+    ```
+  - **Request Body**:
+    ```json
+    {
+      "bookingId": "b0000001-0000-0000-0000-000000000001",
+      "methodId": 2
+    }
+    ```
+- **Expected Output**:
+  ```json
+  {
+    "timestamp": "2025-01-15T10:30:00.000+00:00",
+    "status": 403,
+    "error": "Forbidden",
+    "path": "/api/v1/customer/payments"
+  }
+  ```
+- **Status Code**: `403 Forbidden`
+
+---
+
+### Test Case 19: Role Authorization - Employee Access to Payment History
+- **Test Case ID**: TC_PAYMENT_019
+- **Description**: Verify that employee role cannot access customer payment history.
+- **Preconditions**: Employee is authenticated with valid token.
+- **Input**:
+  - **Method**: `GET`
+  - **URL**: `/api/v1/customer/payments/history/c1000001-0000-0000-0000-000000000001`
+  - **Headers**: 
+    ```
+    Authorization: Bearer <valid_employee_token>
+    ```
+- **Expected Output**:
+  ```json
+  {
+    "timestamp": "2025-01-15T10:30:00.000+00:00",
+    "status": 403,
+    "error": "Forbidden",
+    "path": "/api/v1/customer/payments/history/c1000001-0000-0000-0000-000000000001"
+  }
+  ```
+- **Status Code**: `403 Forbidden`
+
+---
+
+### Test Case 20: Customer Account Not Found
+- **Test Case ID**: TC_PAYMENT_020
+- **Description**: Verify error handling when authenticated user has no associated customer record.
+- **Preconditions**: User is authenticated but has no customer record.
+- **Input**:
+  - **Method**: `POST`
+  - **URL**: `/api/v1/customer/payments`
+  - **Headers**: 
+    ```
+    Authorization: Bearer <valid_token_no_customer>
+    Content-Type: application/json
+    ```
+  - **Request Body**:
+    ```json
+    {
+      "bookingId": "b0000001-0000-0000-0000-000000000001",
+      "methodId": 2
+    }
+    ```
+- **Expected Output**: HTTP 404 Not Found (no response body)
+- **Status Code**: `404 Not Found`
+
+---
+
 ## Notes
 - **Test Environment**: Database should be configured with test data from housekeeping_service_v8.sql.
-- **Authentication**: Most endpoints require valid JWT tokens except webhook endpoint.
+- **Authentication**: Most endpoints require valid JWT tokens except webhook endpoint and methods endpoint.
 - **Authorization**: 
-  - Payment creation and history: CUSTOMER role required
+  - Payment creation: CUSTOMER role required
+  - Payment history: CUSTOMER and ADMIN roles required (customers can only access their own data, admins can access any customer's data)
   - Booking payment lookup: CUSTOMER, EMPLOYEE, or ADMIN role required
   - Payment methods lookup: No authentication required (public endpoint)
   - Webhook: No authentication (called by external payment gateways)
 - **Transaction Management**: Payment operations are wrapped in database transactions.
-- **Error Handling**: Service layer catches exceptions and returns appropriate error responses.
+- **Error Handling**: Service layer throws RuntimeExceptions which return 500 Internal Server Error.
 - **Security**: JWT tokens are validated for format, expiration, and role authorization.
 - **Pagination**: Payment history supports standard Spring Boot pagination with customizable page size and sorting.
 - **Payment Gateway Integration**: Webhook endpoint designed for external payment gateway callbacks.
 - **Transaction Codes**: Generated by payment gateways and used for payment tracking and status updates.
 - **Amount Format**: Payment amounts in VND (Vietnamese Dong) as BigDecimal for precision.
+- **Payment Status Values**: PENDING, PAID, FAILED, CANCELED, REFUNDED (based on PaymentStatus enum).
+- **Payment Method Codes**: CASH, MOMO, VNPAY, BANK_TRANSFER (based on PaymentMethodCode enum).
+- **Customer Ownership Validation**: Payment creation validates that the booking belongs to the authenticated customer.
+- **Default Sorting**: Payment history defaults to createdAt DESC when no sort parameter is provided or invalid sort parameters are used.
+- **Customer ID Validation**: Payment history endpoint requires customerId path parameter and validates customer existence.
+- **Customer Data Access Control**: Customers can only access their own payment history unless they have ADMIN role.

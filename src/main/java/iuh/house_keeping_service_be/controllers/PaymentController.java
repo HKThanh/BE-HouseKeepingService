@@ -1,10 +1,14 @@
-package iuh.house_keeping_service_be.controllers; // Hoặc package tương ứng
+package iuh.house_keeping_service_be.controllers;
 
 import iuh.house_keeping_service_be.dtos.payment.CreatePaymentRequest;
 import iuh.house_keeping_service_be.dtos.payment.PaymentMethodResponse;
 import iuh.house_keeping_service_be.dtos.payment.PaymentResponse;
 import iuh.house_keeping_service_be.dtos.payment.UpdatePaymentStatusRequest;
+import iuh.house_keeping_service_be.models.Account;
+import iuh.house_keeping_service_be.models.Customer;
+import iuh.house_keeping_service_be.repositories.AccountRepository;
 import iuh.house_keeping_service_be.repositories.BookingRepository;
+import iuh.house_keeping_service_be.repositories.CustomerRepository;
 import iuh.house_keeping_service_be.services.PaymentService.PaymentMethodService;
 import iuh.house_keeping_service_be.services.PaymentService.PaymentService;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +35,8 @@ public class PaymentController {
     private final PaymentService paymentService;
     private final PaymentMethodService paymentMethodService;
     private final BookingRepository bookingRepository;
+    private final AccountRepository accountRepository;
+    private final CustomerRepository customerRepository;
 
     /**
      * API cho khách hàng tạo một yêu cầu thanh toán cho một lịch đặt.
@@ -40,9 +46,21 @@ public class PaymentController {
     public ResponseEntity<PaymentResponse> createPayment(@RequestBody CreatePaymentRequest request) {
         // TODO: Thêm logic để kiểm tra xem bookingId có thuộc về người dùng đang đăng nhập không
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String customerId = authentication.getName();
+        String username = authentication.getName();
 
-        boolean ownsBooking = bookingRepository.existsByBookingIdAndCustomer_CustomerId(request.getBookingId(), customerId);
+        Account account = accountRepository.findByUsername(username)
+                .orElse(null);
+        if (account == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+
+        Customer customer = customerRepository.findByAccount_AccountId(account.getAccountId())
+                .orElse(null);
+        if (customer == null) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+
+        boolean ownsBooking = bookingRepository.existsByBookingIdAndCustomer_CustomerId(request.getBookingId(), customer.getCustomerId());
         if (!ownsBooking) {
             return new ResponseEntity<>(HttpStatus.FORBIDDEN);
         }
@@ -64,18 +82,63 @@ public class PaymentController {
     /**
      * API cho khách hàng xem lịch sử thanh toán của chính mình.
      */
-    @GetMapping("/history/me")
-    @PreAuthorize("hasAuthority('ROLE_CUSTOMER')")
-    public ResponseEntity<Page<PaymentResponse>> getMyPaymentHistory(
+    @GetMapping("/history/{customerId}")
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_ADMIN')")
+    public ResponseEntity<Page<PaymentResponse>> getPaymentHistory(
+            @PathVariable String customerId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "createdAt,desc") String[] sort) {
+            @RequestParam(value = "sort", required = false) String sort) {
 
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        String customerId = authentication.getName();
+        String username = authentication.getName();
 
-        Sort.Direction direction = sort[1].equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC;
-        Sort.Order order = new Sort.Order(direction, sort[0]);
+        // Get current user's account
+        Account account = accountRepository.findByUsername(username)
+                .orElse(null);
+        if (account == null) {
+            return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
+        }
+
+        // Check if user is admin or accessing their own data
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
+
+        if (!isAdmin) {
+            // If not admin, check if customer is accessing their own data
+            Customer currentCustomer = customerRepository.findByAccount_AccountId(account.getAccountId())
+                .orElse(null);
+            if (currentCustomer == null) {
+                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            }
+
+            // Customer can only access their own payment history
+            if (!currentCustomer.getCustomerId().equals(customerId)) {
+                return new ResponseEntity<>(HttpStatus.FORBIDDEN);
+            }
+        }
+
+        // Verify the requested customerId exists
+        if (!customerRepository.existsById(customerId)) {
+            return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+
+        String[] sortParts = java.util.Arrays.stream(sort != null ? sort.split(",") : new String[0])
+                .map(String::trim)
+                .filter(part -> !part.isEmpty())
+                .toArray(String[]::new);
+
+        String sortProperty = sortParts.length > 0 ? sortParts[0] : "createdAt";
+        String sortDirection = sortParts.length > 1 ? sortParts[1] : "desc";
+
+        Sort.Direction direction;
+        try {
+            direction = Sort.Direction.fromString(sortDirection);
+        } catch (IllegalArgumentException ex) {
+            direction = Sort.Direction.DESC;
+        }
+
+        Sort.Order order = new Sort.Order(direction, sortProperty);
 
         Pageable pageable = PageRequest.of(page, size, Sort.by(order));
 

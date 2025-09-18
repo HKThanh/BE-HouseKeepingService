@@ -14,12 +14,15 @@ import iuh.house_keeping_service_be.repositories.PaymentRepository;
 import iuh.house_keeping_service_be.services.PaymentService.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -71,7 +74,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional(readOnly = true)
     public PaymentResponse getPaymentByBookingId(String bookingId) {
-        Payment payment = paymentRepository.findLatestPaymentByBookingId(bookingId)
+        Payment payment = paymentRepository.findFirstByBooking_BookingIdOrderByCreatedAtDesc(bookingId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy thanh toán cho Booking ID: " + bookingId));
         return convertToPaymentResponse(payment);
     }
@@ -79,10 +82,10 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional(readOnly = true)
     public Page<PaymentResponse> getPaymentHistoryByCustomerId(String customerId, Pageable pageable) {
-        // Gọi phương thức repository đã được cập nhật
-        Page<Payment> paymentPage = paymentRepository.findByCustomerId(customerId, pageable);
+        // Validate and fix sort parameters
+        Pageable validatedPageable = validateAndFixPageable(pageable);
 
-        // Dùng hàm map của Page để chuyển đổi nội dung
+        Page<Payment> paymentPage = paymentRepository.findByCustomerId(customerId, validatedPageable);
         return paymentPage.map(this::convertToPaymentResponse);
     }
 
@@ -118,5 +121,39 @@ public class PaymentServiceImpl implements PaymentService {
                 method.getMethodName()
 //                method.getIconUrl()
         );
+    }
+
+    private Pageable validateAndFixPageable(Pageable pageable) {
+        // Valid sortable fields for Payment entity
+        Set<String> validSortFields = Set.of(
+                "id", "amount", "paymentStatus", "transactionCode",
+                "createdAt", "paidAt"
+        );
+
+        // Check if sort is valid
+        if (pageable.getSort().isSorted()) {
+            boolean hasInvalidSort = pageable.getSort().stream()
+                    .anyMatch(order -> !validSortFields.contains(order.getProperty()));
+
+            if (hasInvalidSort) {
+                // Return default sort: createdAt DESC
+                return PageRequest.of(
+                        pageable.getPageNumber(),
+                        pageable.getPageSize(),
+                        Sort.by(Sort.Direction.DESC, "createdAt")
+                );
+            }
+        }
+
+        // If no sort specified, use default
+        if (pageable.getSort().isUnsorted()) {
+            return PageRequest.of(
+                    pageable.getPageNumber(),
+                    pageable.getPageSize(),
+                    Sort.by(Sort.Direction.DESC, "createdAt")
+            );
+        }
+
+        return pageable;
     }
 }
