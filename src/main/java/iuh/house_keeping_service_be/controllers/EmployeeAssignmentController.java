@@ -126,7 +126,14 @@ public class EmployeeAssignmentController {
                     "message", "Nhận công việc thành công",
                     "data", response
             ));
-        } catch (IllegalStateException | IllegalArgumentException e) {
+        } catch (IllegalStateException e) {
+            log.warn("Accept booking detail failed: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()
+            ));
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid request when accepting booking detail: {}", e.getMessage());
             return ResponseEntity.badRequest().body(Map.of(
                     "success", false,
                     "message", e.getMessage()

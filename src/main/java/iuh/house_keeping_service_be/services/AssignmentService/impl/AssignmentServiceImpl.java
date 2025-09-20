@@ -5,14 +5,8 @@ import iuh.house_keeping_service_be.dtos.Assignment.response.AssignmentDetailRes
 import iuh.house_keeping_service_be.dtos.Assignment.response.BookingSummary;
 import iuh.house_keeping_service_be.enums.AssignmentStatus;
 import iuh.house_keeping_service_be.enums.BookingStatus;
-import iuh.house_keeping_service_be.models.Assignment;
-import iuh.house_keeping_service_be.models.BookingDetail;
-import iuh.house_keeping_service_be.models.Booking;
-import iuh.house_keeping_service_be.models.Employee;
-import iuh.house_keeping_service_be.repositories.AssignmentRepository;
-import iuh.house_keeping_service_be.repositories.BookingDetailRepository;
-import iuh.house_keeping_service_be.repositories.BookingRepository;
-import iuh.house_keeping_service_be.repositories.EmployeeRepository;
+import iuh.house_keeping_service_be.models.*;
+import iuh.house_keeping_service_be.repositories.*;
 import iuh.house_keeping_service_be.services.AssignmentService.AssignmentService;
 //import iuh.house_keeping_service_be.services.NotificationService.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -36,6 +31,7 @@ public class AssignmentServiceImpl implements AssignmentService {
     private final BookingRepository bookingRepository;
     private final BookingDetailRepository bookingDetailRepository;
     private final EmployeeRepository employeeRepository;
+    private final EmployeeUnavailabilityRepository employeeUnavailabilityRepository;
 //    private final NotificationService notificationService;
 
     @Override
@@ -87,12 +83,43 @@ public class AssignmentServiceImpl implements AssignmentService {
         BookingDetail bookingDetail = bookingDetailRepository.findById(detailId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy dịch vụ"));
 
+        Booking booking = bookingDetail.getBooking();
+        if (booking == null) {
+            throw new IllegalStateException("Không thể xác định booking của chi tiết dịch vụ này");
+        }
+
+        EnumSet<BookingStatus> allowedStatuses = EnumSet.of(BookingStatus.AWAITING_EMPLOYEE, BookingStatus.CONFIRMED);
+        if (!allowedStatuses.contains(booking.getStatus())) {
+            throw new IllegalStateException(String.format(
+                    "Không thể nhận booking khi đang ở trạng thái %s", booking.getStatus().name()));
+        }
+
+        LocalDateTime shiftStart = bookingDetail.getBooking().getBookingTime();
+        LocalDateTime shiftEnd = calculateShiftEndTime(shiftStart, bookingDetail);
+
+        List<Assignment> conflictingAssignments = assignmentRepository.findConflictingAssignments(employeeId, shiftStart, shiftEnd);
+        if (!conflictingAssignments.isEmpty()) {
+            throw new IllegalStateException("Nhân viên đã được phân công công việc khác trong khung giờ này");
+        }
+
+        List<EmployeeUnavailability> unavailabilities =
+                employeeUnavailabilityRepository.findByEmployeeAndPeriod(employeeId, shiftStart, shiftEnd);
+        boolean hasLeaveConflict = employeeUnavailabilityRepository.hasConflict(employeeId, shiftStart, shiftEnd);
+        if (!unavailabilities.isEmpty() || hasLeaveConflict) {
+            throw new IllegalStateException("Nhân viên đang có lịch nghỉ được phê duyệt trong khung giờ này");
+        }
+
         if (bookingDetail.getAssignments().size() >= bookingDetail.getQuantity()) {
             throw new IllegalStateException("Chi tiết dịch vụ đã có đủ nhân viên");
         }
 
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nhân viên"));
+
+        boolean alreadyAssigned = assignmentRepository.existsByBookingDetailIdAndEmployeeEmployeeId(detailId, employeeId);
+        if (alreadyAssigned) {
+            throw new IllegalStateException("Nhân viên đã nhận chi tiết dịch vụ này");
+        }
 
         Assignment assignment = new Assignment();
         assignment.setBookingDetail(bookingDetail);
@@ -102,7 +129,6 @@ public class AssignmentServiceImpl implements AssignmentService {
 
         bookingDetail.getAssignments().add(assignment);
 
-        Booking booking = bookingDetail.getBooking();
         boolean allAssigned = booking.getBookingDetails().stream()
                 .allMatch(bd -> bd.getAssignments().size() >= bd.getQuantity());
         if (allAssigned && booking.getStatus() == BookingStatus.AWAITING_EMPLOYEE) {
@@ -113,6 +139,31 @@ public class AssignmentServiceImpl implements AssignmentService {
 
         return mapToAssignmentDetailResponse(assignment);
     }
+
+    private LocalDateTime calculateShiftEndTime(LocalDateTime shiftStart, BookingDetail bookingDetail) {
+        if (shiftStart == null) {
+            throw new IllegalArgumentException("Booking không có thời gian bắt đầu hợp lệ");
+        }
+
+        if (bookingDetail.getService() == null || bookingDetail.getService().getEstimatedDurationHours() == null) {
+            return shiftStart.plusHours(2);
+        }
+
+        var duration = bookingDetail.getService().getEstimatedDurationHours();
+        long hours = duration.longValue();
+        long minutes = duration.remainder(java.math.BigDecimal.ONE)
+                .multiply(java.math.BigDecimal.valueOf(60))
+                .setScale(0, java.math.RoundingMode.HALF_UP)
+                .longValue();
+
+        if (minutes >= 60) {
+            hours += minutes / 60;
+            minutes = minutes % 60;
+        }
+
+        return shiftStart.plusHours(hours).plusMinutes(minutes);
+    }
+
 
     @Override
     @Transactional
