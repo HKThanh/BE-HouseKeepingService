@@ -89,7 +89,7 @@ public class EmployeeAssignmentController {
 
 
     @GetMapping("/available-bookings")
-    @PreAuthorize("hasAuthority('ROLE_EMPLOYEE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_EMPLOYEE', 'ROLE_ADMIN')")
     public ResponseEntity<?> getAvailableBookings(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
