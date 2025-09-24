@@ -85,7 +85,7 @@ public class BookingController {
         log.info("Creating new booking with {} services", request.bookingDetails().size());
         
         BookingCreationSummary summary = bookingService.createBooking(request);
-        
+
         log.info("Booking created successfully: {}", summary.getBookingId());
         return ResponseEntity.status(HttpStatus.CREATED).body(summary);
     }
@@ -96,7 +96,7 @@ public class BookingController {
         log.info("Getting booking details: {}", bookingId);
         
         BookingResponse response = bookingService.getBookingDetails(bookingId);
-        
+
         return ResponseEntity.ok(response);
     }
 
@@ -106,7 +106,7 @@ public class BookingController {
         log.info("Validating booking request");
         
         BookingValidationResult result = bookingService.validateBooking(request);
-        
+
         return ResponseEntity.ok(result);
     }
 }
