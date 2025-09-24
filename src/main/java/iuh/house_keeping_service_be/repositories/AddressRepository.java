@@ -1,6 +1,7 @@
 package iuh.house_keeping_service_be.repositories;
 
 import iuh.house_keeping_service_be.models.Address;
+import iuh.house_keeping_service_be.repositories.projections.ZoneCoordinate;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -42,4 +43,21 @@ public interface AddressRepository extends JpaRepository<Address, String> {
            "WHERE a.district = :district AND a.city = :city")
     List<Address> findByDistrictAndCityWithCustomer(@Param("district") String district,
                                                    @Param("city") String city);
+
+
+    @Query("SELECT new iuh.house_keeping_service_be.repositories.projections.ZoneCoordinate(" +
+            "AVG(a.latitude), AVG(a.longitude)) " +
+            "FROM Address a " +
+            "WHERE a.district = :district AND a.city = :city " +
+            "AND a.latitude IS NOT NULL AND a.longitude IS NOT NULL")
+    Optional<ZoneCoordinate> findAverageCoordinateByDistrictAndCity(@Param("district") String district,
+                                                                    @Param("city") String city);
+
+    @Query("SELECT new iuh.house_keeping_service_be.repositories.projections.ZoneCoordinate(" +
+           "AVG(a.latitude), AVG(a.longitude)) " +
+           "FROM Address a " +
+           "JOIN EmployeeWorkingZone ewz ON a.district = ewz.district AND a.city = ewz.city " +
+           "WHERE ewz.employee.employeeId = :employeeId " +
+           "AND a.latitude IS NOT NULL AND a.longitude IS NOT NULL")
+    Optional<ZoneCoordinate> findAverageCoordinateByEmployeeZones(@Param("employeeId") String employeeId);
 }

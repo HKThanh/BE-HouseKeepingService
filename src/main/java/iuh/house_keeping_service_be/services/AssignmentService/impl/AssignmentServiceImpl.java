@@ -7,10 +7,12 @@ import iuh.house_keeping_service_be.enums.AssignmentStatus;
 import iuh.house_keeping_service_be.enums.BookingStatus;
 import iuh.house_keeping_service_be.models.*;
 import iuh.house_keeping_service_be.repositories.*;
+import iuh.house_keeping_service_be.repositories.projections.ZoneCoordinate;
 import iuh.house_keeping_service_be.services.AssignmentService.AssignmentService;
 //import iuh.house_keeping_service_be.services.NotificationService.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -18,8 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.EnumSet;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,6 +33,7 @@ public class AssignmentServiceImpl implements AssignmentService {
     private final BookingDetailRepository bookingDetailRepository;
     private final EmployeeRepository employeeRepository;
     private final EmployeeUnavailabilityRepository employeeUnavailabilityRepository;
+    private final AddressRepository addressRepository;
 //    private final NotificationService notificationService;
 
     @Override
@@ -57,24 +59,96 @@ public class AssignmentServiceImpl implements AssignmentService {
                 .collect(Collectors.toList());
     }
 
-    @Override
-    public List<BookingSummary> getAvailableBookings(int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "bookingTime"));
-        List<Booking> bookings = bookingRepository.findAwaitingEmployeeBookings(pageable);
+//    @Override
+//    public List<BookingSummary> getAvailableBookings(String employeeId, int page, int size) {
+//        Employee employee = employeeRepository.findEmployeeWithDetails(employeeId)
+//                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nhân viên"));
+//
+//        Set<EmployeeWorkingZone> workingZones = employee.getWorkingZones() == null
+//                ? Set.of()
+//                : new HashSet<>(employee.getWorkingZones());
+//
+//        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "bookingTime"));
+//
+//        if (!workingZones.isEmpty()) {
+//            List<String> zoneKeys = workingZones.stream()
+//                    .map(this::buildZoneKey)
+//                    .filter(Objects::nonNull)
+//                    .distinct()
+//                    .collect(Collectors.toList());
+//
+//            if (!zoneKeys.isEmpty()) {
+//                List<Booking> zoneBookings = bookingRepository
+//                        .findAwaitingEmployeeBookingsByZones(zoneKeys, pageable)
+//                        .getContent();
+//
+//                List<BookingSummary> zoneSummaries = mapToBookingSummaries(zoneBookings);
+//                if (!zoneSummaries.isEmpty()) {
+//                    return zoneSummaries;
+//                }
+//            }
+//        }
+//
+//        List<Booking> awaitingBookings = bookingRepository.findAwaitingEmployeeBookings(pageable);
+//        return sortBookingsByProximity(awaitingBookings, workingZones);
+//    }
 
-        return bookings.stream()
-                .flatMap(b -> b.getBookingDetails().stream()
-                        .filter(bd -> bd.getAssignments().isEmpty())
-                        .map(bd -> new BookingSummary(
-                                bd.getId(),
-                                b.getBookingCode(),
-                                bd.getService().getName(),
-                                b.getAddress().getFullAddress(),
-                                b.getBookingTime(),
-                                bd.getService().getEstimatedDurationHours(),
-                                bd.getQuantity()
-                        )))
-                .collect(Collectors.toList());
+    @Override
+    public List<BookingSummary> getAvailableBookings(String employeeId, int page, int size) {
+        Employee employee = employeeRepository.findEmployeeWithDetails(employeeId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nhân viên"));
+
+        Set<EmployeeWorkingZone> workingZones = employee.getWorkingZones() == null
+                ? Set.of()
+                : new HashSet<>(employee.getWorkingZones());
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "bookingTime"));
+        List<BookingSummary> result = new ArrayList<>();
+
+        // Get bookings in employee's working zones first
+        if (!workingZones.isEmpty()) {
+            List<String> zoneKeys = workingZones.stream()
+                    .map(this::buildZoneKey)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            if (!zoneKeys.isEmpty()) {
+                Page<Booking> zoneBookingsPage = bookingRepository
+                        .findAwaitingEmployeeBookingsByZones(zoneKeys, pageable);
+
+                List<BookingSummary> zoneSummaries = mapToBookingSummaries(zoneBookingsPage.getContent());
+                result.addAll(zoneSummaries);
+
+                // If we have enough bookings from zones, return them
+                if (result.size() >= size) {
+                    return result.subList(0, size);
+                }
+            }
+        }
+
+        // Get remaining slots to fill with bookings outside zones
+        int remainingSlots = size - result.size();
+        if (remainingSlots > 0) {
+            List<String> zoneKeys = workingZones.stream()
+                    .map(this::buildZoneKey)
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .collect(Collectors.toList());
+
+            List<Booking> outsideZoneBookings = zoneKeys.isEmpty()
+                ? bookingRepository.findAwaitingEmployeeBookings(PageRequest.of(0, remainingSlots * 2))
+                : bookingRepository.findAwaitingEmployeeBookingsOutsideZones(zoneKeys);
+
+            List<BookingSummary> sortedOutsideBookings = sortBookingsByProximity(
+                outsideZoneBookings, workingZones);
+
+            // Add sorted bookings to fill remaining slots
+            int toAdd = Math.min(remainingSlots, sortedOutsideBookings.size());
+            result.addAll(sortedOutsideBookings.subList(0, toAdd));
+        }
+
+        return result;
     }
 
     @Override
@@ -258,6 +332,142 @@ public class AssignmentServiceImpl implements AssignmentService {
                     assignment.getAssignmentId(), e.getMessage(), e);
         }
     }
+
+    private List<BookingSummary> mapToBookingSummaries(List<Booking> bookings) {
+        return bookings.stream()
+                .flatMap(booking -> booking.getBookingDetails().stream()
+                        .filter(detail -> detail.getAssignments().isEmpty())
+                        .map(detail -> mapToBookingSummary(booking, detail)))
+                .collect(Collectors.toList());
+    }
+
+    private List<BookingSummary> sortBookingsByProximity(List<Booking> bookings, Set<EmployeeWorkingZone> workingZones) {
+        Map<String, GeoCoordinate> zoneCoordinates = resolveZoneCoordinates(workingZones);
+
+        if (zoneCoordinates.isEmpty()) {
+            return mapToBookingSummaries(bookings);
+        }
+
+        return bookings.stream()
+                .flatMap(booking -> booking.getBookingDetails().stream()
+                        .filter(detail -> detail.getAssignments().isEmpty())
+                        .map(detail -> new BookingCandidate(
+                                mapToBookingSummary(booking, detail),
+                                calculateMinDistance(booking.getAddress(), zoneCoordinates)
+                        )))
+                .sorted(Comparator.comparingDouble(BookingCandidate::distance))
+                .map(BookingCandidate::summary)
+                .collect(Collectors.toList());
+    }
+
+//    private Map<String, GeoCoordinate> resolveZoneCoordinates(Set<EmployeeWorkingZone> workingZones) {
+//        if (workingZones == null || workingZones.isEmpty()) {
+//            return Map.of();
+//        }
+//
+//        return workingZones.stream()
+//                .map(zone -> new AbstractMap.SimpleEntry<>(buildZoneKey(zone), getZoneRepresentativeCoordinate(zone).orElse(null)))
+//                .filter(entry -> entry.getKey() != null)
+//                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (existing, replacement) -> existing));
+//    }
+
+    private Map<String, GeoCoordinate> resolveZoneCoordinates(Set<EmployeeWorkingZone> workingZones) {
+        if (workingZones == null || workingZones.isEmpty()) {
+            return Map.of();
+        }
+
+        return workingZones.stream()
+                .map(zone -> new AbstractMap.SimpleEntry<>(
+                    buildZoneKey(zone),
+                    getZoneRepresentativeCoordinate(zone).orElse(null)
+                ))
+                .filter(entry -> entry.getKey() != null && entry.getValue() != null) // Filter out null values
+                .collect(Collectors.toMap(
+                    Map.Entry::getKey,
+                    Map.Entry::getValue,
+                    (existing, replacement) -> existing
+                ));
+    }
+
+    private Optional<GeoCoordinate> getZoneRepresentativeCoordinate(EmployeeWorkingZone zone) {
+        if (zone == null || zone.getDistrict() == null || zone.getCity() == null) {
+            return Optional.empty();
+        }
+
+        Optional<ZoneCoordinate> coordinate = addressRepository
+                .findAverageCoordinateByDistrictAndCity(zone.getDistrict(), zone.getCity());
+
+        if (coordinate.isEmpty()) {
+            return Optional.empty();
+        }
+
+        ZoneCoordinate zoneCoordinate = coordinate.get();
+        if (zoneCoordinate.latitude() == null || zoneCoordinate.longitude() == null) {
+            return Optional.empty();
+        }
+
+        return Optional.of(new GeoCoordinate(
+                zoneCoordinate.latitude(),
+                zoneCoordinate.longitude()
+        ));
+    }
+
+    private String buildZoneKey(EmployeeWorkingZone zone) {
+        if (zone == null || zone.getDistrict() == null || zone.getCity() == null) {
+            return null;
+        }
+
+        return (zone.getDistrict().trim().toLowerCase() + "|" + zone.getCity().trim().toLowerCase());
+    }
+
+    private double calculateMinDistance(Address address, Map<String, GeoCoordinate> zoneCoordinates) {
+        if (address == null || address.getLatitude() == null || address.getLongitude() == null || zoneCoordinates.isEmpty()) {
+            return Double.MAX_VALUE;
+        }
+
+        GeoCoordinate bookingCoordinate = new GeoCoordinate(
+                address.getLatitude().doubleValue(),
+                address.getLongitude().doubleValue()
+        );
+
+        return zoneCoordinates.values().stream()
+                .filter(Objects::nonNull)
+                .mapToDouble(zoneCoordinate -> calculateDistance(bookingCoordinate, zoneCoordinate))
+                .min()
+                .orElse(Double.MAX_VALUE);
+    }
+
+    private double calculateDistance(GeoCoordinate source, GeoCoordinate target) {
+        final double earthRadiusKm = 6371.0;
+
+        double sourceLatRad = Math.toRadians(source.latitude());
+        double targetLatRad = Math.toRadians(target.latitude());
+        double deltaLat = Math.toRadians(target.latitude() - source.latitude());
+        double deltaLon = Math.toRadians(target.longitude() - source.longitude());
+
+        double a = Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2)
+                + Math.cos(sourceLatRad) * Math.cos(targetLatRad)
+                * Math.sin(deltaLon / 2) * Math.sin(deltaLon / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        return earthRadiusKm * c;
+    }
+
+    private BookingSummary mapToBookingSummary(Booking booking, BookingDetail detail) {
+        return new BookingSummary(
+                detail.getId(),
+                booking.getBookingCode(),
+                detail.getService().getName(),
+                booking.getAddress() != null ? booking.getAddress().getFullAddress() : null,
+                booking.getBookingTime(),
+                detail.getService().getEstimatedDurationHours(),
+                detail.getQuantity()
+        );
+    }
+
+    private record GeoCoordinate(double latitude, double longitude) {}
+
+    private record BookingCandidate(BookingSummary summary, double distance) {}
 
     private AssignmentDetailResponse mapToAssignmentDetailResponse(Assignment assignment) {
         BookingDetail bookingDetail = assignment.getBookingDetail();

@@ -429,10 +429,10 @@ INSERT INTO admin_profile (admin_profile_id, account_id, full_name, is_male, dep
 ('ad100001-0000-0000-0000-000000000001', 'a1000001-0000-0000-0000-000000000003', 'Admin One', TRUE, 'Management', 'admin1@example.com', '1988-09-10', '2023-03-01');
 
 -- Thêm địa chỉ cho khách hàng
-INSERT INTO address (address_id, customer_id, full_address, ward, district, city, is_default) VALUES
-('adrs0001-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', '123 Lê Trọng Tấn, Tây Thạnh, Tân Phú, TP. Hồ Chí Minh', 'Phường Tây Thạnh', 'Quận Tân Phú', 'TP. Hồ Chí Minh', true),
-('adrs0001-0000-0000-0000-000000000002', 'c1000001-0000-0000-0000-000000000002', '456 Lê Lợi, Bến Nghé, Quận 1,TP. Hồ Chí Minh', 'Phường Bến Nghé', 'Quận 1', 'TP. Hồ Chí Minh', true),
-('adrs0001-0000-0000-0000-000000000003', 'c1000001-0000-0000-0000-000000000003', '104 Lê Lợi, Phường 1, Gò Vấp, TP. Hồ Chí Minh', 'Phường 1', 'Quận Gò Vấp', 'TP. Hồ Chí Minh', true);
+INSERT INTO address (address_id, customer_id, full_address, ward, district, city, latitude, longitude, is_default) VALUES
+('adrs0001-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', '123 Lê Trọng Tấn, Tây Thạnh, Tân Phú, TP. Hồ Chí Minh', 'Phường Tây Thạnh', 'Quận Tân Phú', 'TP. Hồ Chí Minh', 10.7943, 106.6256, true),
+('adrs0001-0000-0000-0000-000000000002', 'c1000001-0000-0000-0000-000000000002', '456 Lê Lợi, Bến Nghé, Quận 1,TP. Hồ Chí Minh', 'Phường Bến Nghé', 'Quận 1', 'TP. Hồ Chí Minh', 10.7769, 106.7009, true),
+('adrs0001-0000-0000-0000-000000000003', 'c1000001-0000-0000-0000-000000000003', '104 Lê Lợi, Phường 1, Gò Vấp, TP. Hồ Chí Minh', 'Phường 1', 'Quận Gò Vấp', 'TP. Hồ Chí Minh', 10.8142, 106.6938, true);
 
 -- Thêm khu vực làm việc cho nhân viên
 INSERT INTO employee_working_zones (employee_id, district, city) VALUES
@@ -976,3 +976,71 @@ INSERT INTO rule_conditions (rule_id, choice_id) VALUES
 INSERT INTO rule_conditions (rule_id, choice_id) VALUES
 ((SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu đầm dạ hội'),
  (SELECT choice_id FROM service_option_choices WHERE option_id = 10 AND label = 'Đầm'));
+
+-- Insert additional addresses for more booking locations
+INSERT INTO address (address_id, customer_id, full_address, ward, district, city, latitude, longitude, is_default) VALUES
+('adrs0001-0000-0000-0000-000000000004', 'c1000001-0000-0000-0000-000000000001', '789 Nguyễn Văn Cừ, Phường 3, Quận 5, TP. Hồ Chí Minh', 'Phường 3', 'Quận 5', 'TP. Hồ Chí Minh', 10.7594, 106.6822, false),
+('adrs0001-0000-0000-0000-000000000005', 'c1000001-0000-0000-0000-000000000002', '321 Phan Văn Trị, Phường 11, Bình Thạnh, TP. Hồ Chí Minh', 'Phường 11', 'Quận Bình Thạnh', 'TP. Hồ Chí Minh', 10.8011, 106.7067, false),
+('adrs0001-0000-0000-0000-000000000006', 'c1000001-0000-0000-0000-000000000003', '567 Lý Thường Kiệt, Phường 8, Tân Bình, TP. Hồ Chí Minh', 'Phường 8', 'Quận Tân Bình', 'TP. Hồ Chí Minh', 10.7993, 106.6554, false),
+('adrs0001-0000-0000-0000-000000000007', 'c1000001-0000-0000-0000-000000000001', '432 Võ Văn Tần, Phường 5, Quận 3, TP. Hồ Chí Minh', 'Phường 5', 'Quận 3', 'TP. Hồ Chí Minh', 10.7756, 106.6914, false),
+('adrs0001-0000-0000-0000-000000000008', 'c1000001-0000-0000-0000-000000000002', '876 Cách Mạng Tháng 8, Phường 5, Tân Bình, TP. Hồ Chí Minh', 'Phường 5', 'Quận Tân Bình', 'TP. Hồ Chí Minh', 10.7854, 106.6533, false);
+
+-- Insert 10 additional bookings
+INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status) VALUES
+('book0004-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000004', 'HKS000004', '2024-09-25 08:00:00+07', 'Cần dọn dẹp tổng quát, chú ý khu vực bếp', 450000, 'AWAITING_EMPLOYEE'),
+('book0005-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000002', 'adrs0001-0000-0000-0000-000000000005', 'HKS000005', '2024-09-25 14:00:00+07', 'Ưu tiên dọn phòng khách và phòng ngủ', 350000, 'AWAITING_EMPLOYEE'),
+('book0006-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000003', 'adrs0001-0000-0000-0000-000000000006', 'HKS000006', '2024-09-26 09:30:00+07', 'Cần giặt rèm cửa và thảm', 600000, 'AWAITING_EMPLOYEE'),
+('book0007-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000007', 'HKS000007', '2024-09-26 16:00:00+07', 'Dọn dẹp sau tiệc, nhiều rác cần dọn', 500000, 'CONFIRMED'),
+('book0008-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000002', 'adrs0001-0000-0000-0000-000000000008', 'HKS000008', '2024-09-27 10:00:00+07', 'Vệ sinh tổng quát hàng tuần', 400000, 'AWAITING_EMPLOYEE'),
+('book0009-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000001', 'HKS000009', '2024-09-27 15:30:00+07', 'Cần dọn nhà trước khi có khách', 300000, 'AWAITING_EMPLOYEE'),
+('book0010-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000003', 'adrs0001-0000-0000-0000-000000000003', 'HKS000010', '2024-09-28 08:30:00+07', 'Lau kính cửa sổ và ban công', 250000, 'AWAITING_EMPLOYEE'),
+('book0011-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000002', 'adrs0001-0000-0000-0000-000000000002', 'HKS000011', '2024-09-28 13:00:00+07', 'Dọn dẹp và sắp xếp tủ quần áo', 350000, 'AWAITING_EMPLOYEE'),
+('book0012-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000004', 'HKS000012', '2024-09-29 11:00:00+07', 'Vệ sinh máy lạnh và quạt trần', 550000, 'AWAITING_EMPLOYEE'),
+('book0013-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000003', 'adrs0001-0000-0000-0000-000000000006', 'HKS000013', '2024-09-29 17:00:00+07', 'Dọn dẹp sau khi sửa chữa nhà', 700000, 'PENDING');
+
+-- Insert booking details for the new bookings (assuming service_id 1, 2, 3 exist)
+INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
+-- Booking HKS000004 - General Cleaning
+('bd000004-0000-0000-0000-000000000001', 'book0004-0000-0000-0000-000000000001', 1, 1, 450000, 450000),
+
+-- Booking HKS000005 - Room Cleaning
+('bd000005-0000-0000-0000-000000000001', 'book0005-0000-0000-0000-000000000001', 1, 1, 350000, 350000),
+
+-- Booking HKS000006 - Deep Cleaning with Laundry
+('bd000006-0000-0000-0000-000000000001', 'book0006-0000-0000-0000-000000000001', 2, 1, 400000, 400000),
+('bd000006-0000-0000-0000-000000000002', 'book0006-0000-0000-0000-000000000001', 3, 1, 200000, 200000),
+
+-- Booking HKS000007 - Post-party Cleaning
+('bd000007-0000-0000-0000-000000000001', 'book0007-0000-0000-0000-000000000001', 2, 1, 500000, 500000),
+
+-- Booking HKS000008 - Weekly Cleaning
+('bd000008-0000-0000-0000-000000000001', 'book0008-0000-0000-0000-000000000001', 1, 1, 400000, 400000),
+
+-- Booking HKS000009 - Quick Cleaning
+('bd000009-0000-0000-0000-000000000001', 'book0009-0000-0000-0000-000000000001', 1, 1, 300000, 300000),
+
+-- Booking HKS000010 - Window Cleaning
+('bd000010-0000-0000-0000-000000000001', 'book0010-0000-0000-0000-000000000001', 1, 1, 250000, 250000),
+
+-- Booking HKS000011 - Organizing Service
+('bd000011-0000-0000-0000-000000000001', 'book0011-0000-0000-0000-000000000001', 1, 1, 350000, 350000),
+
+-- Booking HKS000012 - Appliance Cleaning
+('bd000012-0000-0000-0000-000000000001', 'book0012-0000-0000-0000-000000000001', 2, 1, 550000, 550000),
+
+-- Booking HKS000013 - Post-renovation Cleaning
+('bd000013-0000-0000-0000-000000000001', 'book0013-0000-0000-0000-000000000001', 2, 2, 350000, 700000);
+
+-- Insert assignments for some bookings (only for CONFIRMED and IN_PROGRESS bookings)
+INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status, check_in_time) VALUES
+('assgn004-0000-0000-0000-000000000001', 'bd000007-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED', NULL);
+
+-- Insert payments for some bookings
+INSERT INTO payments (payment_id, booking_id, amount, payment_status, transaction_code, paid_at) VALUES
+('pay00004-0000-0000-0000-000000000001', 'book0007-0000-0000-0000-000000000001', 500000, 'PAID', 'TXN20240926001', '2024-09-26 15:30:00+07'),
+('pay00005-0000-0000-0000-000000000001', 'book0013-0000-0000-0000-000000000001', 700000, 'PENDING', NULL, NULL);
+
+-- Insert employee unavailability (some employees might be on leave)
+INSERT INTO employee_unavailability (unavailability_id, employee_id, start_time, end_time, reason, is_approved) VALUES
+('unavl001-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000002', '2024-09-25 00:00:00+07', '2024-09-25 23:59:59+07', 'Nghỉ phép cá nhân', true),
+('unavl002-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000001', '2024-09-30 14:00:00+07', '2024-09-30 18:00:00+07', 'Khám bệnh định kỳ', true);

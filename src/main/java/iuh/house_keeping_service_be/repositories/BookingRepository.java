@@ -108,4 +108,34 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
             "WHERE b.status = iuh.house_keeping_service_be.enums.BookingStatus.AWAITING_EMPLOYEE " +
             "AND a IS NULL")
     List<Booking> findAwaitingEmployeeBookings(Pageable pageable);
+
+//    @Query(value = "SELECT DISTINCT b FROM Booking b " +
+//            "WHERE b.status = iuh.house_keeping_service_be.enums.BookingStatus.AWAITING_EMPLOYEE " +
+//            "AND (:zoneKeys IS NULL OR LOWER(CONCAT(b.address.district, '|', b.address.city)) IN :zoneKeys)",
+//            countQuery = "SELECT COUNT(DISTINCT b.bookingId) FROM Booking b " +
+//                    "WHERE b.status = iuh.house_keeping_service_be.enums.BookingStatus.AWAITING_EMPLOYEE " +
+//                    "AND (:zoneKeys IS NULL OR LOWER(CONCAT(b.address.district, '|', b.address.city)) IN :zoneKeys)")
+//    Page<Booking> findAwaitingEmployeeBookingsByZones(@Param("zoneKeys") List<String> zoneKeys, Pageable pageable);
+
+    @Query(value = "SELECT DISTINCT b FROM Booking b " +
+            "LEFT JOIN b.bookingDetails bd " +
+            "LEFT JOIN bd.assignments a " +
+            "WHERE b.status = iuh.house_keeping_service_be.enums.BookingStatus.AWAITING_EMPLOYEE " +
+            "AND a IS NULL " +
+            "AND (:zoneKeys IS NULL OR LOWER(CONCAT(b.address.district, '|', b.address.city)) IN :zoneKeys)",
+            countQuery = "SELECT COUNT(DISTINCT b.bookingId) FROM Booking b " +
+                    "LEFT JOIN b.bookingDetails bd " +
+                    "LEFT JOIN bd.assignments a " +
+                    "WHERE b.status = iuh.house_keeping_service_be.enums.BookingStatus.AWAITING_EMPLOYEE " +
+                    "AND a IS NULL " +
+                    "AND (:zoneKeys IS NULL OR LOWER(CONCAT(b.address.district, '|', b.address.city)) IN :zoneKeys)")
+    Page<Booking> findAwaitingEmployeeBookingsByZones(@Param("zoneKeys") List<String> zoneKeys, Pageable pageable);
+
+    @Query(value = "SELECT DISTINCT b FROM Booking b " +
+            "LEFT JOIN b.bookingDetails bd " +
+            "LEFT JOIN bd.assignments a " +
+            "WHERE b.status = iuh.house_keeping_service_be.enums.BookingStatus.AWAITING_EMPLOYEE " +
+            "AND a IS NULL " +
+            "AND (:zoneKeys IS NULL OR LOWER(CONCAT(b.address.district, '|', b.address.city)) NOT IN :zoneKeys)")
+    List<Booking> findAwaitingEmployeeBookingsOutsideZones(@Param("zoneKeys") List<String> zoneKeys);
 }

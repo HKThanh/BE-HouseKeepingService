@@ -2,6 +2,7 @@ package iuh.house_keeping_service_be.repositories;
 
 import iuh.house_keeping_service_be.models.Assignment;
 import iuh.house_keeping_service_be.enums.AssignmentStatus;
+import iuh.house_keeping_service_be.repositories.projections.ZoneCoordinate;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface AssignmentRepository extends JpaRepository<Assignment, String> {

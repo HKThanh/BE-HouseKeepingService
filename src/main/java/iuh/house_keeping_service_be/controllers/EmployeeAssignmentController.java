@@ -91,11 +91,12 @@ public class EmployeeAssignmentController {
     @GetMapping("/available-bookings")
     @PreAuthorize("hasAnyAuthority('ROLE_EMPLOYEE', 'ROLE_ADMIN')")
     public ResponseEntity<?> getAvailableBookings(
+            @RequestParam String employeeId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
         try {
-            List<BookingSummary> bookings = assignmentService.getAvailableBookings(page, size);
+            List<BookingSummary> bookings = assignmentService.getAvailableBookings(employeeId, page, size);
 
             String message = bookings.isEmpty() ? "Không có booking chờ" : "Lấy danh sách booking chờ thành công";
             return ResponseEntity.ok(Map.of(

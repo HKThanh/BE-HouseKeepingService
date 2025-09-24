@@ -11,6 +11,6 @@ public interface AssignmentService {
     boolean cancelAssignment(String assignmentId, AssignmentCancelRequest request);
 //    boolean acceptBooking(String assignmentId);
 
-    List<BookingSummary> getAvailableBookings(int page, int size);
+    List<BookingSummary> getAvailableBookings(String employeeId, int page, int size);
     AssignmentDetailResponse acceptBookingDetail(String detailId, String employeeId);
 }

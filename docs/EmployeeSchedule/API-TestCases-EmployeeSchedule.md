@@ -1,8 +1,8 @@
 # API Test Cases - Employee Schedule Management
 
 ## Overview
-This document describes the test cases for the **Employee Schedule** endpoints of the Admin API.  
-The endpoints allow admin, customers, and employees to manage employee schedules, availability, and unavailability periods.  
+This document describes the test cases for the **Employee Schedule** endpoints of the Admin API.
+The endpoints allow admin, customers, and employees to manage employee schedules, availability, and unavailability periods.
 **Base URL**: `/api/v1/employee-schedule`
 
 ---
@@ -21,7 +21,7 @@ Each test case includes:
 ## Authentication Requirements
 All endpoints require:
 - **Authorization Header**: `Bearer <valid_token>`
-- **Role**: 
+- **Role**:
   - ADMIN: Full access to all endpoints
   - CUSTOMER: Access to search suitable employees and view employee lists
   - EMPLOYEE: Limited access (can only view/modify own schedule)
@@ -30,10 +30,10 @@ All endpoints require:
 
 ## Database Test Data
 Based on housekeeping_service_v6.sql:
-- **Employees**: 
+- **Employees**:
   - Employee ID: "e1000001-0000-0000-0000-000000000001" (Jane Smith, AVAILABLE)
   - Employee ID: "e1000001-0000-0000-0000-000000000002" (Bob Wilson, AVAILABLE)
-- **Working Zones**: 
+- **Working Zones**:
   - Jane Smith: Quận Tân Phú, Quận Tân Bình (TP. Hồ Chí Minh)
   - Bob Wilson: Quận Gò Vấp (TP. Hồ Chí Minh)
 - **Assignments**: Active assignments and unavailability periods exist
@@ -54,7 +54,7 @@ Based on housekeeping_service_v6.sql:
 - **Input**:
   - **Method**: `GET`
   - **URL**: `/api/v1/employee-schedule?status=AVAILABLE&district=Quận Tân Phú&city=TP. Hồ Chí Minh&startDate=2025-08-28T09:00:00&endDate=2025-08-28T17:00:00`
-  - **Query Parameters**: 
+  - **Query Parameters**:
     - `status = AVAILABLE` (default parameter)
     - `district = Quận Tân Phú`
     - `city = TP. Hồ Chí Minh`
@@ -83,7 +83,7 @@ Based on housekeeping_service_v6.sql:
             "city": "TP. Hồ Chí Minh"
           },
           {
-            "district": "Quận Tân Bình", 
+            "district": "Quận Tân Bình",
             "city": "TP. Hồ Chí Minh"
           }
         ],
@@ -112,7 +112,7 @@ Based on housekeeping_service_v6.sql:
 ### Test Case 2: Customer Access to Employee List
 - **Test Case ID**: TC_SCHEDULE_002
 - **Description**: Verify that customer can retrieve available employees for booking purposes.
-- **Preconditions**: 
+- **Preconditions**:
   - User is authenticated with valid customer token.
   - User has ROLE_CUSTOMER authority.
 - **Input**:
@@ -146,7 +146,7 @@ Based on housekeeping_service_v6.sql:
 - **Input**:
   - **Method**: `GET`
   - **URL**: `/api/v1/employee-schedule?status=BUSY&city=TP. Hồ Chí Minh&startDate=2025-08-28T09:00:00&endDate=2025-08-28T17:00:00`
-  - **Query Parameters**: 
+  - **Query Parameters**:
     - `status = BUSY` or `status = AVAILABLE`
     - `city = TP. Hồ Chí Minh`
     - `startDate = 2025-08-28T09:00:00`
@@ -209,7 +209,7 @@ Based on housekeeping_service_v6.sql:
   - **Method**: `GET`
   - **URL**: `/api/v1/employee-schedule/e1000001-0000-0000-0000-000000000001?startDate=2025-08-28T09:00:00&endDate=2025-08-28T17:00:00`
   - **Path Parameter**: `employeeId = e1000001-0000-0000-0000-000000000001`
-  - **Query Parameters**: 
+  - **Query Parameters**:
     - `startDate = 2025-08-28T09:00:00`
     - `endDate = 2025-08-28T17:00:00`
   - **Headers**: 
@@ -435,7 +435,7 @@ Based on housekeeping_service_v6.sql:
 - **Input**:
   - **Method**: `GET`
   - **URL**: `/api/v1/employee-schedule/suitable?serviceId=1&bookingTime=2025-08-28T10:00:00&district=Quận Tân Phú&city=TP. Hồ Chí Minh`
-  - **Query Parameters**: 
+  - **Query Parameters**:
     - `serviceId = 1`
     - `bookingTime = 2025-08-28T10:00:00`
     - `district = Quận Tân Phú` (optional)
@@ -524,26 +524,14 @@ Based on housekeeping_service_v6.sql:
     "data": null
   }
   ```
-- **Status Code**: `200 OK`
+- **Status Code**: 400 Bad Request
 
 ---
 
 ## Notes
-- **Test Environment**: Database should be configured with test data including employees, assignments, and services from housekeeping_service_v6.sql.
-- **Authentication**: All endpoints require valid JWT tokens with appropriate roles.
-- **Authorization**: 
-  - Admin (ROLE_ADMIN): Full access to all endpoints
-  - Customer (ROLE_CUSTOMER): Can search for available employees and find suitable employees
-  - Employee (ROLE_EMPLOYEE): Can only access own schedule and create own unavailability
-- **Time Format**: All datetime parameters use ISO format (yyyy-MM-ddTHH:mm:ss)
-- **Working Zones**: Employees can work in multiple districts/cities, filtered by location parameters
-- **Schedule Conflicts**: System prevents overlapping assignments and unavailability periods
-- **Error Handling**: Service layer catches exceptions and returns appropriate error responses
-- **Security**: Role-based access control using Spring Security @PreAuthorize annotations
-- **Business Logic**: 
-  - Availability is determined by checking both unavailability periods and active assignments
-  - Suitable employees are filtered by working zone and sorted by rating (highest first)
-  - Service duration is calculated from estimated_duration_hours field
-- **Time Slots**: Response includes detailed time slot information with assignment details when applicable
-- **Status Parameter**: GET /employee-schedule endpoint supports status=AVAILABLE (default) or status=BUSY
-- **Location Filtering**: All endpoints support optional district and city parameters for geographic filtering
+- All endpoints require proper JWT token validation
+- Date parameters must be in ISO DateTime format
+- Location-based filtering helps optimize employee assignment
+- Schedule conflicts should be properly validated
+- Real-time availability updates should be considered
+- Implement proper caching for frequently accessed schedule data
