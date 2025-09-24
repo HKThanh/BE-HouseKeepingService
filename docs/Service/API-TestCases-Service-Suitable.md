@@ -29,10 +29,10 @@ All endpoints require:
 ---
 
 ## Database Test Data
-Based on housekeeping_service_v7.sql:
-- **Services**: 
-  - Service ID 1: "Dọn dẹp theo giờ" (50,000đ/hour, 2.0 hours)
-  - Service ID 2: "Tổng vệ sinh" (400,000đ/package, 4.0 hours)
+Based on housekeeping_service_v8.sql:
+- **Services**:
+  - Service ID 1: "Dọn dẹp theo giờ" (50,000đ/hour, 2.0 hours, recommended staff: 1)
+  - Service ID 2: "Tổng vệ sinh" (400,000đ/package, 4.0 hours, recommended staff: 3)
 - **Service Options**: Various option types (RADIO, CHECKBOX, SELECT) with choices
 - **Employees**: 
   - Jane Smith (ID: e1000001-0000-0000-0000-000000000001) - Skills: Cleaning, Organizing
@@ -48,7 +48,7 @@ Based on housekeeping_service_v7.sql:
 - **Description**: Verify that a customer can retrieve service options for a specific service.
 - **Preconditions**:
   - Customer is authenticated with valid token.
-  - Service with ID 1 exists and is active.
+  - Service with ID 1 exists and is active (recommended staff: 1).
   - Service has configured options and choices.
 - **Input**:
   - **Method**: `GET`
@@ -58,7 +58,7 @@ Based on housekeeping_service_v7.sql:
     ```
     Authorization: Bearer <valid_customer_token>
     ```
-- **Expected Output**:
+- **Output**:
   ```json
   {
     "success": true,
@@ -70,6 +70,7 @@ Based on housekeeping_service_v7.sql:
       "basePrice": 50000,
       "unit": "hour",
       "estimatedDurationHours": 2.0,
+      "recommendedStaff": 1,
       "formattedPrice": "50,000đ/giờ",
       "formattedDuration": "2 giờ",
       "options": [
@@ -100,42 +101,6 @@ Based on housekeeping_service_v7.sql:
   ```
 - **Status Code**: `200 OK`
 
-- **Actual Output**:
-  ```json
-  {
-    "success": true,
-    "message": "Lấy thông tin dịch vụ và tùy chọn thành công",
-    "data": {
-      "serviceId": 1,
-      "serviceName": "Dọn dẹp theo giờ",
-      "description": "Lau dọn, hút bụi, làm sạch các bề mặt cơ bản trong nhà.",
-      "basePrice": 50000,
-      "unit": "hour",
-      "estimatedDurationHours": 2.0,
-      "formattedPrice": "50,000đ/giờ",
-      "formattedDuration": "2 giờ",
-      "options": [
-        {
-          "optionId": 1,
-          "optionName": "Loại phòng",
-          "optionType": "RADIO",
-          "displayOrder": 1,
-          "isRequired": true,
-          "choices": [
-            {
-              "choiceId": 1,
-              "label": "Phòng khách",
-              "displayOrder": 1,
-              "isDefault": true
-            }
-          ]
-        }
-      ]
-    }
-  }
-  ```
-- **Status Code**: `200 OK`
-
 ---
 
 ### Test Case 2: Get Options for Service Without Options
@@ -143,7 +108,7 @@ Based on housekeeping_service_v7.sql:
 - **Description**: Verify behavior when requesting options for a service that has no configured options.
 - **Preconditions**:
   - Customer is authenticated with valid token.
-  - Service with ID 2 exists but has no options configured.
+  - Service with ID 2 exists but has no options configured (recommended staff: 3).
 - **Input**:
   - **Method**: `GET`
   - **URL**: `/api/v1/customer/services/2/options`
@@ -152,7 +117,7 @@ Based on housekeeping_service_v7.sql:
     ```
     Authorization: Bearer <valid_customer_token>
     ```
-- **Expected Output**:
+- **Output**:
   ```json
   {
     "success": true,
@@ -164,26 +129,7 @@ Based on housekeeping_service_v7.sql:
       "basePrice": 400000,
       "unit": "package",
       "estimatedDurationHours": 4.0,
-      "formattedPrice": "400,000đ/gói",
-      "formattedDuration": "4 giờ",
-      "options": []
-    }
-  }
-  ```
-- **Status Code**: `200 OK`
-
-- **Actual Output**:
-  ```json
-  {
-    "success": true,
-    "message": "Dịch vụ này không có tùy chọn nào",
-    "data": {
-      "serviceId": 2,
-      "serviceName": "Tổng vệ sinh",
-      "description": "Làm sạch sâu toàn bộ căn nhà, bao gồm lau kính, vệ sinh các khu vực khó tiếp cận.",
-      "basePrice": 400000,
-      "unit": "package",
-      "estimatedDurationHours": 4.0,
+      "recommendedStaff": 3,
       "formattedPrice": "400,000đ/gói",
       "formattedDuration": "4 giờ",
       "options": []
@@ -208,17 +154,7 @@ Based on housekeeping_service_v7.sql:
     ```
     Authorization: Bearer <valid_customer_token>
     ```
-- **Expected Output**:
-  ```json
-  {
-    "success": false,
-    "message": "Không tìm thấy dịch vụ hoặc dịch vụ đã ngừng hoạt động",
-    "data": null
-  }
-  ```
-- **Status Code**: `404 Not Found`
-
-- **Actual Output**:
+- **Output**:
   ```json
   {
     "success": false,
@@ -251,16 +187,6 @@ Based on housekeeping_service_v7.sql:
   ```
 - **Status Code**: `400 Bad Request`
 
-- **Actual Output**:
-  ```json
-  {
-    "success": false,
-    "message": "Token không hợp lệ",
-    "data": null
-  }
-  ```
-- **Status Code**: `400 Bad Request`
-
 ---
 
 ### Test Case 5: Internal Server Error for Service Options
@@ -276,17 +202,7 @@ Based on housekeeping_service_v7.sql:
     ```
     Authorization: Bearer <valid_customer_token>
     ```
-- **Expected Output**:
-  ```json
-  {
-    "success": false,
-    "message": "Lỗi hệ thống",
-    "data": null
-  }
-  ```
-- **Status Code**: `500 Internal Server Error`
-
-- **Actual Output**:
+- **Output**:
   ```json
   {
     "success": false,
@@ -305,7 +221,7 @@ Based on housekeeping_service_v7.sql:
 - **Description**: Verify that a customer can find suitable employees for a specific service and location.
 - **Preconditions**:
   - Customer is authenticated with valid token.
-  - Service with ID 1 exists and is active.
+  - Service with ID 1 exists and is active (recommended staff: 1).
   - Employees are available in the specified district and city.
   - Booking time is in the future.
 - **Input**:
@@ -320,7 +236,7 @@ Based on housekeeping_service_v7.sql:
     ```
     Authorization: Bearer <valid_customer_token>
     ```
-- **Expected Output**:
+- **Output**:
   ```json
   {
     "success": true,
@@ -353,28 +269,6 @@ Based on housekeeping_service_v7.sql:
   ```
 - **Status Code**: `200 OK`
 
-- **Actual Output**:
-  ```json
-  {
-    "success": true,
-    "message": "Tìm thấy 2 nhân viên phù hợp",
-    "data": [
-      {
-        "employeeId": "e1000001-0000-0000-0000-000000000001",
-        "fullName": "Jane Smith",
-        "avatar": "https://picsum.photos/200",
-        "skills": ["Cleaning", "Organizing"],
-        "rating": "4.8",
-        "status": "AVAILABLE",
-        "workingDistricts": ["Quận Tân Phú", "Quận 10"],
-        "workingCity": "TP. Hồ Chí Minh",
-        "completedJobs": 45
-      }
-    ]
-  }
-  ```
-- **Status Code**: `200 OK`
-
 ---
 
 ### Test Case 7: No Suitable Employees Found
@@ -382,7 +276,7 @@ Based on housekeeping_service_v7.sql:
 - **Description**: Verify response when no employees are available for the specified criteria.
 - **Preconditions**:
   - Customer is authenticated with valid token.
-  - Service with ID 1 exists and is active.
+  - Service with ID 1 exists and is active (recommended staff: 1).
   - No employees are available in the specified district and time.
 - **Input**:
   - **Method**: `GET`
@@ -396,17 +290,7 @@ Based on housekeeping_service_v7.sql:
     ```
     Authorization: Bearer <valid_customer_token>
     ```
-- **Expected Output**:
-  ```json
-  {
-    "success": true,
-    "message": "Không tìm thấy nhân viên phù hợp cho yêu cầu này",
-    "data": []
-  }
-  ```
-- **Status Code**: `200 OK`
-
-- **Actual Output**:
+- **Output**:
   ```json
   {
     "success": true,
@@ -432,17 +316,7 @@ Based on housekeeping_service_v7.sql:
     ```
     Authorization: Bearer <valid_customer_token>
     ```
-- **Expected Output**:
-  ```json
-  {
-    "success": false,
-    "message": "Thiếu thông tin thời gian đặt lịch",
-    "data": null
-  }
-  ```
-- **Status Code**: `400 Bad Request`
-
-- **Actual Output**:
+- **Output**:
   ```json
   {
     "success": false,
@@ -472,17 +346,7 @@ Based on housekeeping_service_v7.sql:
     ```
     Authorization: Bearer <valid_customer_token>
     ```
-- **Expected Output**:
-  ```json
-  {
-    "success": false,
-    "message": "Không tìm thấy dịch vụ",
-    "data": null
-  }
-  ```
-- **Status Code**: `400 Bad Request`
-
-- **Actual Output**:
+- **Output**:
   ```json
   {
     "success": false,
@@ -499,7 +363,7 @@ Based on housekeeping_service_v7.sql:
 - **Description**: Verify error handling when booking time is in the past.
 - **Preconditions**:
   - Customer is authenticated with valid token.
-  - Service with ID 1 exists and is active.
+  - Service with ID 1 exists and is active (recommended staff: 1).
 - **Input**:
   - **Method**: `GET`
   - **URL**: `/api/v1/customer/services/employee/suitable?serviceId=1&bookingTime=2024-09-01T10:00:00&district=Quận Tân Phú&city=TP. Hồ Chí Minh`
@@ -512,17 +376,7 @@ Based on housekeeping_service_v7.sql:
     ```
     Authorization: Bearer <valid_customer_token>
     ```
-- **Expected Output**:
-  ```json
-  {
-    "success": false,
-    "message": "Thời gian đặt lịch phải trong tương lai",
-    "data": null
-  }
-  ```
-- **Status Code**: `400 Bad Request`
-
-- **Actual Output**:
+- **Output**:
   ```json
   {
     "success": false,
@@ -544,18 +398,7 @@ Based on housekeeping_service_v7.sql:
   - **Method**: `GET`
   - **URL**: `/api/v1/customer/services/employee/suitable?serviceId=1&bookingTime=2025-09-05T10:00:00`
   - **Headers**: None
-- **Expected Output**:
-  ```json
-  {
-    "timestamp": "2025-09-04T10:30:00.000+00:00",
-    "status": 401,
-    "error": "Unauthorized",
-    "path": "/api/v1/customer/services/suitable"
-  }
-  ```
-- **Status Code**: `401 Unauthorized`
-
-- **Actual Output**:
+- **Output**:
   ```json
   {
     "timestamp": "2025-09-04T10:30:00.000+00:00",
@@ -585,19 +428,7 @@ Based on housekeeping_service_v7.sql:
     ```
     Authorization: Bearer <valid_customer_token>
     ```
-- **Expected Output**:
-  ```json
-  {
-    "timestamp": "2025-09-04T10:30:00.000+00:00",
-    "status": 400,
-    "error": "Bad Request",
-    "message": "Invalid date format",
-    "path": "/api/v1/customer/services/suitable"
-  }
-  ```
-- **Status Code**: `400 Bad Request`
-
-- **Actual Output**:
+- **Output**:
   ```json
   {
     "timestamp": "2025-09-04T10:30:00.000+00:00",
@@ -612,7 +443,7 @@ Based on housekeeping_service_v7.sql:
 ---
 
 ## Notes
-- **Test Environment**: Database should be configured with test data including services, service options, employees, and working zones from housekeeping_service_v7.sql.
+- **Test Environment**: Database should be configured with test data including services, service options, employees, and working zones from housekeeping_service_v8.sql.
 - **Authentication**: All endpoints require valid JWT tokens.
 - **Authorization**: PreAuthorize annotation ensures proper role-based access control for suitable employees endpoint.
 - **Service Options**: Options are returned with proper display order and choice hierarchy.

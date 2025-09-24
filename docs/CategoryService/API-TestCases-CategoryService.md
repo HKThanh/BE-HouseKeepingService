@@ -131,6 +131,7 @@ Mỗi test case gồm:
                 "basePrice": 50000.00,
                 "unit": "Giờ",
                 "estimatedDurationHours": 2.00,
+                "recommendedStaff": 1,
                 "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599899/Cleaning_Clock_z29juh.png",
                 "isActive": true
             },
@@ -141,6 +142,7 @@ Mỗi test case gồm:
                 "basePrice": 100000.00,
                 "unit": "Gói",
                 "estimatedDurationHours": 2.00,
+                "recommendedStaff": 3,  
                 "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599581/house_cleaning_nob_umewqf.png",
                 "isActive": true
             },
@@ -151,6 +153,7 @@ Mỗi test case gồm:
                 "basePrice": 150000.00,
                 "unit": "Máy",
                 "estimatedDurationHours": 1.00,
+                "recommendedStaff": 1,
                 "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757600733/cooler_rnyppn.png",
                 "isActive": true
             },
@@ -161,6 +164,7 @@ Mỗi test case gồm:
                 "basePrice": 300000.00,
                 "unit": "Gói",
                 "estimatedDurationHours": 3.00,
+                "recommendedStaff": 2,
                 "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757600057/sofa_bed_vkkjz8.png",
                 "isActive": true
             }

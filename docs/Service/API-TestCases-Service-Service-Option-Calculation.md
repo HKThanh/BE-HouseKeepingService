@@ -29,8 +29,8 @@ All endpoints require:
 ## Database Test Data
 Based on `housekeeping_service_v8.sql`:
 - **Services**:
-  - Service ID 1: "Dọn dẹp theo giờ" (50,000đ/Giờ, 2.0 giờ)
-  - Service ID 2: "Tổng vệ sinh" (100,000đ/Gói, 2.0 giờ)
+  - Service ID 1: "Dọn dẹp theo giờ" (50,000đ/Giờ, 2.0 giờ, recommended 1 staff)
+  - Service ID 2: "Tổng vệ sinh" (100,000đ/Gói, 2.0 giờ, recommended 3 staff)
 - **Service Options**:
   - **Service 2**:
     - Option ID 1: "Loại hình nhà ở?" (SINGLE_CHOICE_RADIO)
@@ -83,6 +83,7 @@ Based on `housekeeping_service_v8.sql`:
         "basePrice": 50000.00,
         "unit": "Giờ",
         "estimatedDurationHours": 2.00,
+        "recommendedStaff": 1,
         "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599899/Cleaning_Clock_z29juh.png",
         "formattedPrice": "50,000đ/Giờ",
         "formattedDuration": "2 giờ 0 phút",
@@ -206,6 +207,7 @@ Based on `housekeeping_service_v8.sql`:
       "basePrice": 100000.00,
       "unit": "Gói",
       "estimatedDurationHours": 2.00,
+      "recommendedStaff": 3,
       "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599581/house_cleaning_nob_umewqf.png",
       "formattedPrice": "100,000đ/Gói",
       "formattedDuration": "2 giờ 0 phút",
@@ -696,6 +698,7 @@ Based on `housekeeping_service_v8.sql`:
       "data": {
         "serviceId": 2,
         "serviceName": "Tổng vệ sinh",
+        "recommendedStaff": 3,
         "options": [
           {"optionId": 1, "optionName": "Loại hình nhà ở?", "choices": [{"choiceId":1,"choiceName":"Căn hộ"},{"choiceId":2,"choiceName":"Nhà phố"}]},
           {"optionId": 2, "optionName": "Nhà bạn có mấy tầng (bao gồm trệt)?", "choices": []},

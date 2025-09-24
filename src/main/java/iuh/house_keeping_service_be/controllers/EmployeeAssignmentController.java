@@ -89,13 +89,14 @@ public class EmployeeAssignmentController {
 
 
     @GetMapping("/available-bookings")
-    @PreAuthorize("hasAuthority('ROLE_EMPLOYEE')")
+    @PreAuthorize("hasAnyAuthority('ROLE_EMPLOYEE', 'ROLE_ADMIN')")
     public ResponseEntity<?> getAvailableBookings(
+            @RequestParam String employeeId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
         try {
-            List<BookingSummary> bookings = assignmentService.getAvailableBookings(page, size);
+            List<BookingSummary> bookings = assignmentService.getAvailableBookings(employeeId, page, size);
 
             String message = bookings.isEmpty() ? "Không có booking chờ" : "Lấy danh sách booking chờ thành công";
             return ResponseEntity.ok(Map.of(
@@ -126,7 +127,14 @@ public class EmployeeAssignmentController {
                     "message", "Nhận công việc thành công",
                     "data", response
             ));
-        } catch (IllegalStateException | IllegalArgumentException e) {
+        } catch (IllegalStateException e) {
+            log.warn("Accept booking detail failed: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()
+            ));
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid request when accepting booking detail: {}", e.getMessage());
             return ResponseEntity.badRequest().body(Map.of(
                     "success", false,
                     "message", e.getMessage()

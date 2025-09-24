@@ -1,9 +1,9 @@
-# API Test Cases - Assignment Management
+# API Test Cases - Employee Assignment Management
 
 ## Overview
-This document describes the minimum essential test cases for the **Assignment Management** endpoints of the Employee API.  
-The endpoints allow employees and admins to view their assigned tasks and cancel assignments when necessary.  
-**Base URL**: `/api/v1/employee`
+This document describes essential test cases for the **Employee Assignment Management** endpoints using realistic data from the housekeeping service database.  
+**Base URL**: `/api/v1/employee`  
+**Test Date Context**: September 22, 2025
 
 ---
 
@@ -21,21 +21,10 @@ Each test case includes:
 ## Authentication Requirements
 All endpoints require:
 - **Authorization Header**: `Bearer <valid_token>`
-- **Content-Type**: `application/json` (for POST requests)
+- **Content-Type**: `application/json`
 - **Role Requirements**: 
-  - Employee endpoints: EMPLOYEE or ADMIN role required
-  - Assignment operations: EMPLOYEE or ADMIN role required
-
----
-
-## Database Test Data
-Based on housekeeping_service_v8.sql:
-- **Sample Employee**: jane_smith (ID: a1000001-0000-0000-0000-000000000002)
-- **Sample Admin**: admin_1 (ID: a1000001-0000-0000-0000-000000000003)
-- **Sample Customer**: john_doe (ID: a1000001-0000-0000-0000-000000000001)
-- **Sample Assignment**: assignment_001 with status ASSIGNED
-- **Assignment Statuses**: ASSIGNED, IN_PROGRESS, COMPLETED, CANCELLED
-- **Sample Booking**: booking_001 with employee assignment
+  - Assignment management: EMPLOYEE or ADMIN role
+  - Accept booking: EMPLOYEE role only
 
 ---
 
@@ -49,18 +38,20 @@ Based on housekeeping_service_v8.sql:
 
 ## GET /{employeeId}/assignments - Get Employee Assignments
 
-### Test Case 1: Successfully Get Employee Assignments
-- **Test Case ID**: TC_ASSIGNMENT_001
-- **Description**: Verify that an employee can retrieve their assigned tasks with default pagination.
+### Test Case 1: Successful Assignment Retrieval with Status Filter
+- **Test Case ID**: TC_EMP_ASSIGN_001
+- **Description**: Verify that Jane Smith can retrieve her assignments with status filtering
 - **Preconditions**:
-  - Employee is authenticated with valid token.
-  - Employee has existing assignments.
+  - Employee Jane Smith exists with ID 'e1000001-0000-0000-0000-000000000001'
+  - Valid JWT token with EMPLOYEE role for Jane Smith
+  - Jane has assignment for BK000002 (Dọn dẹp theo giờ) scheduled for August 28, 2025
 - **Input**:
-  - **Method**: `GET`
-  - **URL**: `/api/v1/employee/e1000001-0000-0000-0000-000000000001/assignments`
+  - **Path Parameter**: employeeId = "e1000001-0000-0000-0000-000000000001"
+  - **Query Parameters**: status = "ASSIGNED", page = 0, size = 10
   - **Headers**: 
     ```
-    Authorization: Bearer <valid_employee_token>
+    Authorization: Bearer <jane_smith_employee_token>
+    Content-Type: application/json
     ```
 - **Expected Output**:
   ```json
@@ -69,43 +60,36 @@ Based on housekeeping_service_v8.sql:
     "message": "Lấy danh sách công việc thành công",
     "data": [
       {
-        "assignmentId": "assg0001-0000-0000-0000-000000000001",
-        "bookingCode": "BK62589569",
-        "serviceName": "Tổng vệ sinh",
-        "customerName": "Nguyễn Văn A",
-        "customerPhone": "0901234567",
-        "serviceAddress": "123 Lê Trọng Tấn, Tây Thạnh, Tân Phú, TP. Hồ Chí Minh",
-        "bookingTime": "2025-09-12 10:00:00",
-        "estimatedDurationHours": 2.0,
-        "pricePerUnit": 350000.00,
-        "quantity": 1,
-        "totalAmount": 350000.00,
+        "assignmentId": "as000001-0000-0000-0000-000000000002",
+        "bookingCode": "BK000002",
+        "serviceName": "Dọn dẹp theo giờ",
+        "customerName": "Jane Smith Customer",
+        "address": "104 Lê Lợi, Phường 1, Gò Vấp, TP. Hồ Chí Minh",
+        "scheduledDate": "2025-08-28",
+        "scheduledTime": "14:00",
         "status": "ASSIGNED",
-        "assignedAt": "2025-09-06 14:39:22",
-        "checkInTime": null,
-        "checkOutTime": null,
-        "note": "Cần dọn dẹp kỹ lưỡng phòng khách và bếp"
+        "estimatedDuration": 2.0,
+        "price": 50000
       }
     ],
     "totalItems": 1
   }
   ```
-- **Status Code**: `200 OK`
+- **Status Code**: 200 OK
 
----
-
-### Test Case 2: Get Employee Assignments with Status Filter
-- **Test Case ID**: TC_ASSIGNMENT_002
-- **Description**: Verify that assignments can be filtered by status.
+### Test Case 2: Invalid Status Filter Graceful Handling
+- **Test Case ID**: TC_EMP_ASSIGN_002
+- **Description**: Verify system gracefully handles invalid status filters by returning all assignments
 - **Preconditions**:
-  - Employee is authenticated with valid token.
-  - Employee has assignments with different statuses.
+  - Employee Jane Smith exists and has multiple assignments
+  - Valid JWT token with EMPLOYEE role
 - **Input**:
-  - **Method**: `GET`
-  - **URL**: `/api/v1/employee/e1000001-0000-0000-0000-000000000001/assignments?status=ASSIGNED&page=0&size=10`
+  - **Path Parameter**: employeeId = "e1000001-0000-0000-0000-000000000001"
+  - **Query Parameters**: status = "INVALID_STATUS", page = 0, size = 10
   - **Headers**: 
     ```
-    Authorization: Bearer <valid_employee_token>
+    Authorization: Bearer <jane_smith_employee_token>
+    Content-Type: application/json
     ```
 - **Expected Output**:
   ```json
@@ -114,97 +98,42 @@ Based on housekeeping_service_v8.sql:
     "message": "Lấy danh sách công việc thành công",
     "data": [
       {
-        "assignmentId": "assg0001-0000-0000-0000-000000000001",
-        "bookingCode": "BK62589569",
-        "serviceName": "Tổng vệ sinh",
-        "customerName": "Nguyễn Văn A",
-        "customerPhone": "0901234567",
-        "serviceAddress": "123 Lê Trọng Tấn, Tây Thạnh, Tân Phú, TP. Hồ Chí Minh",
-        "bookingTime": "2025-09-12 10:00:00",
-        "estimatedDurationHours": 2.0,
-        "pricePerUnit": 350000.00,
-        "quantity": 1,
-        "totalAmount": 350000.00,
-        "status": "ASSIGNED",
-        "assignedAt": "2025-09-06 14:39:22",
-        "checkInTime": null,
-        "checkOutTime": null,
-        "note": "Cần dọn dẹp kỹ lưỡng phòng khách và bếp"
+        "assignmentId": "as000001-0000-0000-0000-000000000002",
+        "bookingCode": "BK000002",
+        "serviceName": "Dọn dẹp theo giờ",
+        "status": "ASSIGNED"
       }
     ],
     "totalItems": 1
   }
   ```
-- **Status Code**: `200 OK`
-
----
-
-### Test Case 3: Get Assignments with Invalid Status Filter
-- **Test Case ID**: TC_ASSIGNMENT_003
-- **Description**: Verify that invalid status filters are handled gracefully and return all assignments.
-- **Preconditions**: Employee is authenticated with valid token.
-- **Input**:
-  - **Method**: `GET`
-  - **URL**: `/api/v1/employee/e1000001-0000-0000-0000-000000000001/assignments?status=INVALID_STATUS`
-  - **Headers**: 
-    ```
-    Authorization: Bearer <valid_employee_token>
-    ```
-- **Expected Output**:
-  ```json
-  {
-    "success": true,
-    "message": "Lấy danh sách công việc thành công",
-    "data": [
-      {
-        "assignmentId": "assg0001-0000-0000-0000-000000000001",
-        "bookingCode": "BK62589569",
-        "serviceName": "Tổng vệ sinh",
-        "customerName": "Nguyễn Văn A",
-        "customerPhone": "0901234567",
-        "serviceAddress": "123 Lê Trọng Tấn, Tây Thạnh, Tân Phú, TP. Hồ Chí Minh",
-        "bookingTime": "2025-09-12 10:00:00",
-        "estimatedDurationHours": 2.0,
-        "pricePerUnit": 350000.00,
-        "quantity": 1,
-        "totalAmount": 350000.00,
-        "status": "ASSIGNED",
-        "assignedAt": "2025-09-06 14:39:22",
-        "checkInTime": null,
-        "checkOutTime": null,
-        "note": "Cần dọn dẹp kỹ lưỡng phòng khách và bếp"
-      }
-    ],
-    "totalItems": 1
-  }
-  ```
-- **Status Code**: `200 OK`
+- **Status Code**: 200 OK
 
 ---
 
 ## POST /assignments/{assignmentId}/cancel - Cancel Assignment
 
-### Test Case 4: Successfully Cancel Assignment
-- **Test Case ID**: TC_ASSIGNMENT_004
-- **Description**: Verify that an employee can cancel their assigned task with valid reason.
+### Test Case 3: Successful Assignment Cancellation
+- **Test Case ID**: TC_EMP_ASSIGN_003
+- **Description**: Verify Jane Smith can cancel her future assignment (more than 2 hours away)
 - **Preconditions**:
-  - Employee is authenticated with valid token.
-  - Assignment exists and is in ASSIGNED status.
-  - Booking time is more than 2 hours from current time.
+  - Assignment 'as000001-0000-0000-0000-000000000002' exists in ASSIGNED status
+  - Valid JWT token with EMPLOYEE role for Jane Smith
+  - Current date: September 22, 2025
+  - Booking scheduled for October 15, 2025 at 14:00 (more than 2 hours away)
 - **Input**:
-  - **Method**: `POST`
-  - **URL**: `/api/v1/employee/assignments/assg0001-0000-0000-0000-000000000001/cancel`
-  - **Headers**: 
-    ```
-    Authorization: Bearer <valid_employee_token>
-    Content-Type: application/json
-    ```
+  - **Path Parameter**: assignmentId = "as000001-0000-0000-0000-000000000002"
   - **Request Body**:
     ```json
     {
-      "reason": "Có việc đột xuất không thể tham gia",
-      "note": "Xin lỗi quý khách vì sự bất tiện này"
+      "reason": "Bị ốm đột xuất không thể thực hiện công việc",
+      "employeeId": "e1000001-0000-0000-0000-000000000001"
     }
+    ```
+  - **Headers**: 
+    ```
+    Authorization: Bearer <jane_smith_employee_token>
+    Content-Type: application/json
     ```
 - **Expected Output**:
   ```json
@@ -213,60 +142,27 @@ Based on housekeeping_service_v8.sql:
     "message": "Hủy công việc thành công. Hệ thống sẽ thông báo cho khách hàng."
   }
   ```
-- **Status Code**: `200 OK`
+- **Status Code**: 200 OK
 
----
-
-### Test Case 5: Cancel Assignment - Assignment Not Found
-- **Test Case ID**: TC_ASSIGNMENT_005
-- **Description**: Verify error handling when assignment ID does not exist.
-- **Preconditions**: Employee is authenticated with valid token.
-- **Input**:
-  - **Method**: `POST`
-  - **URL**: `/api/v1/employee/assignments/non-existent-assignment/cancel`
-  - **Headers**: 
-    ```
-    Authorization: Bearer <valid_employee_token>
-    Content-Type: application/json
-    ```
-  - **Request Body**:
-    ```json
-    {
-      "reason": "Có việc đột xuất không thể tham gia",
-      "note": "Xin lỗi quý khách vì sự bất tiện này"
-    }
-    ```
-- **Expected Output**:
-  ```json
-  {
-    "success": false,
-    "message": "Không tìm thấy công việc"
-  }
-  ```
-- **Status Code**: `400 Bad Request`
-
----
-
-### Test Case 6: Cancel Assignment - Invalid Status
-- **Test Case ID**: TC_ASSIGNMENT_006
-- **Description**: Verify that only assignments in ASSIGNED status can be cancelled.
+### Test Case 4: Cannot Cancel - Wrong Status or Too Close to Start Time
+- **Test Case ID**: TC_EMP_ASSIGN_004
+- **Description**: Verify cancellation restrictions for completed assignments or assignments too close to start time
 - **Preconditions**:
-  - Employee is authenticated with valid token.
-  - Assignment exists but is in COMPLETED status.
+  - Bob Wilson's assignment 'as000001-0000-0000-0000-000000000001' is in COMPLETED status
+  - Valid JWT token with EMPLOYEE role for Bob Wilson
 - **Input**:
-  - **Method**: `POST`
-  - **URL**: `/api/v1/employee/assignments/assg0002-0000-0000-0000-000000000002/cancel`
-  - **Headers**: 
-    ```
-    Authorization: Bearer <valid_employee_token>
-    Content-Type: application/json
-    ```
+  - **Path Parameter**: assignmentId = "as000001-0000-0000-0000-000000000001"
   - **Request Body**:
     ```json
     {
-      "reason": "Có việc đột xuất không thể tham gia",
-      "note": "Xin lỗi quý khách vì sự bất tiện này"
+      "reason": "Thay đổi kế hoạch",
+      "employeeId": "e1000001-0000-0000-0000-000000000002"
     }
+    ```
+  - **Headers**: 
+    ```
+    Authorization: Bearer <bob_wilson_employee_token>
+    Content-Type: application/json
     ```
 - **Expected Output**:
   ```json
@@ -275,197 +171,28 @@ Based on housekeeping_service_v8.sql:
     "message": "Chỉ có thể hủy công việc đang ở trạng thái 'Đã nhận'"
   }
   ```
-- **Status Code**: `400 Bad Request`
-
----
-
-### Test Case 7: Cancel Assignment - Too Close to Start Time
-- **Test Case ID**: TC_ASSIGNMENT_007
-- **Description**: Verify that assignments cannot be cancelled within 2 hours of start time.
-- **Preconditions**:
-  - Employee is authenticated with valid token.
-  - Assignment exists in ASSIGNED status.
-  - Booking time is within 2 hours from current time.
-- **Input**:
-  - **Method**: `POST`
-  - **URL**: `/api/v1/employee/assignments/assg0003-0000-0000-0000-000000000003/cancel`
-  - **Headers**: 
-    ```
-    Authorization: Bearer <valid_employee_token>
-    Content-Type: application/json
-    ```
-  - **Request Body**:
-    ```json
-    {
-      "reason": "Có việc đột xuất không thể tham gia",
-      "note": "Xin lỗi quý khách vì sự bất tiện này"
-    }
-    ```
-- **Expected Output**:
-  ```json
-  {
-    "success": false,
-    "message": "Không thể hủy công việc trong vòng 2 giờ trước giờ bắt đầu"
-  }
-  ```
-- **Status Code**: `400 Bad Request`
-
----
-
-### Test Case 8: Cancel Assignment - Missing Reason
-- **Test Case ID**: TC_ASSIGNMENT_008
-- **Description**: Verify validation error when required reason field is missing.
-- **Preconditions**: Employee is authenticated with valid token.
-- **Input**:
-  - **Method**: `POST`
-  - **URL**: `/api/v1/employee/assignments/assg0001-0000-0000-0000-000000000001/cancel`
-  - **Headers**: 
-    ```
-    Authorization: Bearer <valid_employee_token>
-    Content-Type: application/json
-    ```
-  - **Request Body**:
-    ```json
-    {
-      "reason": "",
-      "note": "Xin lỗi quý khách vì sự bất tiện này"
-    }
-    ```
-- **Expected Output**:
-  ```json
-  {
-    "success": false,
-    "message": "Lý do hủy là bắt buộc",
-    "validationErrors": [
-      {
-        "field": "reason",
-        "message": "Lý do hủy là bắt buộc"
-      }
-    ]
-  }
-  ```
-- **Status Code**: `400 Bad Request`
-
----
-
-## Error Scenarios
-
-### Test Case 9: Unauthorized Access - Missing Token
-- **Test Case ID**: TC_ASSIGNMENT_009
-- **Description**: Verify that requests fail when Authorization header is missing.
-- **Input**:
-  - **Method**: `GET`
-  - **URL**: `/api/v1/employee/e1000001-0000-0000-0000-000000000001/assignments`
-  - **Headers**: None
-- **Expected Output**:
-  ```json
-  {
-    "error": "Unauthorized",
-    "message": "Access token is missing or invalid"
-  }
-  ```
-- **Status Code**: `401 Unauthorized`
-
----
-
-### Test Case 10: Invalid Token
-- **Test Case ID**: TC_ASSIGNMENT_010
-- **Description**: Verify that requests fail when token is invalid or expired.
-- **Input**:
-  - **Method**: `GET`
-  - **URL**: `/api/v1/employee/e1000001-0000-0000-0000-000000000001/assignments`
-  - **Headers**:
-    ```
-    Authorization: Bearer invalid_or_expired_token
-    ```
-- **Expected Output**:
-  ```json
-  {
-    "error": "Unauthorized",
-    "message": "Invalid or expired token"
-  }
-  ```
-- **Status Code**: `401 Unauthorized`
-
----
-
-### Test Case 11: Role Authorization - Customer Access to Employee Endpoints
-- **Test Case ID**: TC_ASSIGNMENT_011
-- **Description**: Verify that customer role cannot access employee assignment endpoints.
-- **Preconditions**: Customer is authenticated with valid token.
-- **Input**:
-  - **Method**: `GET`
-  - **URL**: `/api/v1/employee/e1000001-0000-0000-0000-000000000001/assignments`
-  - **Headers**:
-    ```
-    Authorization: Bearer <valid_customer_token>
-    ```
-- **Expected Output**:
-  ```json
-  {
-    "error": "Forbidden",
-    "message": "Access denied. Required role: EMPLOYEE or ADMIN"
-  }
-  ```
-- **Status Code**: `403 Forbidden`
-
----
-
-### Test Case 12: Admin Access to Employee Assignments
-- **Test Case ID**: TC_ASSIGNMENT_012
-- **Description**: Verify that admin can access employee assignment endpoints.
-- **Preconditions**: Admin is authenticated with valid token.
-- **Input**:
-  - **Method**: `GET`
-  - **URL**: `/api/v1/employee/e1000001-0000-0000-0000-000000000001/assignments`
-  - **Headers**:
-    ```
-    Authorization: Bearer <valid_admin_token>
-    ```
-- **Expected Output**:
-  ```json
-  {
-    "success": true,
-    "message": "Lấy danh sách công việc thành công",
-    "data": [
-      {
-        "assignmentId": "assg0001-0000-0000-0000-000000000001",
-        "bookingCode": "BK62589569",
-        "serviceName": "Tổng vệ sinh",
-        "customerName": "Nguyễn Văn A",
-        "customerPhone": "0901234567",
-        "serviceAddress": "123 Lê Trọng Tấn, Tây Thạnh, Tân Phú, TP. Hồ Chí Minh",
-        "bookingTime": "2025-09-12 10:00:00",
-        "estimatedDurationHours": 2.0,
-        "pricePerUnit": 350000.00,
-        "quantity": 1,
-        "totalAmount": 350000.00,
-        "status": "ASSIGNED",
-        "assignedAt": "2025-09-06 14:39:22",
-        "checkInTime": null,
-        "checkOutTime": null,
-        "note": "Cần dọn dẹp kỹ lưỡng phòng khách và bếp"
-      }
-    ],
-    "totalItems": 1
-  }
-  ```
-- **Status Code**: `200 OK`
+- **Status Code**: 400 Bad Request
 
 ---
 
 ## GET /available-bookings - Get Available Bookings
 
-### Test Case 13: Successfully Get Available Bookings
-- **Test Case ID**: TC_ASSIGNMENT_013
-- **Description**: Verify that an employee can retrieve available bookings waiting for assignment.
-- **Preconditions**: Employee is authenticated with valid token.
+### Test Case 5: Zone-Based Booking Retrieval
+- **Test Case ID**: TC_EMP_ASSIGN_005
+- **Description**: Verify Jane Smith gets bookings from her working zones (Tân Phú, Tân Bình) prioritized first
+- **Preconditions**:
+  - Jane Smith has working zones: Quận Tân Phú, Quận Tân Bình in TP. Hồ Chí Minh
+  - Available bookings exist in her working zones
+  - Valid JWT token with EMPLOYEE role
 - **Input**:
-  - **Method**: `GET`
-  - **URL**: `/api/v1/employee/available-bookings?page=0&size=10`
+  - **Query Parameters**: 
+    - employeeId = "e1000001-0000-0000-0000-000000000001"
+    - page = 0
+    - size = 10
   - **Headers**: 
     ```
-    Authorization: Bearer <valid_employee_token>
+    Authorization: Bearer <jane_smith_employee_token>
+    Content-Type: application/json
     ```
 - **Expected Output**:
   ```json
@@ -476,30 +203,33 @@ Based on housekeeping_service_v8.sql:
       {
         "detailId": "bd000001-0000-0000-0000-000000000003",
         "bookingCode": "BK000003",
-        "serviceName": "Dọn dẹp theo giờ",
-        "serviceAddress": "789 Nguyễn Văn Cừ, Quận 5, TP. Hồ Chí Minh",
-        "bookingTime": "2025-09-20 10:00:00",
-        "estimatedDurationHours": 2.0,
+        "serviceName": "Vệ sinh máy lạnh",
+        "address": "456 Nguyễn Văn Trỗi, Phường 1, Tân Bình, TP. Hồ Chí Minh",
+        "bookingTime": "2025-09-25T10:00:00+07:00",
+        "estimatedDuration": 1.0,
         "quantity": 1
       }
     ],
     "totalItems": 1
   }
   ```
-- **Status Code**: `200 OK`
+- **Status Code**: 200 OK
 
----
-
-### Test Case 14: Successfully Get Available Bookings
-- **Test Case ID**: TC_ASSIGNMENT_014
-- **Description**: Verify that an employee can retrieve available bookings waiting for assignment.
-- **Preconditions**: Employee is authenticated with valid token.
+### Test Case 6: No Available Bookings
+- **Test Case ID**: TC_EMP_ASSIGN_006
+- **Description**: Verify proper handling when no bookings are available for the employee
+- **Preconditions**:
+  - No available bookings exist for the employee in any zone
+  - Valid JWT token with EMPLOYEE role
 - **Input**:
-  - **Method**: `GET`
-  - **URL**: `/api/v1/employee/available-bookings?page=0&size=10`
-  - **Headers**:
+  - **Query Parameters**: 
+    - employeeId = "e1000001-0000-0000-0000-000000000001"
+    - page = 0
+    - size = 10
+  - **Headers**: 
     ```
-    Authorization: Bearer <valid_employee_token>
+    Authorization: Bearer <jane_smith_employee_token>
+    Content-Type: application/json
     ```
 - **Expected Output**:
   ```json
@@ -510,47 +240,26 @@ Based on housekeeping_service_v8.sql:
     "totalItems": 0
   }
   ```
-- **Status Code**: `200 OK`
-
----
-
-### Test Case 15: Get Available Bookings - Customer Role Access
-- **Test Case ID**: TC_ASSIGNMENT_015
-- **Description**: Verify that customer role cannot access available bookings endpoint.
-- **Preconditions**: Customer is authenticated with valid token.
-- **Input**:
-  - **Method**: `GET`
-  - **URL**: `/api/v1/employee/available-bookings`
-  - **Headers**: 
-    ```
-    Authorization: Bearer <valid_customer_token>
-    ```
-- **Expected Output**:
-  ```json
-  {
-    "error": "Forbidden",
-    "message": "Access denied. Required role: EMPLOYEE"
-  }
-  ```
-- **Status Code**: `403 Forbidden`
+- **Status Code**: 200 OK
 
 ---
 
 ## POST /booking-details/{detailId}/accept - Accept Booking Detail
 
-### Test Case 16: Successfully Accept Booking Detail
-- **Test Case ID**: TC_ASSIGNMENT_016
-- **Description**: Verify that an employee can accept an available booking detail.
+### Test Case 7: Successful Booking Detail Acceptance
+- **Test Case ID**: TC_EMP_ASSIGN_007
+- **Description**: Verify Jane Smith can successfully accept an air conditioner cleaning booking
 - **Preconditions**:
-  - Employee is authenticated with valid token.
-  - Booking detail exists and is available for assignment.
-  - Employee is not already assigned to this booking detail.
+  - Booking detail exists for "Vệ sinh máy lạnh" service with ID 'bd000001-0000-0000-0000-000000000005'
+  - Jane Smith is qualified and available with no scheduling conflicts
+  - Valid JWT token with EMPLOYEE role
+  - Booking is in AWAITING_EMPLOYEE status
 - **Input**:
-  - **Method**: `POST`
-  - **URL**: `/api/v1/employee/booking-details/bd000001-0000-0000-0000-000000000003/accept?employeeId=e1000001-0000-0000-0000-000000000001`
+  - **Path Parameter**: detailId = "bd000001-0000-0000-0000-000000000005"
+  - **Query Parameters**: employeeId = "e1000001-0000-0000-0000-000000000001"
   - **Headers**: 
     ```
-    Authorization: Bearer <valid_employee_token>
+    Authorization: Bearer <jane_smith_employee_token>
     Content-Type: application/json
     ```
 - **Expected Output**:
@@ -559,97 +268,160 @@ Based on housekeeping_service_v8.sql:
     "success": true,
     "message": "Nhận công việc thành công",
     "data": {
-      "assignmentId": "assg0004-0000-0000-0000-000000000004",
-      "bookingCode": "BK000003",
-      "serviceName": "Dọn dẹp theo giờ",
-      "customerName": "Nguyễn Thị B",
-      "customerPhone": "0912345678",
-      "serviceAddress": "789 Nguyễn Văn Cừ, Quận 5, TP. Hồ Chí Minh",
-      "bookingTime": "2025-09-20 10:00:00",
-      "estimatedDurationHours": 2.0,
-      "pricePerUnit": 50000.00,
-      "quantity": 1,
-      "totalAmount": 50000.00,
+      "assignmentId": "as000001-0000-0000-0000-000000000005",
+      "bookingCode": "BK000005",
+      "serviceName": "Vệ sinh máy lạnh",
       "status": "ASSIGNED",
-      "assignedAt": "2025-09-15 15:30:00",
-      "checkInTime": null,
-      "checkOutTime": null,
-      "note": "Cần dọn dẹp kỹ lưỡng"
+      "scheduledDate": "2025-09-25",
+      "scheduledTime": "10:00",
+      "estimatedDuration": 1.0,
+      "price": 150000
     }
   }
   ```
-- **Status Code**: `200 OK`
+- **Status Code**: 200 OK
 
----
+### Test Case 8: Booking Acceptance Conflict Scenarios
+- **Test Case ID**: TC_EMP_ASSIGN_008
+- **Description**: Verify comprehensive error handling for various booking acceptance conflicts
+- **Sub-scenarios**:
+  - **8a**: Employee already assigned to same booking detail
+  - **8b**: Booking detail already at capacity (has enough employees)
+  - **8c**: Employee has schedule conflict with existing assignment
+  - **8d**: Employee has approved leave during booking time
+  - **8e**: Booking is in invalid status (CANCELLED)
+- **Input Example (8a)**:
+  - **Path Parameter**: detailId = "bd000001-0000-0000-0000-000000000002"
+  - **Query Parameters**: employeeId = "e1000001-0000-0000-0000-000000000001"
+- **Expected Output (8a)**:
+  ```json
+  {
+    "success": false,
+    "message": "Nhân viên đã nhận chi tiết dịch vụ này"
+  }
+  ```
+- **Status Code**: 400 Bad Request
 
-### Test Case 17: Accept Booking Detail - Already Fully Assigned
-- **Test Case ID**: TC_ASSIGNMENT_017
-- **Description**: Verify error handling when booking detail already has enough employees assigned.
+### Test Case 9: Multi-Staff Service Coordination
+- **Test Case ID**: TC_EMP_ASSIGN_009
+- **Description**: Verify booking status updates to CONFIRMED when all positions are filled for multi-staff services
 - **Preconditions**:
-  - Employee is authenticated with valid token.
-  - Booking detail already has the required number of employees assigned.
+  - Multi-staff service booking (Tổng vệ sinh requires 3 employees)
+  - Currently has 2 employees assigned, needs 1 more
+  - Booking status is AWAITING_EMPLOYEE
+  - Bob Wilson is available to fill the last position
 - **Input**:
-  - **Method**: `POST`
-  - **URL**: `/api/v1/employee/booking-details/bd000001-0000-0000-0000-000000000001/accept?employeeId=e1000001-0000-0000-0000-000000000002`
+  - **Path Parameter**: detailId = "bd000001-0000-0000-0000-000000000010"
+  - **Query Parameters**: employeeId = "e1000001-0000-0000-0000-000000000002"
   - **Headers**: 
     ```
-    Authorization: Bearer <valid_employee_token>
+    Authorization: Bearer <bob_wilson_employee_token>
     Content-Type: application/json
     ```
 - **Expected Output**:
   ```json
   {
-    "success": false,
-    "message": "Chi tiết dịch vụ đã có đủ nhân viên"
+    "success": true,
+    "message": "Nhận công việc thành công",
+    "data": {
+      "assignmentId": "as000001-0000-0000-0000-000000000010",
+      "bookingCode": "BK000010",
+      "serviceName": "Tổng vệ sinh",
+      "status": "ASSIGNED",
+      "bookingStatus": "CONFIRMED"
+    }
   }
   ```
-- **Status Code**: `400 Bad Request`
+- **Status Code**: 200 OK
 
 ---
 
-### Test Case 18: Accept Booking Detail - Not Found
-- **Test Case ID**: TC_ASSIGNMENT_018
-- **Description**: Verify error handling when booking detail ID does not exist.
-- **Preconditions**: Employee is authenticated with valid token.
-- **Input**:
-  - **Method**: `POST`
-  - **URL**: `/api/v1/employee/booking-details/non-existent-detail/accept?employeeId=e1000001-0000-0000-0000-000000000001`
-  - **Headers**: 
+## Authorization and Error Scenarios
+
+### Test Case 10: Role-Based Authorization Validation
+- **Test Case ID**: TC_EMP_ASSIGN_010
+- **Description**: Verify proper role-based access control across all endpoints
+- **Sub-scenarios**:
+  - **10a**: ADMIN cannot accept booking details (EMPLOYEE role required)
+  - **10b**: ADMIN can view employee assignments
+  - **10c**: Invalid/expired JWT tokens are rejected
+- **Input Example (10a)**:
+  - **Path Parameter**: detailId = "bd000001-0000-0000-0000-000000000005"
+  - **Query Parameters**: employeeId = "e1000001-0000-0000-0000-000000000001"
+  - **Headers**:
     ```
-    Authorization: Bearer <valid_employee_token>
+    Authorization: Bearer <admin_one_token>
     Content-Type: application/json
     ```
-- **Expected Output**:
+- **Expected Output (10a)**:
   ```json
   {
     "success": false,
-    "message": "Không tìm thấy dịch vụ"
+    "message": "Access denied. Employee role required."
   }
   ```
-- **Status Code**: `400 Bad Request`
+- **Status Code**: 403 Forbidden
+
+### Test Case 11: Data Validation and Edge Cases
+- **Test Case ID**: TC_EMP_ASSIGN_011
+- **Description**: Verify proper validation and edge case handling across all endpoints
+- **Sub-scenarios**:
+  - **11a**: Missing/invalid request body for assignment cancellation
+  - **11b**: Non-existent employee ID for available bookings
+  - **11c**: Non-existent assignment ID for cancellation
+  - **11d**: Duration calculation with null service duration (defaults to 2 hours)
+  - **11e**: Employee with no working zones configured (fallback to general bookings)
+- **Input Example (11a)**:
+  - **Path Parameter**: assignmentId = "as000001-0000-0000-0000-000000000002"
+  - **Request Body**:
+    ```json
+    {
+      "reason": "",
+      "employeeId": null
+    }
+    ```
+- **Expected Output (11a)**:
+  ```json
+  {
+    "success": false,
+    "message": "Dữ liệu yêu cầu không hợp lệ"
+  }
+  ```
+- **Status Code**: 400 Bad Request
+
+---
+
+## Database Integration Test Scenarios
+
+### Test Case 12: Real Database Integration
+- **Test Case ID**: TC_EMP_ASSIGN_012
+- **Description**: Verify integration with actual database data from housekeeping_service_v8.sql
+- **Covered Data**:
+  - **Employees**: Jane Smith (e1000001-0000-0000-0000-000000000001), Bob Wilson (e1000001-0000-0000-0000-000000000002)
+  - **Customers**: John Doe, Mary Jones, Jane Smith Customer
+  - **Services**: Dọn dẹp theo giờ (50,000 VND), Tổng vệ sinh (100,000 VND), Vệ sinh máy lạnh (150,000 VND)
+  - **Working Zones**: Real Ho Chi Minh City districts (Tân Phú, Tân Bình, Gò Vấp)
+  - **Addresses**: Actual street addresses in Ho Chi Minh City
+  - **Existing Assignments**: Bob's completed BK000001, Jane's pending BK000002
+- **Validation Points**:
+  - Zone-based booking matching works with real coordinates
+  - Proximity calculations use actual geographic data
+  - Service pricing and duration match database values
+  - Employee skills align with service requirements
 
 ---
 
 ## Notes
-- **Test Environment**: Database should be configured with test data from housekeeping_service_v8.sql.
-- **Authentication**: All endpoints require valid JWT tokens with appropriate roles.
-- **Authorization**: 
-  - Employee assignment retrieval: EMPLOYEE or ADMIN role required
-  - Assignment cancellation: EMPLOYEE or ADMIN role required
-  - Available bookings: EMPLOYEE role required
-  - Accept booking detail: EMPLOYEE role required
-- **Transaction Management**: Assignment operations are wrapped in database transactions.
-- **Error Handling**: Service layer catches exceptions and returns appropriate error responses.
-- **Security**: JWT tokens are validated for format, expiration, and role authorization.
-- **Pagination**: Assignment listing and available bookings support standard Spring Boot pagination.
-- **Status Filtering**: Assignments can be filtered by status (ASSIGNED, IN_PROGRESS, COMPLETED, CANCELLED).
-- **Business Rules**: 
-  - Only ASSIGNED assignments can be cancelled
-  - Assignments cannot be cancelled within 2 hours of start time
-  - Assignment cancellation triggers customer notification
-  - If all assignments for a booking are cancelled, booking status is updated to CANCELLED
-  - Booking details can only be accepted if they don't already have enough employees
-  - When all booking details are fully assigned, booking status changes to CONFIRMED
-- **Validation**: Assignment cancellation requires a valid reason (not blank).
-- **Crisis Management**: Assignment cancellations trigger crisis notifications to customers and admin monitoring.
-- **Time Management**: Assignment times are managed in the system timezone with proper formatting.
+- **Test Date Context**: All test cases assume current date is September 22, 2025
+- **Real Data Integration**: Uses actual IDs, addresses, and service data from housekeeping_service_v8.sql
+- **Employee Profiles**:
+  - Jane Smith: Skills (Cleaning, Organizing), Zones (Tân Phú, Tân Bình)
+  - Bob Wilson: Skills (Deep Cleaning, Laundry), Zone (Gò Vấp)
+- **Service Categories**: House cleaning, laundry, other household services with realistic pricing
+- **Business Logic Validation**:
+  - 2-hour cancellation rule enforcement
+  - Crisis notification system for customer alerts
+  - Zone-based assignment optimization
+  - Multi-staff service coordination
+  - Conflict detection and prevention
+- **Geographic Context**: Ho Chi Minh City districts and real addresses for location-based testing

@@ -6,8 +6,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public record BookingCreateRequest(
-        @NotBlank(message = "Address ID is required")
         String addressId,
+
+        @Valid
+        NewAddressRequest newAddress,
 
         @NotNull(message = "Booking time is required")
         @Future(message = "Booking time must be in the future")
@@ -27,4 +29,12 @@ public record BookingCreateRequest(
         List<AssignmentRequest> assignments,
 
         int paymentMethodId
-) {}
+) {
+
+        @AssertTrue(message = "Either addressId or newAddress must be provided")
+        public boolean isAddressSelectionValid() {
+                boolean hasAddressId = addressId != null && !addressId.isBlank();
+                boolean hasNewAddress = newAddress != null;
+                return (hasAddressId || hasNewAddress) && !(hasAddressId && hasNewAddress);
+        }
+}

@@ -68,7 +68,7 @@ public class BookingCreationSummary {
                     }
                 })
                 .sum();
-            this.estimatedDuration = (totalMinutes / 60) + " hours " + (totalMinutes % 60) + " minutes";
+            this.estimatedDuration = (totalMinutes / 60) + " giờ " + (totalMinutes % 60) + " phút";
         }
     }
 }

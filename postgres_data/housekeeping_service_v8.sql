@@ -123,6 +123,7 @@ CREATE TABLE service (
     base_price DECIMAL(10, 2) NOT NULL,
     unit VARCHAR(20) NOT NULL, -- Ví dụ: 'hour', 'm2', 'package'
     estimated_duration_hours DECIMAL(5, 2), -- Thời gian dự kiến (giờ)
+    recommended_staff INT NOT NULL DEFAULT 1,
     icon_url VARCHAR(255),
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -428,10 +429,10 @@ INSERT INTO admin_profile (admin_profile_id, account_id, full_name, is_male, dep
 ('ad100001-0000-0000-0000-000000000001', 'a1000001-0000-0000-0000-000000000003', 'Admin One', TRUE, 'Management', 'admin1@example.com', '1988-09-10', '2023-03-01');
 
 -- Thêm địa chỉ cho khách hàng
-INSERT INTO address (address_id, customer_id, full_address, ward, district, city, is_default) VALUES
-('adrs0001-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', '123 Lê Trọng Tấn, Tây Thạnh, Tân Phú, TP. Hồ Chí Minh', 'Phường Tây Thạnh', 'Quận Tân Phú', 'TP. Hồ Chí Minh', true),
-('adrs0001-0000-0000-0000-000000000002', 'c1000001-0000-0000-0000-000000000002', '456 Lê Lợi, Bến Nghé, Quận 1,TP. Hồ Chí Minh', 'Phường Bến Nghé', 'Quận 1', 'TP. Hồ Chí Minh', true),
-('adrs0001-0000-0000-0000-000000000003', 'c1000001-0000-0000-0000-000000000003', '104 Lê Lợi, Phường 1, Gò Vấp, TP. Hồ Chí Minh', 'Phường 1', 'Quận Gò Vấp', 'TP. Hồ Chí Minh', true);
+INSERT INTO address (address_id, customer_id, full_address, ward, district, city, latitude, longitude, is_default) VALUES
+('adrs0001-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', '123 Lê Trọng Tấn, Tây Thạnh, Tân Phú, TP. Hồ Chí Minh', 'Phường Tây Thạnh', 'Quận Tân Phú', 'TP. Hồ Chí Minh', 10.7943, 106.6256, true),
+('adrs0001-0000-0000-0000-000000000002', 'c1000001-0000-0000-0000-000000000002', '456 Lê Lợi, Bến Nghé, Quận 1,TP. Hồ Chí Minh', 'Phường Bến Nghé', 'Quận 1', 'TP. Hồ Chí Minh', 10.7769, 106.7009, true),
+('adrs0001-0000-0000-0000-000000000003', 'c1000001-0000-0000-0000-000000000003', '104 Lê Lợi, Phường 1, Gò Vấp, TP. Hồ Chí Minh', 'Phường 1', 'Quận Gò Vấp', 'TP. Hồ Chí Minh', 10.8142, 106.6938, true);
 
 -- Thêm khu vực làm việc cho nhân viên
 INSERT INTO employee_working_zones (employee_id, district, city) VALUES
@@ -515,21 +516,19 @@ INSERT INTO service_categories (category_name, description, icon_url) VALUES
 
 -- Thêm các dịch vụ con vào từng danh mục
 -- Dữ liệu cho danh mục 'Dọn dẹp nhà' (category_id = 1)
-INSERT INTO service (category_id, name, description, base_price, unit, estimated_duration_hours, icon_url, is_active) VALUES
-(1, 'Dọn dẹp theo giờ', 'Lau dọn, hút bụi, làm sạch các bề mặt cơ bản trong nhà. Phù hợp cho nhu cầu duy trì vệ sinh hàng tuần.', 50000, 'Giờ', 2.0, 'https://res.cloudinary.com/dkzemgit8/image/upload/v1757599899/Cleaning_Clock_z29juh.png', TRUE),
-(1, 'Tổng vệ sinh', 'Làm sạch sâu toàn diện, bao gồm các khu vực khó tiếp cận, trần nhà, lau cửa kính. Thích hợp cho nhà mới hoặc dọn dẹp theo mùa.', 100000, 'Gói', 2.0, 'https://res.cloudinary.com/dkzemgit8/image/upload/v1757599581/house_cleaning_nob_umewqf.png', TRUE),
-(1, 'Vệ sinh Sofa - Nệm - Rèm', 'Giặt sạch và khử khuẩn Sofa, Nệm, Rèm cửa bằng máy móc chuyên dụng.', 300000, 'Gói', 3.0, 'https://res.cloudinary.com/dkzemgit8/image/upload/v1757600057/sofa_bed_vkkjz8.png', TRUE),
-(1, 'Vệ sinh máy lạnh', 'Bảo trì, làm sạch dàn nóng và dàn lạnh, bơm gas nếu cần.', 150000, 'Máy', 1.0, 'https://res.cloudinary.com/dkzemgit8/image/upload/v1757600733/cooler_rnyppn.png', TRUE);
-
+INSERT INTO service (category_id, name, description, base_price, unit, estimated_duration_hours, recommended_staff, icon_url, is_active) VALUES
+(1, 'Dọn dẹp theo giờ', 'Lau dọn, hút bụi, làm sạch các bề mặt cơ bản trong nhà. Phù hợp cho nhu cầu duy trì vệ sinh hàng tuần.', 50000, 'Giờ', 2.0, 1, 'https://res.cloudinary.com/dkzemgit8/image/upload/v1757599899/Cleaning_Clock_z29juh.png', TRUE),
+(1, 'Tổng vệ sinh', 'Làm sạch sâu toàn diện, bao gồm các khu vực khó tiếp cận, trần nhà, lau cửa kính. Thích hợp cho nhà mới hoặc dọn dẹp theo mùa.', 100000, 'Gói', 2.0, 1, 'https://res.cloudinary.com/dkzemgit8/image/upload/v1757599581/house_cleaning_nob_umewqf.png', TRUE),
+(1, 'Vệ sinh Sofa - Nệm - Rèm', 'Giặt sạch và khử khuẩn Sofa, Nệm, Rèm cửa bằng máy móc chuyên dụng.', 300000, 'Gói', 3.0, 1, 'https://res.cloudinary.com/dkzemgit8/image/upload/v1757600057/sofa_bed_vkkjz8.png', TRUE),
+(1, 'Vệ sinh máy lạnh', 'Bảo trì, làm sạch dàn nóng và dàn lạnh, bơm gas nếu cần.', 150000, 'Máy', 1.0, 1, 'https://res.cloudinary.com/dkzemgit8/image/upload/v1757600733/cooler_rnyppn.png', TRUE);
 -- Dữ liệu cho danh mục 'Giặt ủi' (category_id = 2)
-INSERT INTO service (category_id, name, description, base_price, unit, estimated_duration_hours, icon_url, is_active) VALUES
-(2, 'Giặt sấy theo kg', 'Giặt và sấy khô quần áo thông thường, giao nhận tận nơi.', 30000, 'Kg', 24.0, 'https://res.cloudinary.com/dkzemgit8/image/upload/v1757601210/shirt_nmee0d.png', TRUE),
-(2, 'Giặt hấp cao cấp', 'Giặt khô cho các loại vải cao cấp như vest, áo dài, lụa.', 120000, 'Bộ', 48.0, 'https://res.cloudinary.com/dkzemgit8/image/upload/v1757601414/vest_2_kfigzg.png', TRUE);
-
+INSERT INTO service (category_id, name, description, base_price, unit, estimated_duration_hours, recommended_staff, icon_url, is_active) VALUES
+(2, 'Giặt sấy theo kg', 'Giặt và sấy khô quần áo thông thường, giao nhận tận nơi.', 30000, 'Kg', 24.0, 1, 'https://res.cloudinary.com/dkzemgit8/image/upload/v1757601210/shirt_nmee0d.png', TRUE),
+(2, 'Giặt hấp cao cấp', 'Giặt khô cho các loại vải cao cấp như vest, áo dài, lụa.', 120000, 'Bộ', 48.0, 1, 'https://res.cloudinary.com/dkzemgit8/image/upload/v1757601414/vest_2_kfigzg.png', TRUE);
 -- Dữ liệu cho danh mục 'Việc nhà khác' (category_id = 3)
-INSERT INTO service (category_id, name, description, base_price, unit, estimated_duration_hours, icon_url, is_active) VALUES
-(3, 'Nấu ăn gia đình', 'Đi chợ (chi phí thực phẩm tính riêng) và chuẩn bị bữa ăn cho gia đình theo thực đơn yêu cầu.', 60000, 'Giờ', 2.5, 'https://res.cloudinary.com/dkzemgit8/image/upload/v1757601546/pan_ysmoql.png', TRUE),
-(3, 'Đi chợ hộ', 'Mua sắm và giao hàng tận nơi theo danh sách của bạn.', 40000, 'Lần', 1.0, 'https://res.cloudinary.com/dkzemgit8/image/upload/v1757601712/shopping_etf5iz.png', TRUE);
+INSERT INTO service (category_id, name, description, base_price, unit, estimated_duration_hours, recommended_staff, icon_url, is_active) VALUES
+(3, 'Nấu ăn gia đình', 'Đi chợ (chi phí thực phẩm tính riêng) và chuẩn bị bữa ăn cho gia đình theo thực đơn yêu cầu.', 60000, 'Giờ', 2.5, 1, 'https://res.cloudinary.com/dkzemgit8/image/upload/v1757601546/pan_ysmoql.png', TRUE),
+(3, 'Đi chợ hộ', 'Mua sắm và giao hàng tận nơi theo danh sách của bạn.', 40000, 'Lần', 1.0, 1, 'https://res.cloudinary.com/dkzemgit8/image/upload/v1757601712/shopping_etf5iz.png', TRUE);
 
 -- Thêm các chương trình khuyến mãi
 INSERT INTO promotions (promo_code, description, discount_type, discount_value, max_discount_amount, start_date, end_date, is_active) VALUES
@@ -540,12 +539,12 @@ INSERT INTO promotions (promo_code, description, discount_type, discount_value, 
 -- Một lịch đã HOÀN THÀNH của khách hàng 'John Doe'
 -- Một lịch đã XÁC NHẬN của khách hàng 'Jane Smith Customer'
 INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status, promotion_id) VALUES
-('b0000001-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000001', 'BK000001', '2025-08-20 09:00:00+07', 'Nhà có trẻ nhỏ, vui lòng lau dọn kỹ khu vực phòng khách.', 380000.00, 'COMPLETED', (SELECT promotion_id FROM promotions WHERE promo_code = 'GIAM20K')),
+('b0000001-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000001', 'BK000001', '2025-08-20 09:00:00+07', 'Nhà có trẻ nhỏ, vui lòng lau dọn kỹ khu vực phòng khách.', 80000.00, 'COMPLETED', (SELECT promotion_id FROM promotions WHERE promo_code = 'GIAM20K')),
 ('b0000001-0000-0000-0000-000000000002', 'c1000001-0000-0000-0000-000000000003', 'adrs0001-0000-0000-0000-000000000003', 'BK000002', '2025-08-28 14:00:00+07', 'Vui lòng đến đúng giờ.', 90000.00, 'CONFIRMED', (SELECT promotion_id FROM promotions WHERE promo_code = 'KHAITRUONG10'));
 
 -- Thêm chi tiết dịch vụ cho các lịch đặt
 INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
-('bd000001-0000-0000-0000-000000000001', 'b0000001-0000-0000-0000-000000000001', (SELECT service_id FROM service WHERE name = 'Tổng vệ sinh'), 1, 400000.00, 400000.00),
+('bd000001-0000-0000-0000-000000000001', 'b0000001-0000-0000-0000-000000000001', (SELECT service_id FROM service WHERE name = 'Tổng vệ sinh'), 1, 100000.00, 100000.00),
 ('bd000001-0000-0000-0000-000000000002', 'b0000001-0000-0000-0000-000000000002', (SELECT service_id FROM service WHERE name = 'Dọn dẹp theo giờ'), 2, 50000.00, 100000.00);
 
 -- Phân công nhân viên cho các lịch đặt
@@ -556,10 +555,6 @@ INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status, 
 -- Khối IV: Thêm dữ liệu cho Thanh toán và Đánh giá
 -- =================================================================================
 
--- Thêm dữ liệu thanh toán
-INSERT INTO payments (payment_id, booking_id, amount, method_id, payment_status, transaction_code, paid_at) VALUES
-('pay00001-0000-0000-0000-000000000001', 'b0000001-0000-0000-0000-000000000001', 380000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'VNPAY'), 'PAID', 'VNP123456789', '2025-08-20 13:05:00+07'),
-('pay00001-0000-0000-0000-000000000002', 'b0000001-0000-0000-0000-000000000002', 90000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'MOMO'), 'PENDING', NULL, NULL);
 -- Thêm các tiêu chí đánh giá
 INSERT INTO review_criteria (criteria_name) VALUES
 ('Thái độ'),
@@ -859,6 +854,8 @@ INSERT INTO payments (payment_id, booking_id, amount, method_id, payment_status,
 ('pay00001-0000-0000-0000-000000000003', 'b0000001-0000-0000-0000-000000000004', 120000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'CASH'), 'PAID', NULL, '2025-09-01 08:30:00+07'),
 ('pay00001-0000-0000-0000-000000000004', 'b0000001-0000-0000-0000-000000000005', 150000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'MOMO'), 'PENDING', NULL, NULL),
 ('pay00001-0000-0000-0000-000000000005', 'b0000001-0000-0000-0000-000000000008', 40000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'CASH'), 'PAID', NULL, '2025-08-18 12:30:00+07'),
+('pay00001-0000-0000-0000-000000000001', 'b0000001-0000-0000-0000-000000000001', 80000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'VNPAY'), 'PAID', 'VNP123456789', '2025-08-20 13:05:00+07'),
+('pay00001-0000-0000-0000-000000000002', 'b0000001-0000-0000-0000-000000000002', 90000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'MOMO'), 'PENDING', NULL, NULL),
 ('pay00001-0000-0000-0000-000000000006', 'b0000001-0000-0000-0000-000000000010', 630000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'VNPAY'), 'PENDING', NULL, NULL);
 
 -- Add reviews for completed bookings
@@ -869,3 +866,181 @@ INSERT INTO review_details (review_id, criteria_id, rating) VALUES
 (2, (SELECT criteria_id FROM review_criteria WHERE criteria_name = 'Thái độ'), 4.5),
 (2, (SELECT criteria_id FROM review_criteria WHERE criteria_name = 'Đúng giờ'), 5.0),
 (2, (SELECT criteria_id FROM review_criteria WHERE criteria_name = 'Chất lượng công việc'), 4.0);
+
+UPDATE service SET base_price = 60000 WHERE name = 'Dọn dẹp theo giờ';
+UPDATE service SET base_price = 500000 WHERE name = 'Tổng vệ sinh';
+UPDATE service SET base_price = 350000 WHERE name = 'Vệ sinh Sofa - Nệm - Rèm';
+UPDATE service SET base_price = 200000 WHERE name = 'Vệ sinh máy lạnh';
+UPDATE service SET base_price = 25000 WHERE name = 'Giặt sấy theo kg';
+UPDATE service SET base_price = 150000 WHERE name = 'Giặt hấp cao cấp';
+UPDATE service SET base_price = 80000 WHERE name = 'Nấu ăn gia đình';
+UPDATE service SET base_price = 50000 WHERE name = 'Đi chợ hộ';
+
+-- Update pricing rules to reflect realistic market adjustments
+UPDATE pricing_rules SET price_adjustment = 200000 WHERE rule_name = 'Phụ thu nhà phố lớn';
+UPDATE pricing_rules SET price_adjustment = 25000 WHERE rule_name = 'Giặt chăn ga';
+UPDATE pricing_rules SET price_adjustment = 20000 WHERE rule_name = 'Rửa chén';
+UPDATE pricing_rules SET price_adjustment = 35000 WHERE rule_name = 'Lau cửa kính';
+UPDATE pricing_rules SET price_adjustment = 100000 WHERE rule_name = 'Vệ sinh nệm';
+UPDATE pricing_rules SET price_adjustment = 80000 WHERE rule_name = 'Vệ sinh rèm';
+UPDATE pricing_rules SET price_adjustment = 100000 WHERE rule_name = 'Máy lạnh âm trần';
+UPDATE pricing_rules SET price_adjustment = 15000 WHERE rule_name = 'Gấp quần áo';
+UPDATE pricing_rules SET price_adjustment = 40000 WHERE rule_name = 'Mua nguyên liệu nấu ăn';
+
+-- Update existing booking details to reflect new pricing
+UPDATE booking_details SET
+    price_per_unit = 500000,
+    sub_total = 500000
+WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000001';
+
+UPDATE booking_details SET
+    price_per_unit = 60000,
+    sub_total = 120000
+WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000002';
+
+UPDATE booking_details SET
+    price_per_unit = 200000,
+    sub_total = 200000
+WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000003';
+
+UPDATE booking_details SET
+    price_per_unit = 150000,
+    sub_total = 150000
+WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000004';
+
+UPDATE booking_details SET
+    price_per_unit = 80000,
+    sub_total = 160000
+WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000005';
+
+UPDATE booking_details SET
+    price_per_unit = 25000,
+    sub_total = 50000
+WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000006';
+
+UPDATE booking_details SET
+    price_per_unit = 350000,
+    sub_total = 350000
+WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000007';
+
+UPDATE booking_details SET
+    price_per_unit = 50000,
+    sub_total = 50000
+WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000008';
+
+UPDATE booking_details SET
+    price_per_unit = 60000,
+    sub_total = 180000
+WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000009';
+
+UPDATE booking_details SET
+    price_per_unit = 700000,
+    sub_total = 700000
+WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000010';
+
+-- Update booking total amounts accordingly
+UPDATE bookings SET total_amount = 480000 WHERE booking_id = 'b0000001-0000-0000-0000-000000000001'; -- 500k - 20k promotion
+UPDATE bookings SET total_amount = 108000 WHERE booking_id = 'b0000001-0000-0000-0000-000000000002'; -- 120k - 10% promotion (max 12k)
+UPDATE bookings SET total_amount = 200000 WHERE booking_id = 'b0000001-0000-0000-0000-000000000003';
+UPDATE bookings SET total_amount = 150000 WHERE booking_id = 'b0000001-0000-0000-0000-000000000004';
+UPDATE bookings SET total_amount = 200000 WHERE booking_id = 'b0000001-0000-0000-0000-000000000005'; -- 160k + 40k for buying ingredients
+UPDATE bookings SET total_amount = 50000 WHERE booking_id = 'b0000001-0000-0000-0000-000000000006';
+UPDATE bookings SET total_amount = 330000 WHERE booking_id = 'b0000001-0000-0000-0000-000000000007'; -- 350k - 20k promotion
+UPDATE bookings SET total_amount = 50000 WHERE booking_id = 'b0000001-0000-0000-0000-000000000008';
+UPDATE bookings SET total_amount = 180000 WHERE booking_id = 'b0000001-0000-0000-0000-000000000009';
+UPDATE bookings SET total_amount = 630000 WHERE booking_id = 'b0000001-0000-0000-0000-000000000010'; -- 700k - 10% (70k discount)
+
+-- Update payment amounts to match new booking totals
+UPDATE payments SET amount = 480000 WHERE payment_id = 'pay00001-0000-0000-0000-000000000001';
+UPDATE payments SET amount = 108000 WHERE payment_id = 'pay00001-0000-0000-0000-000000000002';
+UPDATE payments SET amount = 150000 WHERE payment_id = 'pay00001-0000-0000-0000-000000000003';
+UPDATE payments SET amount = 200000 WHERE payment_id = 'pay00001-0000-0000-0000-000000000004';
+UPDATE payments SET amount = 50000 WHERE payment_id = 'pay00001-0000-0000-0000-000000000005';
+UPDATE payments SET amount = 630000 WHERE payment_id = 'pay00001-0000-0000-0000-000000000006';
+
+-- Add new pricing rules for quantity-based services
+INSERT INTO pricing_rules (service_id, rule_name, condition_logic, priority, price_adjustment, staff_adjustment, duration_adjustment_hours) VALUES
+((SELECT service_id FROM service WHERE name = 'Vệ sinh máy lạnh'), 'Phụ thu máy tủ đứng', 'ALL', 8, 150000, 0, 1.0),
+((SELECT service_id FROM service WHERE name = 'Giặt hấp cao cấp'), 'Phụ thu áo dài', 'ALL', 5, 50000, 0, 0.5),
+((SELECT service_id FROM service WHERE name = 'Giặt hấp cao cấp'), 'Phụ thu đầm dạ hội', 'ALL', 5, 100000, 0, 1.0);
+
+-- Add rule conditions for new pricing rules
+INSERT INTO rule_conditions (rule_id, choice_id) VALUES
+((SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu máy tủ đứng'),
+ (SELECT choice_id FROM service_option_choices WHERE option_id = 7 AND label = 'Tủ đứng'));
+
+INSERT INTO rule_conditions (rule_id, choice_id) VALUES
+((SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu áo dài'),
+ (SELECT choice_id FROM service_option_choices WHERE option_id = 10 AND label = 'Áo dài'));
+
+INSERT INTO rule_conditions (rule_id, choice_id) VALUES
+((SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu đầm dạ hội'),
+ (SELECT choice_id FROM service_option_choices WHERE option_id = 10 AND label = 'Đầm'));
+
+-- Insert additional addresses for more booking locations
+INSERT INTO address (address_id, customer_id, full_address, ward, district, city, latitude, longitude, is_default) VALUES
+('adrs0001-0000-0000-0000-000000000004', 'c1000001-0000-0000-0000-000000000001', '789 Nguyễn Văn Cừ, Phường 3, Quận 5, TP. Hồ Chí Minh', 'Phường 3', 'Quận 5', 'TP. Hồ Chí Minh', 10.7594, 106.6822, false),
+('adrs0001-0000-0000-0000-000000000005', 'c1000001-0000-0000-0000-000000000002', '321 Phan Văn Trị, Phường 11, Bình Thạnh, TP. Hồ Chí Minh', 'Phường 11', 'Quận Bình Thạnh', 'TP. Hồ Chí Minh', 10.8011, 106.7067, false),
+('adrs0001-0000-0000-0000-000000000006', 'c1000001-0000-0000-0000-000000000003', '567 Lý Thường Kiệt, Phường 8, Tân Bình, TP. Hồ Chí Minh', 'Phường 8', 'Quận Tân Bình', 'TP. Hồ Chí Minh', 10.7993, 106.6554, false),
+('adrs0001-0000-0000-0000-000000000007', 'c1000001-0000-0000-0000-000000000001', '432 Võ Văn Tần, Phường 5, Quận 3, TP. Hồ Chí Minh', 'Phường 5', 'Quận 3', 'TP. Hồ Chí Minh', 10.7756, 106.6914, false),
+('adrs0001-0000-0000-0000-000000000008', 'c1000001-0000-0000-0000-000000000002', '876 Cách Mạng Tháng 8, Phường 5, Tân Bình, TP. Hồ Chí Minh', 'Phường 5', 'Quận Tân Bình', 'TP. Hồ Chí Minh', 10.7854, 106.6533, false);
+
+-- Insert 10 additional bookings
+INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status) VALUES
+('book0004-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000004', 'HKS000004', '2024-09-25 08:00:00+07', 'Cần dọn dẹp tổng quát, chú ý khu vực bếp', 450000, 'AWAITING_EMPLOYEE'),
+('book0005-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000002', 'adrs0001-0000-0000-0000-000000000005', 'HKS000005', '2024-09-25 14:00:00+07', 'Ưu tiên dọn phòng khách và phòng ngủ', 350000, 'AWAITING_EMPLOYEE'),
+('book0006-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000003', 'adrs0001-0000-0000-0000-000000000006', 'HKS000006', '2024-09-26 09:30:00+07', 'Cần giặt rèm cửa và thảm', 600000, 'AWAITING_EMPLOYEE'),
+('book0007-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000007', 'HKS000007', '2024-09-26 16:00:00+07', 'Dọn dẹp sau tiệc, nhiều rác cần dọn', 500000, 'CONFIRMED'),
+('book0008-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000002', 'adrs0001-0000-0000-0000-000000000008', 'HKS000008', '2024-09-27 10:00:00+07', 'Vệ sinh tổng quát hàng tuần', 400000, 'AWAITING_EMPLOYEE'),
+('book0009-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000001', 'HKS000009', '2024-09-27 15:30:00+07', 'Cần dọn nhà trước khi có khách', 300000, 'AWAITING_EMPLOYEE'),
+('book0010-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000003', 'adrs0001-0000-0000-0000-000000000003', 'HKS000010', '2024-09-28 08:30:00+07', 'Lau kính cửa sổ và ban công', 250000, 'AWAITING_EMPLOYEE'),
+('book0011-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000002', 'adrs0001-0000-0000-0000-000000000002', 'HKS000011', '2024-09-28 13:00:00+07', 'Dọn dẹp và sắp xếp tủ quần áo', 350000, 'AWAITING_EMPLOYEE'),
+('book0012-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000004', 'HKS000012', '2024-09-29 11:00:00+07', 'Vệ sinh máy lạnh và quạt trần', 550000, 'AWAITING_EMPLOYEE'),
+('book0013-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000003', 'adrs0001-0000-0000-0000-000000000006', 'HKS000013', '2024-09-29 17:00:00+07', 'Dọn dẹp sau khi sửa chữa nhà', 700000, 'PENDING');
+
+-- Insert booking details for the new bookings (assuming service_id 1, 2, 3 exist)
+INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
+-- Booking HKS000004 - General Cleaning
+('bd000004-0000-0000-0000-000000000001', 'book0004-0000-0000-0000-000000000001', 1, 1, 450000, 450000),
+
+-- Booking HKS000005 - Room Cleaning
+('bd000005-0000-0000-0000-000000000001', 'book0005-0000-0000-0000-000000000001', 1, 1, 350000, 350000),
+
+-- Booking HKS000006 - Deep Cleaning with Laundry
+('bd000006-0000-0000-0000-000000000001', 'book0006-0000-0000-0000-000000000001', 2, 1, 400000, 400000),
+('bd000006-0000-0000-0000-000000000002', 'book0006-0000-0000-0000-000000000001', 3, 1, 200000, 200000),
+
+-- Booking HKS000007 - Post-party Cleaning
+('bd000007-0000-0000-0000-000000000001', 'book0007-0000-0000-0000-000000000001', 2, 1, 500000, 500000),
+
+-- Booking HKS000008 - Weekly Cleaning
+('bd000008-0000-0000-0000-000000000001', 'book0008-0000-0000-0000-000000000001', 1, 1, 400000, 400000),
+
+-- Booking HKS000009 - Quick Cleaning
+('bd000009-0000-0000-0000-000000000001', 'book0009-0000-0000-0000-000000000001', 1, 1, 300000, 300000),
+
+-- Booking HKS000010 - Window Cleaning
+('bd000010-0000-0000-0000-000000000001', 'book0010-0000-0000-0000-000000000001', 1, 1, 250000, 250000),
+
+-- Booking HKS000011 - Organizing Service
+('bd000011-0000-0000-0000-000000000001', 'book0011-0000-0000-0000-000000000001', 1, 1, 350000, 350000),
+
+-- Booking HKS000012 - Appliance Cleaning
+('bd000012-0000-0000-0000-000000000001', 'book0012-0000-0000-0000-000000000001', 2, 1, 550000, 550000),
+
+-- Booking HKS000013 - Post-renovation Cleaning
+('bd000013-0000-0000-0000-000000000001', 'book0013-0000-0000-0000-000000000001', 2, 2, 350000, 700000);
+
+-- Insert assignments for some bookings (only for CONFIRMED and IN_PROGRESS bookings)
+INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status, check_in_time) VALUES
+('assgn004-0000-0000-0000-000000000001', 'bd000007-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED', NULL);
+
+-- Insert payments for some bookings
+INSERT INTO payments (payment_id, booking_id, amount, payment_status, transaction_code, paid_at) VALUES
+('pay00004-0000-0000-0000-000000000001', 'book0007-0000-0000-0000-000000000001', 500000, 'PAID', 'TXN20240926001', '2024-09-26 15:30:00+07'),
+('pay00005-0000-0000-0000-000000000001', 'book0013-0000-0000-0000-000000000001', 700000, 'PENDING', NULL, NULL);
+
+-- Insert employee unavailability (some employees might be on leave)
+INSERT INTO employee_unavailability (unavailability_id, employee_id, start_time, end_time, reason, is_approved) VALUES
+('unavl001-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000002', '2024-09-25 00:00:00+07', '2024-09-25 23:59:59+07', 'Nghỉ phép cá nhân', true),
+('unavl002-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000001', '2024-09-30 14:00:00+07', '2024-09-30 18:00:00+07', 'Khám bệnh định kỳ', true);

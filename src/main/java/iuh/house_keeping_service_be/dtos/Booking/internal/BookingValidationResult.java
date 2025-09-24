@@ -1,5 +1,7 @@
 package iuh.house_keeping_service_be.dtos.Booking.internal;
 
+import iuh.house_keeping_service_be.models.Address;
+import iuh.house_keeping_service_be.models.Customer;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,14 +20,24 @@ public class BookingValidationResult {
     private List<ConflictInfo> conflicts;
     private BigDecimal calculatedTotalAmount;
     private List<ServiceValidationInfo> serviceValidations;
+    private Customer customer;
+    private Address address;
+    private boolean usingNewAddress;
     
-    public static BookingValidationResult success(BigDecimal totalAmount, List<ServiceValidationInfo> validations) {
+    public static BookingValidationResult success(BigDecimal totalAmount,
+                                                  List<ServiceValidationInfo> validations,
+                                                  Customer customer,
+                                                  Address address,
+                                                  boolean usingNewAddress) {
         return BookingValidationResult.builder()
             .valid(true)
             .errors(List.of())
             .conflicts(List.of())
             .calculatedTotalAmount(totalAmount)
             .serviceValidations(validations)
+            .customer(customer)
+            .address(address)
+            .usingNewAddress(usingNewAddress)
             .build();
     }
     
@@ -36,6 +48,9 @@ public class BookingValidationResult {
             .conflicts(List.of())
             .calculatedTotalAmount(BigDecimal.ZERO)
             .serviceValidations(List.of())
+            .customer(null)
+            .address(null)
+            .usingNewAddress(false)
             .build();
     }
     
@@ -46,6 +61,9 @@ public class BookingValidationResult {
             .conflicts(conflicts)
             .calculatedTotalAmount(BigDecimal.ZERO)
             .serviceValidations(List.of())
+            .customer(null)
+            .address(null)
+            .usingNewAddress(false)
             .build();
     }
 }

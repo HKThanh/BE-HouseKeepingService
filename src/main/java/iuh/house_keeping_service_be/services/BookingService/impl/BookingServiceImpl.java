@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.rmi.NotBoundException;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -37,6 +38,7 @@ public class BookingServiceImpl implements BookingService {
     private final AssignmentRepository assignmentRepository;
     private final AddressRepository addressRepository;
     private final EmployeeRepository employeeRepository;
+    private final CustomerRepository customerRepository;
     private final ServiceRepository serviceRepository;
     private final PromotionRepository promotionRepository;
     private final ServiceOptionChoiceRepository serviceOptionChoiceRepository;
@@ -51,10 +53,19 @@ public class BookingServiceImpl implements BookingService {
         log.info("Creating booking for customer with {} services", request.bookingDetails().size());
         
         try {
-            // Step 1: Validate booking request
-            BookingValidationResult validation = validateBooking(request);
+            // Step 1: Validate booking request (no need for clients to call validate endpoint first)
+            ValidationOutcome validationOutcome = performValidation(request);
+            BookingValidationResult validation = validationOutcome.result();
             if (!validation.isValid()) {
-                throw BookingValidationException.withErrors(validation.getErrors());
+                if (validation.getErrors() != null && !validation.getErrors().isEmpty()) {
+                    throw BookingValidationException.withErrors(validation.getErrors());
+                }
+
+                if (validation.getConflicts() != null && !validation.getConflicts().isEmpty()) {
+                    throw EmployeeConflictException.withConflicts(validation.getConflicts());
+                }
+
+                throw BookingValidationException.withErrors(List.of("Booking validation failed"));
             }
 
             boolean hasAssignments = request.assignments() != null && !request.assignments().isEmpty();
@@ -117,49 +128,51 @@ public class BookingServiceImpl implements BookingService {
     @Override
     public BookingValidationResult validateBooking(BookingCreateRequest request) {
         log.info("Validating booking request");
-        
+
+        return performValidation(request).result();
+    }
+
+    private ValidationOutcome performValidation(BookingCreateRequest request) {
+        log.info("Performing booking validation");
+
         List<String> errors = new ArrayList<>();
         List<ConflictInfo> conflicts = new ArrayList<>();
-        BigDecimal calculatedTotalAmount = BigDecimal.ZERO;
+
+        CustomerAddressContext addressContext;
         
         try {
-            // Validate customer and address
-            Customer customer = validateCustomerAndAddress(request.addressId(), errors);
-            
+            addressContext = validateCustomerAndAddress(request);
+        } catch (AddressNotFoundException | CustomerNotFoundException | IllegalArgumentException e) {
+            log.error("Error validating booking address: {}", e.getMessage());
+            errors.add(e.getMessage());
+            return new ValidationOutcome(BookingValidationResult.error(errors), null);
+        } catch (Exception e) {
+            log.error("Unexpected error validating booking address: {}", e.getMessage(), e);
+            errors.add("Validation error: " + e.getMessage());
+            return new ValidationOutcome(BookingValidationResult.error(errors), null);
+        }
+
+        try {
+            Customer customer = addressContext.customer();
+
             // Validate booking time
             validateBookingTime(request.bookingTime(), errors);
             
             // Validate services and calculate prices
             List<ServiceValidationInfo> serviceValidations = validateServices(request.bookingDetails(), errors);
-            calculatedTotalAmount = serviceValidations.stream()
+            BigDecimal calculatedTotalAmount = serviceValidations.stream()
                 .map(ServiceValidationInfo::getCalculatedPrice)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
             
             // Apply promotion if provided
             BigDecimal finalAmount = applyPromotion(request.promoCode(), calculatedTotalAmount, customer, errors);
-
-//            int requiredEmployees = calculateRequiredEmployees(request.bookingDetails());
-//            long assignedEmployees = request.assignments().stream()
-//                    .map(AssignmentRequest::employeeId)
-//                    .distinct()
-//                    .count();
-//            if (requiredEmployees != assignedEmployees) {
-//                errors.add("Total employees assigned (" + assignedEmployees + ") does not match required employees (" + requiredEmployees + ")");
-//            }
             
             if (!errors.isEmpty()) {
-                return BookingValidationResult.error(errors);
+                return new ValidationOutcome(BookingValidationResult.error(errors), addressContext);
             }
 
-            // Validate employee assignments
-//            validateEmployeeAssignments(request.assignments(), request.bookingTime(), conflicts);
-//
-//            if (!conflicts.isEmpty()) {
-//                return BookingValidationResult.conflict(conflicts);
-//            }
-
             if (request.assignments() != null && !request.assignments().isEmpty()) {
-                int requiredEmployees = calculateRequiredEmployees(request.bookingDetails());
+                int requiredEmployees = calculateRequiredEmployees(request.bookingDetails(), serviceValidations);
                 long assignedEmployees = request.assignments().stream()
                         .map(AssignmentRequest::employeeId)
                         .distinct()
@@ -169,45 +182,65 @@ public class BookingServiceImpl implements BookingService {
                 }
 
                 if (!errors.isEmpty()) {
-                    return BookingValidationResult.error(errors);
+                    return new ValidationOutcome(BookingValidationResult.error(errors), addressContext);
                 }
 
                 // Validate employee assignments
                 validateEmployeeAssignments(request.assignments(), request.bookingTime(), conflicts);
 
                 if (!conflicts.isEmpty()) {
-                    return BookingValidationResult.conflict(conflicts);
+                    return new ValidationOutcome(BookingValidationResult.conflict(conflicts), addressContext);
                 }
             }
-            
-            return BookingValidationResult.success(finalAmount, serviceValidations);
+
+            BookingValidationResult successResult = BookingValidationResult.success(finalAmount, serviceValidations, customer, addressContext.address(), addressContext.isNewAddress());
+            return new ValidationOutcome(successResult, addressContext);
             
         } catch (Exception e) {
             log.error("Error during booking validation: {}", e.getMessage(), e);
             errors.add("Validation error: " + e.getMessage());
-            return BookingValidationResult.error(errors);
+            return new ValidationOutcome(BookingValidationResult.error(errors), addressContext);
         }
     }
 
     // Private helper methods
 
-    private Customer validateCustomerAndAddress(String addressId, List<String> errors) {
-        try {
-            // Get address with customer info
-            Address address = addressRepository.findAddressWithCustomer(addressId)
-                .orElseThrow(() -> AddressNotFoundException.withId(addressId));
-            
+    private CustomerAddressContext validateCustomerAndAddress(BookingCreateRequest request) {
+        boolean hasAddressId = request.addressId() != null && !request.addressId().isBlank();
+        boolean hasNewAddress = request.newAddress() != null;
+
+        if ((hasAddressId && hasNewAddress) || (!hasAddressId && !hasNewAddress)) {
+            throw new IllegalArgumentException("Either addressId or newAddress must be provided");
+        }
+
+        if (hasAddressId) {
+            Address address = addressRepository.findAddressWithCustomer(request.addressId())
+                    .orElseThrow(() -> AddressNotFoundException.withId(request.addressId()));
+
+
             Customer customer = address.getCustomer();
             if (customer == null) {
-                errors.add("Customer not found for address");
-                throw CustomerNotFoundException.forAddress(addressId);
+                throw CustomerNotFoundException.forAddress(request.addressId());
             }
-            
-            return customer;
-        } catch (AddressNotFoundException | CustomerNotFoundException e) {
-            errors.add(e.getMessage());
-            throw e;
+
+            return new CustomerAddressContext(customer, address, false);
         }
+
+        NewAddressRequest newAddress = request.newAddress();
+        Customer customer = customerRepository.findById(newAddress.customerId())
+                .orElseThrow(() -> CustomerNotFoundException.withId(newAddress.customerId()));
+
+        Address address = new Address();
+        address.setCustomer(customer);
+        address.setFullAddress(newAddress.fullAddress());
+        address.setWard(newAddress.ward());
+        address.setDistrict(newAddress.district());
+        address.setCity(newAddress.city());
+        address.setLatitude(newAddress.latitude() != null ? BigDecimal.valueOf(newAddress.latitude()) : null);
+        address.setLongitude(newAddress.longitude() != null ? BigDecimal.valueOf(newAddress.longitude()) : null);
+        address.setIsDefault(Boolean.FALSE);
+
+        return new CustomerAddressContext(customer, address, true);
     }
 
     private void validateBookingTime(LocalDateTime bookingTime, List<String> errors) {
@@ -291,6 +324,7 @@ public class BookingServiceImpl implements BookingService {
             .calculatedPrice(calculatedPrice)
             .expectedPrice(detail.expectedPrice())
             .priceMatches(priceMatches)
+            .recommendedStaff(service.getRecommendedStaff() != null ? service.getRecommendedStaff() : 1)
             .build();
     }
 
@@ -320,8 +354,22 @@ public class BookingServiceImpl implements BookingService {
         }
     }
 
-    private int calculateRequiredEmployees(List<BookingDetailRequest> details) {
-        return details.stream().mapToInt(BookingDetailRequest::quantity).sum();
+    private int calculateRequiredEmployees(List<BookingDetailRequest> details,
+                                           List<ServiceValidationInfo> serviceValidations) {
+        Map<Integer, Integer> requiredStaffByService = serviceValidations.stream()
+                .filter(ServiceValidationInfo::isValid)
+                .collect(Collectors.toMap(
+                        ServiceValidationInfo::getServiceId,
+                        info -> info.getRecommendedStaff() != null ? info.getRecommendedStaff() : 1,
+                        (existing, replacement) -> existing
+                ));
+
+        int totalRequiredEmployees = 0;
+        for (BookingDetailRequest detail : details) {
+            int recommendedStaff = requiredStaffByService.getOrDefault(detail.serviceId(), 1);
+            totalRequiredEmployees += recommendedStaff * detail.quantity();
+        }
+        return totalRequiredEmployees;
     }
 
     private BigDecimal applyPromotion(String promoCode, BigDecimal amount, Customer customer, List<String> errors) {
@@ -445,11 +493,26 @@ public class BookingServiceImpl implements BookingService {
         booking.setStatus(BookingStatus.PENDING);
         
         // Set customer and address
-        Address address = addressRepository.findById(request.addressId())
-            .orElseThrow(() -> AddressNotFoundException.withId(request.addressId()));
-        booking.setCustomer(address.getCustomer());
-        booking.setAddress(address);
-        
+        Address bookingAddress = validation.getAddress();
+        if (validation.isUsingNewAddress()) {
+            Address newAddress = bookingAddress;
+            if (newAddress.getCustomer() == null && validation.getCustomer() != null) {
+                newAddress.setCustomer(validation.getCustomer());
+            }
+            bookingAddress = addressRepository.save(newAddress);
+        } else if (bookingAddress == null || bookingAddress.getAddressId() == null) {
+            bookingAddress = addressRepository.findById(request.addressId())
+                    .orElseThrow(() -> AddressNotFoundException.withId(request.addressId()));
+        }
+
+        booking.setAddress(bookingAddress);
+        if (validation.getCustomer() != null) {
+            booking.setCustomer(validation.getCustomer());
+        } else if (bookingAddress.getCustomer() != null) {
+            booking.setCustomer(bookingAddress.getCustomer());
+        }
+
+
         // Set promotion if applicable
         if (request.promoCode() != null && !request.promoCode().trim().isEmpty()) {
             promotionRepository.findByPromoCode(request.promoCode())
@@ -570,8 +633,7 @@ public class BookingServiceImpl implements BookingService {
                 .toList())
             .createdAt(booking.getCreatedAt())
             .build();
-        
-        // Calculate summary fields if method exists
+
         try {
             summary.calculateSummaryFields();
         } catch (Exception e) {
@@ -579,5 +641,11 @@ public class BookingServiceImpl implements BookingService {
         }
         
         return summary;
+    }
+
+    private record CustomerAddressContext(Customer customer, Address address, boolean isNewAddress) {
+    }
+
+    private record ValidationOutcome(BookingValidationResult result, CustomerAddressContext addressContext) {
     }
 }
