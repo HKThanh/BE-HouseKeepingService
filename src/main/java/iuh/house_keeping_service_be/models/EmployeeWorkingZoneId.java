@@ -17,8 +17,8 @@ public class EmployeeWorkingZoneId implements Serializable {
     @Column(name = "employee_id")
     private String employeeId;
 
-    @Column(name = "district")
-    private String district;
+    @Column(name = "ward")
+    private String ward;
 
     @Column(name = "city")
     private String city;

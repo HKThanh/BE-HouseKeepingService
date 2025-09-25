@@ -7,7 +7,7 @@ public record EmployeeScheduleRequest(
     String employeeId,
     LocalDateTime startDate,
     LocalDateTime endDate,
-    String district,
+    String ward,
     String city
 ) {}
 

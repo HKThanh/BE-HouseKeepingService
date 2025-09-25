@@ -9,7 +9,7 @@ public record SuitableEmployeeResponse(
         List<String> skills,
         String rating,
         String status,
-        String[] workingDistricts,
+        String[] workingWards,
         String workingCity,
         Integer completedJobs
 ) {

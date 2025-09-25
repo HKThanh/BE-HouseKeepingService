@@ -73,7 +73,6 @@ public class BookingMapper {
             address.getAddressId(),
             address.getFullAddress(),
             address.getWard(),
-            address.getDistrict(),
             address.getCity(),
             address.getLatitude() != null ? address.getLatitude().doubleValue() : null,
             address.getLongitude() != null ? address.getLongitude().doubleValue() : null,

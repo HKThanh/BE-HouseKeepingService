@@ -107,26 +107,6 @@ public interface EmployeeRepository extends JpaRepository<Employee, String> {
                                           @Param("startTime") LocalDateTime startTime,
                                           @Param("endTime") LocalDateTime endTime);
     
-    // Find employees by working zone
-    @Query("SELECT e FROM Employee e " +
-           "JOIN e.workingZones wz " +
-           "WHERE wz.district = :district AND wz.city = :city " +
-           "AND e.employeeStatus = 'AVAILABLE'")
-    List<Employee> findByWorkingZone(@Param("district") String district,
-                                    @Param("city") String city);
-    
-    // Find by status with created_at ordering
-    @Query("SELECT e FROM Employee e WHERE e.employeeStatus = :status ORDER BY e.createdAt DESC")
-    List<Employee> findByStatusOrderByCreatedAtDesc(@Param("status") EmployeeStatus status);
-    
-    // Get employee workload (PostgreSQL DATE function)
-    @Query("SELECT COUNT(a) FROM Assignment a " +
-           "WHERE a.employee.employeeId = :employeeId " +
-           "AND DATE(a.bookingDetail.booking.bookingTime) = DATE(:date) " +
-           "AND a.status IN (iuh.house_keeping_service_be.enums.AssignmentStatus.ASSIGNED, iuh.house_keeping_service_be.enums.AssignmentStatus.IN_PROGRESS)")
-    long getEmployeeWorkloadForDate(@Param("employeeId") String employeeId,
-                                   @Param("date") LocalDateTime date);
-    
     // Find employee with account and working zones
     @Query("SELECT e FROM Employee e " +
            "LEFT JOIN FETCH e.account " +

@@ -5,6 +5,6 @@ import java.time.LocalDateTime;
 public record SuitableEmployeeRequest(
     Integer serviceId,
     LocalDateTime bookingTime,
-    String district,
+    String ward,
     String city
 ) {}

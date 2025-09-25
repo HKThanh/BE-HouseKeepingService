@@ -4,7 +4,6 @@ public record CustomerAddressInfo(
         String addressId,
         String fullAddress,
         String ward,
-        String district,
         String city,
         Double latitude,
         Double longitude,

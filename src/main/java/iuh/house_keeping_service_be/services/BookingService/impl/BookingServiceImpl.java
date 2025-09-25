@@ -237,7 +237,6 @@ public class BookingServiceImpl implements BookingService {
         address.setCustomer(customer);
         address.setFullAddress(newAddress.fullAddress());
         address.setWard(newAddress.ward());
-        address.setDistrict(newAddress.district());
         address.setCity(newAddress.city());
         address.setLatitude(newAddress.latitude() != null ? BigDecimal.valueOf(newAddress.latitude()) : null);
         address.setLongitude(newAddress.longitude() != null ? BigDecimal.valueOf(newAddress.longitude()) : null);

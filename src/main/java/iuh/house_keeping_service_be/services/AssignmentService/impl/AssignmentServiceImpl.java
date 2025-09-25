@@ -390,12 +390,12 @@ public class AssignmentServiceImpl implements AssignmentService {
     }
 
     private Optional<GeoCoordinate> getZoneRepresentativeCoordinate(EmployeeWorkingZone zone) {
-        if (zone == null || zone.getDistrict() == null || zone.getCity() == null) {
+        if (zone == null || zone.getWard() == null || zone.getCity() == null) {
             return Optional.empty();
         }
 
         Optional<ZoneCoordinate> coordinate = addressRepository
-                .findAverageCoordinateByDistrictAndCity(zone.getDistrict(), zone.getCity());
+                .findAverageCoordinateByWardAndCity(zone.getWard(), zone.getCity());
 
         if (coordinate.isEmpty()) {
             return Optional.empty();
@@ -413,11 +413,11 @@ public class AssignmentServiceImpl implements AssignmentService {
     }
 
     private String buildZoneKey(EmployeeWorkingZone zone) {
-        if (zone == null || zone.getDistrict() == null || zone.getCity() == null) {
+        if (zone == null || zone.getWard() == null || zone.getCity() == null) {
             return null;
         }
 
-        return (zone.getDistrict().trim().toLowerCase() + "|" + zone.getCity().trim().toLowerCase());
+        return (zone.getWard().trim().toLowerCase() + "|" + zone.getCity().trim().toLowerCase());
     }
 
     private double calculateMinDistance(Address address, Map<String, GeoCoordinate> zoneCoordinates) {
