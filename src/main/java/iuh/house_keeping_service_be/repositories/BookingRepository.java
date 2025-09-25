@@ -138,4 +138,12 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
             "AND a IS NULL " +
             "AND (:zoneKeys IS NULL OR LOWER(CONCAT(b.address.district, '|', b.address.city)) NOT IN :zoneKeys)")
     List<Booking> findAwaitingEmployeeBookingsOutsideZones(@Param("zoneKeys") List<String> zoneKeys);
+
+    @Query("SELECT b FROM Booking b " +
+           "LEFT JOIN FETCH b.customer c " +
+           "LEFT JOIN FETCH b.address a " +
+           "LEFT JOIN FETCH b.promotion p " +
+           "WHERE b.customer.customerId = :customerId " +
+           "ORDER BY b.createdAt DESC")
+    Page<Booking> findByCustomerIdWithPagination(@Param("customerId") String customerId, Pageable pageable);
 }

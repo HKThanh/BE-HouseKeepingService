@@ -16,6 +16,8 @@ import iuh.house_keeping_service_be.utils.BookingDTOFormatter;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -748,5 +750,52 @@ public class BookingServiceImpl implements BookingService {
     }
 
     private record ServicePricingResult(BigDecimal totalPrice, BigDecimal unitPrice, int suggestedStaff) {
+    }
+
+    @Override
+    public Page<BookingHistoryResponse> getBookingsByCustomerId(String customerId, Pageable pageable) {
+        log.info("Fetching bookings for customer {} with pagination", customerId);
+
+        // First verify customer exists
+        if (!customerRepository.existsById(customerId)) {
+            log.warn("Customer {} not found", customerId);
+            return Page.empty(pageable);
+        }
+
+        // Fetch paginated bookings for the customer
+        Page<Booking> bookingPage = bookingRepository.findByCustomerIdWithPagination(customerId, pageable);
+
+        if (bookingPage.isEmpty()) {
+            log.info("No bookings found for customer {}", customerId);
+            return Page.empty(pageable);
+        }
+
+        Page<BookingHistoryResponse> bookingHistoryResponsePage = bookingPage.map(booking -> {
+            CustomerAddressInfo addressInfo = bookingMapper.toCustomerAddressInfo(booking.getAddress());
+            PaymentInfo paymentInfo = booking.getPayments().isEmpty() ? null : bookingMapper.toPaymentInfo(booking.getPayments().get(0));
+            PromotionInfo promotionInfo = booking.getPromotion() != null ? bookingMapper.toPromotionInfo(booking.getPromotion()) : null;
+
+            return new BookingHistoryResponse(
+                booking.getBookingId(),
+                booking.getBookingCode(),
+                booking.getCustomer().getCustomerId(),
+                booking.getCustomer().getFullName(),
+                addressInfo,
+                booking.getBookingTime().toString(),
+                booking.getNote(),
+                BookingDTOFormatter.formatPrice(booking.getTotalAmount()),
+                booking.getStatus().toString(),
+                promotionInfo,
+                paymentInfo
+            );
+        });
+
+        log.info("Found {} bookings for customer {} (page {} of {})",
+            bookingPage.getNumberOfElements(),
+            customerId,
+            bookingPage.getNumber() + 1,
+            bookingPage.getTotalPages());
+
+        return bookingHistoryResponsePage;
     }
 }
