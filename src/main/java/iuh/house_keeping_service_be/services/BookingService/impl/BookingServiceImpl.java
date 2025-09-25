@@ -16,16 +16,15 @@ import iuh.house_keeping_service_be.utils.BookingDTOFormatter;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.rmi.NotBoundException;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
-@Service
+@org.springframework.stereotype.Service
 @RequiredArgsConstructor
 @Slf4j
 public class BookingServiceImpl implements BookingService {
@@ -42,6 +41,8 @@ public class BookingServiceImpl implements BookingService {
     private final ServiceRepository serviceRepository;
     private final PromotionRepository promotionRepository;
     private final ServiceOptionChoiceRepository serviceOptionChoiceRepository;
+    private final PricingRuleRepository pricingRuleRepository;
+    private final RuleConditionRepository ruleConditionRepository;
     
     // Other Services
     private final ServiceService serviceService;
@@ -266,12 +267,11 @@ public class BookingServiceImpl implements BookingService {
     private List<ServiceValidationInfo> validateServices(List<BookingDetailRequest> detailRequests, List<String> errors) {
         return detailRequests.stream()
             .map(detail -> validateSingleService(detail, errors))
-            .toList();
+            .collect(Collectors.toList());
     }
 
     private ServiceValidationInfo validateSingleService(BookingDetailRequest detail, List<String> errors) {
-        // Find service - sử dụng Optional properly
-        Optional<iuh.house_keeping_service_be.models.Service> serviceOpt = 
+        Optional<Service> serviceOpt =
             serviceRepository.findBookableService(detail.serviceId());
         
         if (serviceOpt.isEmpty()) {
@@ -300,7 +300,8 @@ public class BookingServiceImpl implements BookingService {
         }
         
         // Calculate actual price using ServiceService
-        BigDecimal calculatedPrice = calculateServicePrice(detail);
+        ServicePricingResult pricingResult = calculateServicePricing(detail, service, validChoiceIds);
+        BigDecimal calculatedPrice = pricingResult.totalPrice();
         
         // Compare with expected price (tolerance of 1000 VND)
         BigDecimal priceDifference = calculatedPrice.subtract(detail.expectedPrice()).abs();
@@ -328,30 +329,127 @@ public class BookingServiceImpl implements BookingService {
             .build();
     }
 
-    // Fixed calculateServicePrice method to use existing ServiceService
-    private BigDecimal calculateServicePrice(BookingDetailRequest detail) {
+    private ServicePricingResult calculateServicePricing(BookingDetailRequest detail,
+                                                         Service service,
+                                                         List<Integer> validChoiceIds) {
+        BigDecimal basePrice = service.getBasePrice() != null ? service.getBasePrice() : BigDecimal.ZERO;
+        BigDecimal quantityMultiplier = BigDecimal.valueOf(detail.quantity() != null ? detail.quantity() : 1);
+        BigDecimal fallbackTotal = detail.expectedPrice() != null
+                ? detail.expectedPrice()
+                : basePrice.multiply(quantityMultiplier);
+        int fallbackStaff = service.getRecommendedStaff() != null ? service.getRecommendedStaff() : 1;
+        BigDecimal fallbackUnitPrice = calculateUnitPrice(fallbackTotal, detail.quantity());
+
         try {
             // Create CalculatePriceRequest using existing ServiceService method
+            List<Integer> selectionForPricing = (validChoiceIds != null && !validChoiceIds.isEmpty())
+                    ? validChoiceIds
+                    : (detail.selectedChoiceIds() != null ? detail.selectedChoiceIds() : List.of());
+
             CalculatePriceRequest priceRequest = new CalculatePriceRequest(
                 detail.serviceId(),
-                detail.selectedChoiceIds() != null ? detail.selectedChoiceIds() : List.of(),
+                selectionForPricing,
                 detail.quantity()
             );
             
             // Call existing calculatePrice method
             CalculatePriceResponse priceResponse = serviceService.calculatePrice(priceRequest);
-            
-            if (priceResponse.success() && priceResponse.data() != null) {
-                return priceResponse.data().finalPrice();
-            } else {
-                log.warn("Price calculation failed for service {}: {}", detail.serviceId(), priceResponse.message());
-                return detail.expectedPrice(); // Fallback to expected price
+
+            if (Boolean.TRUE.equals(priceResponse.success()) && priceResponse.data() != null) {
+                BigDecimal totalPrice = priceResponse.data().finalPrice();
+                int suggestedStaff = priceResponse.data().suggestedStaff() != null
+                        ? priceResponse.data().suggestedStaff()
+                        : fallbackStaff;
+                suggestedStaff = Math.max(1, suggestedStaff);
+                BigDecimal calculatedUnitPrice = calculateUnitPrice(totalPrice, detail.quantity());
+                return new ServicePricingResult(totalPrice, calculatedUnitPrice, suggestedStaff);
             }
-            
+
+            log.warn("Price calculation failed for service {}: {}", detail.serviceId(), priceResponse.message());
+            return calculatePricingUsingRules(service, selectionForPricing, detail.quantity())
+                    .orElseGet(() -> new ServicePricingResult(fallbackTotal, fallbackUnitPrice, Math.max(1, fallbackStaff)));
+
         } catch (Exception e) {
             log.error("Error calculating price for service {}: {}", detail.serviceId(), e.getMessage());
-            return detail.expectedPrice(); // Fallback to expected price
+            return calculatePricingUsingRules(service,
+                    validChoiceIds != null ? validChoiceIds : (detail.selectedChoiceIds() != null ? detail.selectedChoiceIds() : List.of()),
+                    detail.quantity())
+                    .orElseGet(() -> new ServicePricingResult(fallbackTotal, fallbackUnitPrice, Math.max(1, fallbackStaff)));
         }
+    }
+
+    private Optional<ServicePricingResult> calculatePricingUsingRules(Service service,
+                                                                      List<Integer> selectedChoiceIds,
+                                                                      Integer quantity) {
+        try {
+            List<Integer> safeChoiceIds = selectedChoiceIds != null ? selectedChoiceIds : List.of();
+            List<PricingRule> applicableRules = findApplicablePricingRules(service.getServiceId(), safeChoiceIds);
+
+            BigDecimal basePrice = service.getBasePrice() != null ? service.getBasePrice() : BigDecimal.ZERO;
+            BigDecimal totalPriceAdjustment = applicableRules.stream()
+                    .map(PricingRule::getPriceAdjustment)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            BigDecimal finalPrice = basePrice.add(totalPriceAdjustment);
+            if (quantity != null && quantity > 1) {
+                finalPrice = finalPrice.multiply(BigDecimal.valueOf(quantity));
+            }
+
+            int baseRecommendedStaff = service.getRecommendedStaff() != null ? service.getRecommendedStaff() : 1;
+            int staffAdjustment = applicableRules.stream()
+                    .map(PricingRule::getStaffAdjustment)
+                    .filter(Objects::nonNull)
+                    .reduce(0, Integer::sum);
+            int suggestedStaff = Math.max(1, baseRecommendedStaff + staffAdjustment);
+
+            BigDecimal unitPrice = calculateUnitPrice(finalPrice, quantity);
+
+            return Optional.of(new ServicePricingResult(finalPrice, unitPrice, suggestedStaff));
+        } catch (Exception ex) {
+            log.error("Failed to calculate pricing using rules for service {}: {}", service.getServiceId(), ex.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private List<PricingRule> findApplicablePricingRules(Integer serviceId, List<Integer> selectedChoiceIds) {
+        List<PricingRule> allRules = pricingRuleRepository.findByServiceIdOrderByPriorityDesc(serviceId);
+        List<PricingRule> applicableRules = new ArrayList<>();
+
+        for (PricingRule rule : allRules) {
+            if (isRuleApplicable(rule, selectedChoiceIds)) {
+                applicableRules.add(rule);
+            }
+        }
+
+        return applicableRules;
+    }
+
+    private boolean isRuleApplicable(PricingRule rule, List<Integer> selectedChoiceIds) {
+        List<Integer> requiredChoiceIds = ruleConditionRepository.findChoiceIdsByRuleId(rule.getId());
+
+        if (requiredChoiceIds.isEmpty()) {
+            return true; // Rule applies if no specific conditions
+        }
+
+        // Check if the rule applies based on condition logic
+        if (rule.getConditionLogic() == ConditionLogic.ALL) {
+            // ALL: All required choices must be selected
+            return new HashSet<>(selectedChoiceIds).containsAll(requiredChoiceIds);
+        } else if (rule.getConditionLogic() == ConditionLogic.ANY) {
+            // ANY: At least one required choice must be selected
+            return requiredChoiceIds.stream().anyMatch(selectedChoiceIds::contains);
+        }
+
+        return false;
+    }
+
+    private BigDecimal calculateUnitPrice(BigDecimal totalPrice, Integer quantity) {
+        if (quantity == null || quantity <= 0) {
+            return totalPrice;
+        }
+
+        return totalPrice.divide(BigDecimal.valueOf(quantity), 2, RoundingMode.HALF_UP);
     }
 
     private int calculateRequiredEmployees(List<BookingDetailRequest> details,
@@ -410,8 +508,7 @@ public class BookingServiceImpl implements BookingService {
         return finalAmount.max(BigDecimal.ZERO); // Ensure amount is not negative
     }
 
-    // Fixed validateEmployeeAssignments - sử dụng đúng constructor ConflictInfo
-    private void validateEmployeeAssignments(List<AssignmentRequest> assignments, 
+    private void validateEmployeeAssignments(List<AssignmentRequest> assignments,
                                            LocalDateTime bookingTime, 
                                            List<ConflictInfo> conflicts) {
         for (AssignmentRequest assignment : assignments) {
@@ -432,12 +529,11 @@ public class BookingServiceImpl implements BookingService {
         }
     }
 
-    // Fixed checkEmployeeAvailability - sử dụng đúng constructor ConflictInfo
-    private void checkEmployeeAvailability(Employee employee, Integer serviceId, 
+    private void checkEmployeeAvailability(Employee employee, Integer serviceId,
                                          LocalDateTime bookingTime, 
                                          List<ConflictInfo> conflicts) {
         // Get service duration for time range calculation
-        Optional<iuh.house_keeping_service_be.models.Service> serviceOpt = serviceRepository.findById(serviceId);
+        Optional<Service> serviceOpt = serviceRepository.findById(serviceId);
         if (serviceOpt.isEmpty()) return;
         
         var service = serviceOpt.get();
@@ -535,13 +631,15 @@ public class BookingServiceImpl implements BookingService {
             detail.setBooking(booking);
             
             // Set service
-            iuh.house_keeping_service_be.models.Service service = serviceRepository.findById(detailRequest.serviceId())
+            Service service = serviceRepository.findById(detailRequest.serviceId())
                 .orElseThrow(() -> ServiceNotFoundException.withId(detailRequest.serviceId()));
             detail.setService(service);
             
             detail.setQuantity(detailRequest.quantity());
-            detail.setPricePerUnit(detailRequest.expectedPricePerUnit());
-            detail.setSubTotal(serviceValidation.getCalculatedPrice());
+            BigDecimal calculatedPrice = serviceValidation.getCalculatedPrice();
+            BigDecimal pricePerUnit = calculateUnitPrice(calculatedPrice, detailRequest.quantity());
+            detail.setPricePerUnit(pricePerUnit);
+            detail.setSubTotal(calculatedPrice);
             
             // Set selected choice IDs as comma-separated string
             if (detailRequest.selectedChoiceIds() != null && !detailRequest.selectedChoiceIds().isEmpty()) {
@@ -647,5 +745,8 @@ public class BookingServiceImpl implements BookingService {
     }
 
     private record ValidationOutcome(BookingValidationResult result, CustomerAddressContext addressContext) {
+    }
+
+    private record ServicePricingResult(BigDecimal totalPrice, BigDecimal unitPrice, int suggestedStaff) {
     }
 }
