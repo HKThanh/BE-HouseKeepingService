@@ -3,6 +3,7 @@ package iuh.house_keeping_service_be.controllers;
 import iuh.house_keeping_service_be.config.JwtUtil;
 import iuh.house_keeping_service_be.dtos.Booking.internal.BookingValidationResult;
 import iuh.house_keeping_service_be.dtos.Booking.request.BookingCreateRequest;
+import iuh.house_keeping_service_be.dtos.Booking.response.BookingHistoryResponse;
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingResponse;
 import iuh.house_keeping_service_be.dtos.Booking.summary.BookingCreationSummary;
 import iuh.house_keeping_service_be.dtos.Service.ServiceDetailResponse;
@@ -13,6 +14,10 @@ import iuh.house_keeping_service_be.services.BookingService.BookingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -108,5 +113,41 @@ public class BookingController {
         BookingValidationResult result = bookingService.validateBooking(request);
 
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/customer/{customerId}")
+    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_ADMIN')")
+    public ResponseEntity<Page<BookingHistoryResponse>> getBookingsByCustomerId(
+            @PathVariable String customerId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "createdAt,desc") String[] sort) {
+
+        log.info("Getting bookings for customer: {} (page: {}, size: {})", customerId, page, size);
+
+        try {
+            // Validate pagination parameters
+            if (page < 0) page = 0;
+            if (size <= 0 || size > 100) size = 10; // Limit max size to prevent performance issues
+
+            // Safe sort parameter parsing
+            String sortProperty = sort.length > 0 ? sort[0] : "createdAt";
+            Sort.Direction direction = Sort.Direction.DESC; // Default to DESC
+
+            if (sort.length > 1) {
+                direction = sort[1].equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+            }
+
+            Pageable pageable = PageRequest.of(page, size, Sort.by(new Sort.Order(direction, sortProperty)));
+
+            Page<BookingHistoryResponse> bookingsPage = bookingService.getBookingsByCustomerId(customerId, pageable);
+
+            log.info("Retrieved {} bookings for customer: {}", bookingsPage.getNumberOfElements(), customerId);
+            return ResponseEntity.ok(bookingsPage);
+
+        } catch (Exception e) {
+            log.error("Error retrieving bookings for customer {}: {}", customerId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Page.empty());
+        }
     }
 }
