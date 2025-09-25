@@ -400,7 +400,7 @@ All endpoints require:
   - **Employees**: Jane Smith (e1000001-0000-0000-0000-000000000001), Bob Wilson (e1000001-0000-0000-0000-000000000002)
   - **Customers**: John Doe, Mary Jones, Jane Smith Customer
   - **Services**: Dọn dẹp theo giờ (50,000 VND), Tổng vệ sinh (100,000 VND), Vệ sinh máy lạnh (150,000 VND)
-  - **Working Zones**: Real Ho Chi Minh City districts (Tân Phú, Tân Bình, Gò Vấp)
+  - **Working Zones**: Real Ho Chi Minh City wards (Tây Thạnh)
   - **Addresses**: Actual street addresses in Ho Chi Minh City
   - **Existing Assignments**: Bob's completed BK000001, Jane's pending BK000002
 - **Validation Points**:
@@ -424,4 +424,4 @@ All endpoints require:
   - Zone-based assignment optimization
   - Multi-staff service coordination
   - Conflict detection and prevention
-- **Geographic Context**: Ho Chi Minh City districts and real addresses for location-based testing
+- **Geographic Context**: Ho Chi Minh City wards and real addresses for location-based testing

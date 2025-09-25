@@ -15,7 +15,7 @@ public interface EmployeeWorkingZoneRepository extends JpaRepository<EmployeeWor
 
     @Query("SELECT ewz FROM EmployeeWorkingZone ewz " +
             "JOIN FETCH ewz.employee " +
-            "WHERE (:district IS NULL OR ewz.ward = :ward) " +
+            "WHERE (:ward IS NULL OR ewz.ward = :ward) " +
             "AND (:city IS NULL OR ewz.city = :city)")
     List<EmployeeWorkingZone> findByLocation(
             @Param("ward") String ward,

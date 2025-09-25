@@ -40,7 +40,7 @@ public interface AddressRepository extends JpaRepository<Address, String> {
             "FROM Address a " +
             "WHERE a.ward = :ward AND a.city = :city " +
             "AND a.latitude IS NOT NULL AND a.longitude IS NOT NULL")
-    Optional<ZoneCoordinate> findAverageCoordinateByWardAndCity(@Param("district") String ward,
+    Optional<ZoneCoordinate> findAverageCoordinateByWardAndCity(@Param("ward") String ward,
                                                                     @Param("city") String city);
 
     @Query("SELECT new iuh.house_keeping_service_be.repositories.projections.ZoneCoordinate(" +

@@ -12,9 +12,6 @@ public record NewAddressRequest(
         @NotBlank(message = "Ward is required")
         String ward,
 
-        @NotBlank(message = "District is required")
-        String district,
-
         @NotBlank(message = "City is required")
         String city,
 

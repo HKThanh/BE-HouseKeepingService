@@ -81,9 +81,9 @@ public interface EmployeeRepository extends JpaRepository<Employee, String> {
 
     @Query(value = "SELECT DISTINCT e.* FROM Employee e " +
             "INNER JOIN employee_working_zones wz ON wz.employee_id = e.employee_id " +
-            "WHERE e.employee_status = :district " +
-            "AND wz.district = :district " +
-            "AND wz.city = :city " +
+            "WHERE e.employee_status = 'AVAILABLE' " +
+            "AND (:ward IS NULL OR wz.ward = :ward) " +
+            "AND (:city IS NULL OR wz.city = :city) " +
             "AND NOT EXISTS (" +
             "   SELECT 1 FROM assignments a " +
             "   INNER JOIN Employee emp ON a.employee_id = emp.employee_id " +
@@ -101,7 +101,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, String> {
             "   WHERE emp.employee_id = e.employee_id " +
             "   AND :bookingTime BETWEEN eu.start_time AND eu.end_time " +
             ")", nativeQuery = true)
-    List<Employee> findAvailableEmployees(@Param("district") String district,
+    List<Employee> findAvailableEmployees(@Param("ward") String ward,
                                           @Param("city") String city,
                                           @Param("bookingTime") LocalDateTime bookingTime,
                                           @Param("startTime") LocalDateTime startTime,

@@ -429,8 +429,8 @@ INSERT INTO admin_profile (admin_profile_id, account_id, full_name, is_male, dep
 
 -- Thêm địa chỉ cho khách hàng
 INSERT INTO address (address_id, customer_id, full_address, ward, city, latitude, longitude, is_default) VALUES
-('adrs0001-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', '123 Lê Trọng Tấn, Tây Thạnh, TP. Hồ Chí Minh', 'Phường Tây Thạnh', 'TP. Hồ Chí Minh', 10.7943, 106.6256, true),
-('adrs0001-0000-0000-0000-000000000002', 'c1000001-0000-0000-0000-000000000002', '456 Lê Lợi, Sài Gòn, TP. Hồ Chí Minh', 'Phường Sài Gòn', 'TP. Hồ Chí Minh', 10.7769, 106.7009, true),
+('adrs0001-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', '123 Lê Trọng Tấn, Phường Tây Thạnh, TP. Hồ Chí Minh', 'Phường Tây Thạnh', 'TP. Hồ Chí Minh', 10.7943, 106.6256, true),
+('adrs0001-0000-0000-0000-000000000002', 'c1000001-0000-0000-0000-000000000002', '456 Lê Lợi, Phường Sài Gòn, TP. Hồ Chí Minh', 'Phường Sài Gòn', 'TP. Hồ Chí Minh', 10.7769, 106.7009, true),
 ('adrs0001-0000-0000-0000-000000000003', 'c1000001-0000-0000-0000-000000000003', '104 Lê Lợi, Phường Hạnh Thông, TP. Hồ Chí Minh', 'Phường Hạnh Thông', 'TP. Hồ Chí Minh', 10.8142, 106.6938, true);
 
 -- Thêm khu vực làm việc cho nhân viên
