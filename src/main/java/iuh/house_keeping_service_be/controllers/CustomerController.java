@@ -4,12 +4,14 @@ import iuh.house_keeping_service_be.config.JwtUtil;
 import iuh.house_keeping_service_be.dtos.Admin.UserPermission.response.PermissionManagementResponse;
 import iuh.house_keeping_service_be.dtos.Admin.UserPermission.response.UserPermissionData;
 import iuh.house_keeping_service_be.dtos.Admin.UserPermission.response.UserPermissionsResponse;
+import iuh.house_keeping_service_be.dtos.Cloudinary.CloudinaryUploadResult;
 import iuh.house_keeping_service_be.dtos.Customer.CustomerUpdateRequest;
 import iuh.house_keeping_service_be.dtos.Service.ServiceDetailResponse;
 import iuh.house_keeping_service_be.enums.RoleName;
 import iuh.house_keeping_service_be.models.Account;
 import iuh.house_keeping_service_be.models.Customer;
 import iuh.house_keeping_service_be.services.AdminService.PermissionService;
+import iuh.house_keeping_service_be.services.CloudinaryService.CloudinaryService;
 import iuh.house_keeping_service_be.services.CustomerService.CustomerService;
 import iuh.house_keeping_service_be.services.AuthorizationService.AuthorizationService;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -35,6 +38,8 @@ public class CustomerController {
     private final AuthorizationService authorizationService;
 
     private final PermissionService permissionService;
+
+    private final CloudinaryService cloudinaryService;
 
     private final JwtUtil jwtUtil;
 
@@ -188,6 +193,44 @@ public class CustomerController {
             return ResponseEntity.status(500).body(Map.of(
                     "success", false,
                     "message", "Đã xảy ra lỗi khi vô hiệu hóa khách hàng"
+            ));
+        }
+    }
+
+    @PostMapping("/{customerId}/avatar")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_CUSTOMER')")
+    public ResponseEntity<?> uploadAvatar(@PathVariable String customerId,
+                                          @RequestParam("avatar") MultipartFile avatar,
+                                          @RequestHeader("Authorization") String authHeader) {
+        try {
+            if (!authorizationService.canAccessResource(authHeader, customerId)) {
+                return ResponseEntity.status(403).body(Map.of(
+                        "success", false,
+                        "message", "Access denied. You can only update your own data."
+                ));
+            }
+
+            CloudinaryUploadResult uploadResult = cloudinaryService.uploadCustomerAvatar(avatar);
+            Customer updatedCustomer = customerService.updateAvatar(customerId, uploadResult.secureUrl());
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "data", Map.of(
+                            "customer", updatedCustomer,
+                            "avatarPublicId", uploadResult.publicId()
+                    )
+            ));
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid avatar upload: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()
+            ));
+        } catch (RuntimeException e) {
+            log.error("Error uploading avatar: {}", e.getMessage());
+            return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "message", "Đã xảy ra lỗi khi tải ảnh đại diện"
             ));
         }
     }

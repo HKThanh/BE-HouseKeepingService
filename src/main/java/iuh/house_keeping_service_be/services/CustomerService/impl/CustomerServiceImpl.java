@@ -75,4 +75,12 @@ public class CustomerServiceImpl implements CustomerService {
         customer.getAccount().setStatus(AccountStatus.INACTIVE);
         return customerRepository.save(customer);
     }
+
+    @Override
+    public Customer updateAvatar(String id, String avatarUrl) {
+        Customer customer = customerRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin khách hàng"));
+        customer.setAvatar(avatarUrl);
+        return customerRepository.save(customer);
+    }
 }

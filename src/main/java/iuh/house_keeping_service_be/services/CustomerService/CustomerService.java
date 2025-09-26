@@ -19,4 +19,6 @@ public interface CustomerService {
     Customer updateCustomer(String id, CustomerUpdateRequest request);
 
     Customer inActivateCustomer(String id);
+
+    Customer updateAvatar(String id, String avatarUrl);
 }

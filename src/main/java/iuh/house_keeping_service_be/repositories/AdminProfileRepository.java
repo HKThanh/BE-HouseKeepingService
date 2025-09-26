@@ -13,6 +13,8 @@ import java.util.Optional;
 public interface AdminProfileRepository extends JpaRepository<AdminProfile, String> {
     Optional<AdminProfile> findByAccount_AccountId(String accountId);
 
+    Optional<AdminProfile> findByAccount_Username(String username);
+
     @Query("SELECT ap FROM AdminProfile ap JOIN ap.account.roles r WHERE ap.contactInfo = :contactInfo AND r.roleName = :roleName")
     Optional<AdminProfile> findByContactInfoAndAccountRole(@Param("contactInfo") String contactInfo, @Param("roleName") RoleName roleName);
 
