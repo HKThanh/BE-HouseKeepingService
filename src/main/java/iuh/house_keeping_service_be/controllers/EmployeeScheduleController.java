@@ -82,16 +82,16 @@ public class EmployeeScheduleController {
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_CUSTOMER')") // Cho phép cả Customer tìm kiếm
     public ResponseEntity<ApiResponse<List<EmployeeScheduleResponse>>> getEmployeesByStatus(
             @RequestParam(defaultValue = "AVAILABLE") String status, // Mặc định là tìm nhân viên rảnh
-            @RequestParam(required = false) String district,
+            @RequestParam(required = false) String ward,
             @RequestParam(required = false) String city,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
 
         log.info("Getting employees with status: {} for district: {}, city: {}, from: {} to: {}",
-                status, district, city, startDate, endDate);
+                status, ward, city, startDate, endDate);
 
         try {
-            EmployeeScheduleRequest request = new EmployeeScheduleRequest(null, startDate, endDate, district, city);
+            EmployeeScheduleRequest request = new EmployeeScheduleRequest(null, startDate, endDate, ward, city);
             ApiResponse<List<EmployeeScheduleResponse>> response;
 
             if ("BUSY".equalsIgnoreCase(status)) {
@@ -152,14 +152,14 @@ public class EmployeeScheduleController {
     public ResponseEntity<ApiResponse<List<SuitableEmployeeResponse>>> findSuitableEmployees(
             @RequestParam Integer serviceId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime bookingTime,
-            @RequestParam(required = false) String district,
+            @RequestParam(required = false) String ward,
             @RequestParam(required = false) String city) {
 
         log.info("Finding suitable employees for service: {}, booking time: {}, district: {}, city: {}",
-                serviceId, bookingTime, district, city);
+                serviceId, bookingTime, ward, city);
 
         try {
-            SuitableEmployeeRequest request = new SuitableEmployeeRequest(serviceId, bookingTime, district, city);
+            SuitableEmployeeRequest request = new SuitableEmployeeRequest(serviceId, bookingTime, ward, city);
             ApiResponse<List<SuitableEmployeeResponse>> response = employeeScheduleService.findSuitableEmployees(request);
 
             return ResponseEntity.ok(response);

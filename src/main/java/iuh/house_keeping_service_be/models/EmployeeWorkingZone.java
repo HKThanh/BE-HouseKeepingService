@@ -24,8 +24,8 @@ public class EmployeeWorkingZone {
     @JsonIgnore
     private Employee employee;
 
-    @Column(name = "district", insertable = false, updatable = false)
-    private String district;
+    @Column(name = "ward", insertable = false, updatable = false)
+    private String ward;
 
     @Column(name = "city", insertable = false, updatable = false)
     private String city;

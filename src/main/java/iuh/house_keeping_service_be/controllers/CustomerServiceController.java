@@ -259,14 +259,14 @@ public class CustomerServiceController {
     public ResponseEntity<ApiResponse<List<SuitableEmployeeResponse>>> findSuitableEmployees(
             @RequestParam Integer serviceId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime bookingTime,
-            @RequestParam(required = false) String district,
+            @RequestParam(required = false) String ward,
             @RequestParam(required = false) String city) {
 
         log.info("Finding suitable employees for service: {}, booking time: {}, district: {}, city: {}",
-                serviceId, bookingTime, district, city);
+                serviceId, bookingTime, ward, city);
 
         try {
-            SuitableEmployeeRequest request = new SuitableEmployeeRequest(serviceId, bookingTime, district, city);
+            SuitableEmployeeRequest request = new SuitableEmployeeRequest(serviceId, bookingTime, ward, city);
             ApiResponse<List<SuitableEmployeeResponse>> response = employeeScheduleService.findSuitableEmployees(request);
 
             return ResponseEntity.ok(response);

@@ -73,94 +73,46 @@ Based on housekeeping_service_v8.sql:
   {
     "content": [
         {
-            "bookingId": "b7b0804e-ed1b-4b71-a67a-d72310e64bb4",
-            "bookingCode": "BK34606126",
+            "bookingId": "book0012-0000-0000-0000-000000000001",
+            "bookingCode": "HKS000012",
             "customerId": "c1000001-0000-0000-0000-000000000001",
             "customerName": "John Doe",
             "address": {
-                "addressId": "d803f91e-f477-49b2-a1f1-33335567ea74",
-                "fullAddress": "456 Nguyễn Văn Linh, An Phú, Quận 2, TP. Hồ Chí Minh",
-                "ward": "Phường An Phú",
-                "district": "Quận 2",
+                "addressId": "adrs0001-0000-0000-0000-000000000004",
+                "fullAddress": "789 Nguyễn Văn Cừ, Phường Chợ Quán, TP. Hồ Chí Minh",
+                "ward": "Phường Chợ Quán",
                 "city": "TP. Hồ Chí Minh",
-                "latitude": 10.7829,
-                "longitude": 106.7439,
+                "latitude": 10.7594,
+                "longitude": 106.6822,
                 "isDefault": false
             },
-            "bookingTime": "2025-09-26T16:00",
-            "note": "New address booking test",
-            "formattedTotalAmount": "700,000đ",
-            "status": "PENDING",
-            "promotion": null,
-            "payment": {
-                "paymentId": "4104f029-bca0-4575-9234-b696d5c54954",
-                "amount": 700000.00,
-                "paymentMethod": "Thanh toán tiền mặt",
-                "paymentStatus": "PENDING",
-                "transactionCode": "TXN_1758776934605",
-                "createdAt": "2025-09-25 12:08:54",
-                "paidAt": null
-            }
-        },
-        {
-            "bookingId": "9ed86dba-8dff-41b0-a4a8-c3d0f5d731ca",
-            "bookingCode": "BK58157400",
-            "customerId": "c1000001-0000-0000-0000-000000000001",
-            "customerName": "John Doe",
-            "address": {
-                "addressId": "adrs0001-0000-0000-0000-000000000001",
-                "fullAddress": "123 Lê Trọng Tấn, Tây Thạnh, Tân Phú, TP. Hồ Chí Minh",
-                "ward": "Phường Tây Thạnh",
-                "district": "Quận Tân Phú",
-                "city": "TP. Hồ Chí Minh",
-                "latitude": 10.7943,
-                "longitude": 106.6256,
-                "isDefault": true
-            },
-            "bookingTime": "2025-09-26T14:00",
-            "note": "Booking without specific employee assignment",
-            "formattedTotalAmount": "700,000đ",
+            "bookingTime": "2024-09-29T11:00",
+            "note": "Vệ sinh máy lạnh và quạt trần",
+            "formattedTotalAmount": "550,000đ",
             "status": "AWAITING_EMPLOYEE",
             "promotion": null,
-            "payment": {
-                "paymentId": "16fe4f1c-6184-40ae-a300-c9cc212e9435",
-                "amount": 700000.00,
-                "paymentMethod": "Thanh toán tiền mặt",
-                "paymentStatus": "PENDING",
-                "transactionCode": "TXN_1758772558152",
-                "createdAt": "2025-09-25 10:55:58",
-                "paidAt": null
-            }
+            "payment": null
         },
         {
-            "bookingId": "147d53a6-8556-4670-b803-5f05d335fca5",
-            "bookingCode": "BK38797809",
+            "bookingId": "book0004-0000-0000-0000-000000000001",
+            "bookingCode": "HKS000004",
             "customerId": "c1000001-0000-0000-0000-000000000001",
             "customerName": "John Doe",
             "address": {
-                "addressId": "adrs0001-0000-0000-0000-000000000001",
-                "fullAddress": "123 Lê Trọng Tấn, Tây Thạnh, Tân Phú, TP. Hồ Chí Minh",
-                "ward": "Phường Tây Thạnh",
-                "district": "Quận Tân Phú",
+                "addressId": "adrs0001-0000-0000-0000-000000000004",
+                "fullAddress": "789 Nguyễn Văn Cừ, Phường Chợ Quán, TP. Hồ Chí Minh",
+                "ward": "Phường Chợ Quán",
                 "city": "TP. Hồ Chí Minh",
-                "latitude": 10.7943,
-                "longitude": 106.6256,
-                "isDefault": true
+                "latitude": 10.7594,
+                "longitude": 106.6822,
+                "isDefault": false
             },
-            "bookingTime": "2025-09-26T10:00",
-            "note": "Cần dọn dẹp kỹ lưỡng phòng khách và bếp",
-            "formattedTotalAmount": "700,000đ",
-            "status": "PENDING",
+            "bookingTime": "2024-09-25T08:00",
+            "note": "Cần dọn dẹp tổng quát, chú ý khu vực bếp",
+            "formattedTotalAmount": "450,000đ",
+            "status": "AWAITING_EMPLOYEE",
             "promotion": null,
-            "payment": {
-                "paymentId": "4b5fcbe9-05f9-48f3-87ed-3425fa4bf09d",
-                "amount": 700000.00,
-                "paymentMethod": "Thanh toán tiền mặt",
-                "paymentStatus": "PENDING",
-                "transactionCode": "TXN_1758767838783",
-                "createdAt": "2025-09-25 09:37:19",
-                "paidAt": null
-            }
+            "payment": null
         },
         {
             "bookingId": "book0007-0000-0000-0000-000000000001",
@@ -169,9 +121,8 @@ Based on housekeeping_service_v8.sql:
             "customerName": "John Doe",
             "address": {
                 "addressId": "adrs0001-0000-0000-0000-000000000007",
-                "fullAddress": "432 Võ Văn Tần, Phường 5, Quận 3, TP. Hồ Chí Minh",
-                "ward": "Phường 5",
-                "district": "Quận 3",
+                "fullAddress": "432 Võ Văn Tần, Phường Bàn Cờ, TP. Hồ Chí Minh",
+                "ward": "Phường Bàn Cờ",
                 "city": "TP. Hồ Chí Minh",
                 "latitude": 10.7756,
                 "longitude": 106.6914,
@@ -188,31 +139,9 @@ Based on housekeeping_service_v8.sql:
                 "paymentMethod": null,
                 "paymentStatus": "PAID",
                 "transactionCode": "TXN20240926001",
-                "createdAt": "2025-09-24 17:01:13",
+                "createdAt": "2025-09-25 22:22:16",
                 "paidAt": "2024-09-26 15:30:00"
             }
-        },
-        {
-            "bookingId": "book0004-0000-0000-0000-000000000001",
-            "bookingCode": "HKS000004",
-            "customerId": "c1000001-0000-0000-0000-000000000001",
-            "customerName": "John Doe",
-            "address": {
-                "addressId": "adrs0001-0000-0000-0000-000000000004",
-                "fullAddress": "789 Nguyễn Văn Cừ, Phường 3, Quận 5, TP. Hồ Chí Minh",
-                "ward": "Phường 3",
-                "district": "Quận 5",
-                "city": "TP. Hồ Chí Minh",
-                "latitude": 10.7594,
-                "longitude": 106.6822,
-                "isDefault": false
-            },
-            "bookingTime": "2024-09-25T08:00",
-            "note": "Cần dọn dẹp tổng quát, chú ý khu vực bếp",
-            "formattedTotalAmount": "450,000đ",
-            "status": "AWAITING_EMPLOYEE",
-            "promotion": null,
-            "payment": null
         },
         {
             "bookingId": "book0009-0000-0000-0000-000000000001",
@@ -221,9 +150,8 @@ Based on housekeeping_service_v8.sql:
             "customerName": "John Doe",
             "address": {
                 "addressId": "adrs0001-0000-0000-0000-000000000001",
-                "fullAddress": "123 Lê Trọng Tấn, Tây Thạnh, Tân Phú, TP. Hồ Chí Minh",
+                "fullAddress": "123 Lê Trọng Tấn, Tây Thạnh, TP. Hồ Chí Minh",
                 "ward": "Phường Tây Thạnh",
-                "district": "Quận Tân Phú",
                 "city": "TP. Hồ Chí Minh",
                 "latitude": 10.7943,
                 "longitude": 106.6256,
@@ -237,37 +165,14 @@ Based on housekeeping_service_v8.sql:
             "payment": null
         },
         {
-            "bookingId": "book0012-0000-0000-0000-000000000001",
-            "bookingCode": "HKS000012",
-            "customerId": "c1000001-0000-0000-0000-000000000001",
-            "customerName": "John Doe",
-            "address": {
-                "addressId": "adrs0001-0000-0000-0000-000000000004",
-                "fullAddress": "789 Nguyễn Văn Cừ, Phường 3, Quận 5, TP. Hồ Chí Minh",
-                "ward": "Phường 3",
-                "district": "Quận 5",
-                "city": "TP. Hồ Chí Minh",
-                "latitude": 10.7594,
-                "longitude": 106.6822,
-                "isDefault": false
-            },
-            "bookingTime": "2024-09-29T11:00",
-            "note": "Vệ sinh máy lạnh và quạt trần",
-            "formattedTotalAmount": "550,000đ",
-            "status": "AWAITING_EMPLOYEE",
-            "promotion": null,
-            "payment": null
-        },
-        {
             "bookingId": "b0000001-0000-0000-0000-000000000010",
             "bookingCode": "BK000010",
             "customerId": "c1000001-0000-0000-0000-000000000001",
             "customerName": "John Doe",
             "address": {
                 "addressId": "adrs0001-0000-0000-0000-000000000001",
-                "fullAddress": "123 Lê Trọng Tấn, Tây Thạnh, Tân Phú, TP. Hồ Chí Minh",
+                "fullAddress": "123 Lê Trọng Tấn, Tây Thạnh, TP. Hồ Chí Minh",
                 "ward": "Phường Tây Thạnh",
-                "district": "Quận Tân Phú",
                 "city": "TP. Hồ Chí Minh",
                 "latitude": 10.7943,
                 "longitude": 106.6256,
@@ -291,7 +196,7 @@ Based on housekeeping_service_v8.sql:
                 "paymentMethod": "Cổng thanh toán VNPAY",
                 "paymentStatus": "PENDING",
                 "transactionCode": null,
-                "createdAt": "2025-09-24 17:01:13",
+                "createdAt": "2025-09-25 22:22:16",
                 "paidAt": null
             }
         },
@@ -302,9 +207,8 @@ Based on housekeeping_service_v8.sql:
             "customerName": "John Doe",
             "address": {
                 "addressId": "adrs0001-0000-0000-0000-000000000001",
-                "fullAddress": "123 Lê Trọng Tấn, Tây Thạnh, Tân Phú, TP. Hồ Chí Minh",
+                "fullAddress": "123 Lê Trọng Tấn, Tây Thạnh, TP. Hồ Chí Minh",
                 "ward": "Phường Tây Thạnh",
-                "district": "Quận Tân Phú",
                 "city": "TP. Hồ Chí Minh",
                 "latitude": 10.7943,
                 "longitude": 106.6256,
@@ -331,9 +235,8 @@ Based on housekeeping_service_v8.sql:
             "customerName": "John Doe",
             "address": {
                 "addressId": "adrs0001-0000-0000-0000-000000000001",
-                "fullAddress": "123 Lê Trọng Tấn, Tây Thạnh, Tân Phú, TP. Hồ Chí Minh",
+                "fullAddress": "123 Lê Trọng Tấn, Tây Thạnh, TP. Hồ Chí Minh",
                 "ward": "Phường Tây Thạnh",
-                "district": "Quận Tân Phú",
                 "city": "TP. Hồ Chí Minh",
                 "latitude": 10.7943,
                 "longitude": 106.6256,
@@ -350,8 +253,44 @@ Based on housekeeping_service_v8.sql:
                 "paymentMethod": "Thanh toán tiền mặt",
                 "paymentStatus": "PAID",
                 "transactionCode": null,
-                "createdAt": "2025-09-24 17:01:13",
+                "createdAt": "2025-09-25 22:22:16",
                 "paidAt": "2025-09-01 08:30:00"
+            }
+        },
+        {
+            "bookingId": "b0000001-0000-0000-0000-000000000001",
+            "bookingCode": "BK000001",
+            "customerId": "c1000001-0000-0000-0000-000000000001",
+            "customerName": "John Doe",
+            "address": {
+                "addressId": "adrs0001-0000-0000-0000-000000000001",
+                "fullAddress": "123 Lê Trọng Tấn, Tây Thạnh, TP. Hồ Chí Minh",
+                "ward": "Phường Tây Thạnh",
+                "city": "TP. Hồ Chí Minh",
+                "latitude": 10.7943,
+                "longitude": 106.6256,
+                "isDefault": true
+            },
+            "bookingTime": "2025-08-20T09:00",
+            "note": "Nhà có trẻ nhỏ, vui lòng lau dọn kỹ khu vực phòng khách.",
+            "formattedTotalAmount": "480,000đ",
+            "status": "COMPLETED",
+            "promotion": {
+                "promotionId": 1,
+                "promoCode": "GIAM20K",
+                "description": "Giảm giá 20,000đ cho mọi đơn hàng",
+                "discountType": "FIXED_AMOUNT",
+                "discountValue": 20000.00,
+                "maxDiscountAmount": null
+            },
+            "payment": {
+                "paymentId": "pay00001-0000-0000-0000-000000000001",
+                "amount": 480000.00,
+                "paymentMethod": "Cổng thanh toán VNPAY",
+                "paymentStatus": "PAID",
+                "transactionCode": "VNP123456789",
+                "createdAt": "2025-09-25 22:22:16",
+                "paidAt": "2025-08-20 13:05:00"
             }
         }
     ],
@@ -367,9 +306,9 @@ Based on housekeeping_service_v8.sql:
         "paged": true,
         "unpaged": false
     },
-    "totalElements": 11,
-    "totalPages": 2,
-    "last": false,
+    "totalElements": 8,
+    "totalPages": 1,
+    "last": true,
     "size": 10,
     "number": 0,
     "sort": {
@@ -377,7 +316,7 @@ Based on housekeeping_service_v8.sql:
         "sorted": true,
         "unsorted": false
     },
-    "numberOfElements": 10,
+    "numberOfElements": 8,
     "first": true,
     "empty": false
   }
@@ -404,63 +343,53 @@ Based on housekeeping_service_v8.sql:
   {
     "content": [
         {
-            "bookingId": "b7b0804e-ed1b-4b71-a67a-d72310e64bb4",
-            "bookingCode": "BK34606126",
+            "bookingId": "book0004-0000-0000-0000-000000000001",
+            "bookingCode": "HKS000004",
             "customerId": "c1000001-0000-0000-0000-000000000001",
             "customerName": "John Doe",
             "address": {
-                "addressId": "d803f91e-f477-49b2-a1f1-33335567ea74",
-                "fullAddress": "456 Nguyễn Văn Linh, An Phú, Quận 2, TP. Hồ Chí Minh",
-                "ward": "Phường An Phú",
-                "district": "Quận 2",
+                "addressId": "adrs0001-0000-0000-0000-000000000004",
+                "fullAddress": "789 Nguyễn Văn Cừ, Phường Chợ Quán, TP. Hồ Chí Minh",
+                "ward": "Phường Chợ Quán",
                 "city": "TP. Hồ Chí Minh",
-                "latitude": 10.7829,
-                "longitude": 106.7439,
+                "latitude": 10.7594,
+                "longitude": 106.6822,
                 "isDefault": false
             },
-            "bookingTime": "2025-09-26T16:00",
-            "note": "New address booking test",
-            "formattedTotalAmount": "700,000đ",
-            "status": "PENDING",
+            "bookingTime": "2024-09-25T08:00",
+            "note": "Cần dọn dẹp tổng quát, chú ý khu vực bếp",
+            "formattedTotalAmount": "450,000đ",
+            "status": "AWAITING_EMPLOYEE",
             "promotion": null,
-            "payment": {
-                "paymentId": "4104f029-bca0-4575-9234-b696d5c54954",
-                "amount": 700000.00,
-                "paymentMethod": "Thanh toán tiền mặt",
-                "paymentStatus": "PENDING",
-                "transactionCode": "TXN_1758776934605",
-                "createdAt": "2025-09-25 12:08:54",
-                "paidAt": null
-            }
+            "payment": null
         },
         {
-            "bookingId": "9ed86dba-8dff-41b0-a4a8-c3d0f5d731ca",
-            "bookingCode": "BK58157400",
+            "bookingId": "book0007-0000-0000-0000-000000000001",
+            "bookingCode": "HKS000007",
             "customerId": "c1000001-0000-0000-0000-000000000001",
             "customerName": "John Doe",
             "address": {
-                "addressId": "adrs0001-0000-0000-0000-000000000001",
-                "fullAddress": "123 Lê Trọng Tấn, Tây Thạnh, Tân Phú, TP. Hồ Chí Minh",
-                "ward": "Phường Tây Thạnh",
-                "district": "Quận Tân Phú",
+                "addressId": "adrs0001-0000-0000-0000-000000000007",
+                "fullAddress": "432 Võ Văn Tần, Phường Bàn Cờ, TP. Hồ Chí Minh",
+                "ward": "Phường Bàn Cờ",
                 "city": "TP. Hồ Chí Minh",
-                "latitude": 10.7943,
-                "longitude": 106.6256,
-                "isDefault": true
+                "latitude": 10.7756,
+                "longitude": 106.6914,
+                "isDefault": false
             },
-            "bookingTime": "2025-09-26T14:00",
-            "note": "Booking without specific employee assignment",
-            "formattedTotalAmount": "700,000đ",
-            "status": "AWAITING_EMPLOYEE",
+            "bookingTime": "2024-09-26T16:00",
+            "note": "Dọn dẹp sau tiệc, nhiều rác cần dọn",
+            "formattedTotalAmount": "500,000đ",
+            "status": "CONFIRMED",
             "promotion": null,
             "payment": {
-                "paymentId": "16fe4f1c-6184-40ae-a300-c9cc212e9435",
-                "amount": 700000.00,
-                "paymentMethod": "Thanh toán tiền mặt",
-                "paymentStatus": "PENDING",
-                "transactionCode": "TXN_1758772558152",
-                "createdAt": "2025-09-25 10:55:58",
-                "paidAt": null
+                "paymentId": "pay00004-0000-0000-0000-000000000001",
+                "amount": 500000.00,
+                "paymentMethod": null,
+                "paymentStatus": "PAID",
+                "transactionCode": "TXN20240926001",
+                "createdAt": "2025-09-25 22:22:16",
+                "paidAt": "2024-09-26 15:30:00"
             }
         }
     ],
@@ -476,8 +405,8 @@ Based on housekeeping_service_v8.sql:
         "paged": true,
         "unpaged": false
     },
-    "totalElements": 11,
-    "totalPages": 6,
+    "totalElements": 8,
+    "totalPages": 4,
     "last": false,
     "size": 2,
     "number": 0,
@@ -513,105 +442,14 @@ Based on housekeeping_service_v8.sql:
   {
     "content": [
         {
-            "bookingId": "b7b0804e-ed1b-4b71-a67a-d72310e64bb4",
-            "bookingCode": "BK34606126",
-            "customerId": "c1000001-0000-0000-0000-000000000001",
-            "customerName": "John Doe",
-            "address": {
-                "addressId": "d803f91e-f477-49b2-a1f1-33335567ea74",
-                "fullAddress": "456 Nguyễn Văn Linh, An Phú, Quận 2, TP. Hồ Chí Minh",
-                "ward": "Phường An Phú",
-                "district": "Quận 2",
-                "city": "TP. Hồ Chí Minh",
-                "latitude": 10.7829,
-                "longitude": 106.7439,
-                "isDefault": false
-            },
-            "bookingTime": "2025-09-26T16:00",
-            "note": "New address booking test",
-            "formattedTotalAmount": "700,000đ",
-            "status": "PENDING",
-            "promotion": null,
-            "payment": {
-                "paymentId": "4104f029-bca0-4575-9234-b696d5c54954",
-                "amount": 700000.00,
-                "paymentMethod": "Thanh toán tiền mặt",
-                "paymentStatus": "PENDING",
-                "transactionCode": "TXN_1758776934605",
-                "createdAt": "2025-09-25 12:08:54",
-                "paidAt": null
-            }
-        },
-        {
-            "bookingId": "9ed86dba-8dff-41b0-a4a8-c3d0f5d731ca",
-            "bookingCode": "BK58157400",
-            "customerId": "c1000001-0000-0000-0000-000000000001",
-            "customerName": "John Doe",
-            "address": {
-                "addressId": "adrs0001-0000-0000-0000-000000000001",
-                "fullAddress": "123 Lê Trọng Tấn, Tây Thạnh, Tân Phú, TP. Hồ Chí Minh",
-                "ward": "Phường Tây Thạnh",
-                "district": "Quận Tân Phú",
-                "city": "TP. Hồ Chí Minh",
-                "latitude": 10.7943,
-                "longitude": 106.6256,
-                "isDefault": true
-            },
-            "bookingTime": "2025-09-26T14:00",
-            "note": "Booking without specific employee assignment",
-            "formattedTotalAmount": "700,000đ",
-            "status": "AWAITING_EMPLOYEE",
-            "promotion": null,
-            "payment": {
-                "paymentId": "16fe4f1c-6184-40ae-a300-c9cc212e9435",
-                "amount": 700000.00,
-                "paymentMethod": "Thanh toán tiền mặt",
-                "paymentStatus": "PENDING",
-                "transactionCode": "TXN_1758772558152",
-                "createdAt": "2025-09-25 10:55:58",
-                "paidAt": null
-            }
-        },
-        {
-            "bookingId": "147d53a6-8556-4670-b803-5f05d335fca5",
-            "bookingCode": "BK38797809",
-            "customerId": "c1000001-0000-0000-0000-000000000001",
-            "customerName": "John Doe",
-            "address": {
-                "addressId": "adrs0001-0000-0000-0000-000000000001",
-                "fullAddress": "123 Lê Trọng Tấn, Tây Thạnh, Tân Phú, TP. Hồ Chí Minh",
-                "ward": "Phường Tây Thạnh",
-                "district": "Quận Tân Phú",
-                "city": "TP. Hồ Chí Minh",
-                "latitude": 10.7943,
-                "longitude": 106.6256,
-                "isDefault": true
-            },
-            "bookingTime": "2025-09-26T10:00",
-            "note": "Cần dọn dẹp kỹ lưỡng phòng khách và bếp",
-            "formattedTotalAmount": "700,000đ",
-            "status": "PENDING",
-            "promotion": null,
-            "payment": {
-                "paymentId": "4b5fcbe9-05f9-48f3-87ed-3425fa4bf09d",
-                "amount": 700000.00,
-                "paymentMethod": "Thanh toán tiền mặt",
-                "paymentStatus": "PENDING",
-                "transactionCode": "TXN_1758767838783",
-                "createdAt": "2025-09-25 09:37:19",
-                "paidAt": null
-            }
-        },
-        {
             "bookingId": "book0009-0000-0000-0000-000000000001",
             "bookingCode": "HKS000009",
             "customerId": "c1000001-0000-0000-0000-000000000001",
             "customerName": "John Doe",
             "address": {
                 "addressId": "adrs0001-0000-0000-0000-000000000001",
-                "fullAddress": "123 Lê Trọng Tấn, Tây Thạnh, Tân Phú, TP. Hồ Chí Minh",
+                "fullAddress": "123 Lê Trọng Tấn, Tây Thạnh, TP. Hồ Chí Minh",
                 "ward": "Phường Tây Thạnh",
-                "district": "Quận Tân Phú",
                 "city": "TP. Hồ Chí Minh",
                 "latitude": 10.7943,
                 "longitude": 106.6256,
@@ -631,9 +469,8 @@ Based on housekeeping_service_v8.sql:
             "customerName": "John Doe",
             "address": {
                 "addressId": "adrs0001-0000-0000-0000-000000000004",
-                "fullAddress": "789 Nguyễn Văn Cừ, Phường 3, Quận 5, TP. Hồ Chí Minh",
-                "ward": "Phường 3",
-                "district": "Quận 5",
+                "fullAddress": "789 Nguyễn Văn Cừ, Phường Chợ Quán, TP. Hồ Chí Minh",
+                "ward": "Phường Chợ Quán",
                 "city": "TP. Hồ Chí Minh",
                 "latitude": 10.7594,
                 "longitude": 106.6822,
@@ -645,6 +482,92 @@ Based on housekeeping_service_v8.sql:
             "status": "AWAITING_EMPLOYEE",
             "promotion": null,
             "payment": null
+        },
+        {
+            "bookingId": "book0007-0000-0000-0000-000000000001",
+            "bookingCode": "HKS000007",
+            "customerId": "c1000001-0000-0000-0000-000000000001",
+            "customerName": "John Doe",
+            "address": {
+                "addressId": "adrs0001-0000-0000-0000-000000000007",
+                "fullAddress": "432 Võ Văn Tần, Phường Bàn Cờ, TP. Hồ Chí Minh",
+                "ward": "Phường Bàn Cờ",
+                "city": "TP. Hồ Chí Minh",
+                "latitude": 10.7756,
+                "longitude": 106.6914,
+                "isDefault": false
+            },
+            "bookingTime": "2024-09-26T16:00",
+            "note": "Dọn dẹp sau tiệc, nhiều rác cần dọn",
+            "formattedTotalAmount": "500,000đ",
+            "status": "CONFIRMED",
+            "promotion": null,
+            "payment": {
+                "paymentId": "pay00004-0000-0000-0000-000000000001",
+                "amount": 500000.00,
+                "paymentMethod": null,
+                "paymentStatus": "PAID",
+                "transactionCode": "TXN20240926001",
+                "createdAt": "2025-09-25 22:22:16",
+                "paidAt": "2024-09-26 15:30:00"
+            }
+        },
+        {
+            "bookingId": "book0012-0000-0000-0000-000000000001",
+            "bookingCode": "HKS000012",
+            "customerId": "c1000001-0000-0000-0000-000000000001",
+            "customerName": "John Doe",
+            "address": {
+                "addressId": "adrs0001-0000-0000-0000-000000000004",
+                "fullAddress": "789 Nguyễn Văn Cừ, Phường Chợ Quán, TP. Hồ Chí Minh",
+                "ward": "Phường Chợ Quán",
+                "city": "TP. Hồ Chí Minh",
+                "latitude": 10.7594,
+                "longitude": 106.6822,
+                "isDefault": false
+            },
+            "bookingTime": "2024-09-29T11:00",
+            "note": "Vệ sinh máy lạnh và quạt trần",
+            "formattedTotalAmount": "550,000đ",
+            "status": "AWAITING_EMPLOYEE",
+            "promotion": null,
+            "payment": null
+        },
+        {
+            "bookingId": "b0000001-0000-0000-0000-000000000010",
+            "bookingCode": "BK000010",
+            "customerId": "c1000001-0000-0000-0000-000000000001",
+            "customerName": "John Doe",
+            "address": {
+                "addressId": "adrs0001-0000-0000-0000-000000000001",
+                "fullAddress": "123 Lê Trọng Tấn, Tây Thạnh, TP. Hồ Chí Minh",
+                "ward": "Phường Tây Thạnh",
+                "city": "TP. Hồ Chí Minh",
+                "latitude": 10.7943,
+                "longitude": 106.6256,
+                "isDefault": true
+            },
+            "bookingTime": "2025-09-02T13:00",
+            "note": "Tổng vệ sinh nhà phố 2 tầng.",
+            "formattedTotalAmount": "630,000đ",
+            "status": "CONFIRMED",
+            "promotion": {
+                "promotionId": 2,
+                "promoCode": "KHAITRUONG10",
+                "description": "Giảm 10% mừng khai trương",
+                "discountType": "PERCENTAGE",
+                "discountValue": 10.00,
+                "maxDiscountAmount": 50000.00
+            },
+            "payment": {
+                "paymentId": "pay00001-0000-0000-0000-000000000006",
+                "amount": 630000.00,
+                "paymentMethod": "Cổng thanh toán VNPAY",
+                "paymentStatus": "PENDING",
+                "transactionCode": null,
+                "createdAt": "2025-09-25 22:22:16",
+                "paidAt": null
+            }
         }
     ],
     "pageable": {
@@ -659,8 +582,8 @@ Based on housekeeping_service_v8.sql:
         "paged": true,
         "unpaged": false
     },
-    "totalElements": 11,
-    "totalPages": 3,
+    "totalElements": 8,
+    "totalPages": 2,
     "last": false,
     "size": 5,
     "number": 0,

@@ -15,42 +15,10 @@ public interface EmployeeWorkingZoneRepository extends JpaRepository<EmployeeWor
 
     @Query("SELECT ewz FROM EmployeeWorkingZone ewz " +
             "JOIN FETCH ewz.employee " +
-            "WHERE (:district IS NULL OR ewz.district = :district) " +
+            "WHERE (:ward IS NULL OR ewz.ward = :ward) " +
             "AND (:city IS NULL OR ewz.city = :city)")
     List<EmployeeWorkingZone> findByLocation(
-            @Param("district") String district,
+            @Param("ward") String ward,
             @Param("city") String city
     );
-
-    @Query("SELECT ewz FROM EmployeeWorkingZone ewz " +
-            "WHERE ewz.employee.employeeId = :employeeId")
-    List<EmployeeWorkingZone> findByEmployeeEmployeeId(@Param("employeeId") String employeeId);
-
-    @Query("SELECT DISTINCT ewz.employee.employeeId FROM EmployeeWorkingZone ewz " +
-            "WHERE (:district IS NULL OR ewz.district = :district) " +
-            "AND (:city IS NULL OR ewz.city = :city)")
-    List<String> findEmployeeIdsByLocation(
-            @Param("district") String district,
-            @Param("city") String city
-    );
-
-    boolean existsByEmployeeEmployeeIdAndDistrictAndCity(
-            String employeeId,
-            String district,
-            String city
-    );
-
-    void deleteByEmployeeEmployeeId(String employeeId);
-
-    @Query("SELECT COUNT(ewz) FROM EmployeeWorkingZone ewz WHERE ewz.employee.employeeId = :employeeId")
-    long countByEmployeeId(@Param("employeeId") String employeeId);
-
-    @Query("SELECT DISTINCT ewz.employee FROM EmployeeWorkingZone ewz WHERE ewz.district = :district AND ewz.city = :city")
-    List<Employee> findEmployeesByDistrictAndCity(@Param("district") String district, @Param("city") String city);
-
-    @Query("SELECT DISTINCT ewz.employee FROM EmployeeWorkingZone ewz WHERE ewz.city = :city")
-    List<Employee> findEmployeesByCity(@Param("city") String city);
-
-    @Query("SELECT ewz FROM EmployeeWorkingZone ewz WHERE ewz.employee.employeeId = :employeeId")
-    List<EmployeeWorkingZone> findByEmployeeId(String employeeId);
 }

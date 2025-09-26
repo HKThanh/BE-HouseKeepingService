@@ -16,8 +16,6 @@ public interface AddressRepository extends JpaRepository<Address, String> {
 
     Optional<Address> findByCustomer_CustomerIdAndIsDefaultTrue(String customerId);
 
-    List<Address> findByDistrictAndCity(String district, String city);
-
     // Find by customer ID
     List<Address> findByCustomer_CustomerIdOrderByCreatedAtDesc(String customerId);
     
@@ -37,26 +35,18 @@ public interface AddressRepository extends JpaRepository<Address, String> {
            "WHERE a.addressId = :addressId")
     Optional<Address> findAddressWithCustomer(@Param("addressId") String addressId);
 
-        // Find addresses by district and city with customer info
-    @Query("SELECT a FROM Address a " +
-           "LEFT JOIN FETCH a.customer " +
-           "WHERE a.district = :district AND a.city = :city")
-    List<Address> findByDistrictAndCityWithCustomer(@Param("district") String district,
-                                                   @Param("city") String city);
-
-
     @Query("SELECT new iuh.house_keeping_service_be.repositories.projections.ZoneCoordinate(" +
             "AVG(a.latitude), AVG(a.longitude)) " +
             "FROM Address a " +
-            "WHERE a.district = :district AND a.city = :city " +
+            "WHERE a.ward = :ward AND a.city = :city " +
             "AND a.latitude IS NOT NULL AND a.longitude IS NOT NULL")
-    Optional<ZoneCoordinate> findAverageCoordinateByDistrictAndCity(@Param("district") String district,
+    Optional<ZoneCoordinate> findAverageCoordinateByWardAndCity(@Param("ward") String ward,
                                                                     @Param("city") String city);
 
     @Query("SELECT new iuh.house_keeping_service_be.repositories.projections.ZoneCoordinate(" +
            "AVG(a.latitude), AVG(a.longitude)) " +
            "FROM Address a " +
-           "JOIN EmployeeWorkingZone ewz ON a.district = ewz.district AND a.city = ewz.city " +
+           "JOIN EmployeeWorkingZone ewz ON a.ward = ewz.ward AND a.city = ewz.city " +
            "WHERE ewz.employee.employeeId = :employeeId " +
            "AND a.latitude IS NOT NULL AND a.longitude IS NOT NULL")
     Optional<ZoneCoordinate> findAverageCoordinateByEmployeeZones(@Param("employeeId") String employeeId);

@@ -31,7 +31,7 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
     @Override
     public ApiResponse<List<EmployeeScheduleResponse>> getAvailableEmployees(EmployeeScheduleRequest request) {
         try {
-            List<Employee> employees = getEmployeesInWorkingZone(request.district(), request.city());
+            List<Employee> employees = getEmployeesInWorkingZone(request.ward(), request.city());
 
             if (employees.isEmpty()) {
                 return new ApiResponse<>(true, "Không tìm thấy nhân viên ở " + request.city(), Collections.emptyList());
@@ -52,7 +52,7 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
     @Override
     public ApiResponse<List<EmployeeScheduleResponse>> getBusyEmployees(EmployeeScheduleRequest request) {
         try {
-            List<Employee> employees = getEmployeesInWorkingZone(request.district(), request.city());
+            List<Employee> employees = getEmployeesInWorkingZone(request.ward(), request.city());
 
             if (employees.isEmpty()) {
                 return new ApiResponse<>(true, "Không tìm thấy nhân viên nào ở " + request.city(), Collections.emptyList());
@@ -123,14 +123,14 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
         }
     }
 
-    private List<Employee> getEmployeesInWorkingZone(String district, String city) {
-        if (district == null && city == null) {
+    private List<Employee> getEmployeesInWorkingZone(String ward, String city) {
+        if (ward == null && city == null) {
             return employeeRepository.findAll().stream()
                     .filter(emp -> emp.getEmployeeStatus() == EmployeeStatus.AVAILABLE)
                     .collect(Collectors.toList());
         }
 
-        List<EmployeeWorkingZone> workingZones = workingZoneRepository.findByLocation(district, city);
+        List<EmployeeWorkingZone> workingZones = workingZoneRepository.findByLocation(ward, city);
         return workingZones.stream()
                 .map(EmployeeWorkingZone::getEmployee)
                 .filter(emp -> emp.getEmployeeStatus() == EmployeeStatus.AVAILABLE)
@@ -152,7 +152,7 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
         List<String> skills = employee.getSkills() != null ? employee.getSkills() : Collections.emptyList();
 
         List<WorkingZone> workingZones = employee.getWorkingZones().stream()
-                .map(ewz -> new WorkingZone(ewz.getDistrict(), ewz.getCity()))
+                .map(ewz -> new WorkingZone(ewz.getWard(), ewz.getCity()))
                 .collect(Collectors.toList());
 
         String rating = employee.getRating() != null ? employee.getRating().toString() : "N/A";
@@ -279,7 +279,7 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
                     estimatedDuration, endTime);
 
             // 2. Lọc nhân viên theo khu vực làm việc
-            List<Employee> potentialEmployees = filterEmployeesByWorkingZone(request.district(), request.city());
+            List<Employee> potentialEmployees = filterEmployeesByWorkingZone(request.ward(), request.city());
 
             if (potentialEmployees.isEmpty()) {
                 return new ApiResponse<>(true, "Không có nhân viên nào trong khu vực được chỉ định", Collections.emptyList());
@@ -326,11 +326,11 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
     /**
      * Lọc nhân viên theo khu vực làm việc
      */
-    private List<Employee> filterEmployeesByWorkingZone(String district, String city) {
-        if (district != null && city != null) {
+    private List<Employee> filterEmployeesByWorkingZone(String ward, String city) {
+        if (ward != null && city != null) {
             // Sử dụng method hiện có để lọc theo location
-            List<EmployeeWorkingZone> workingZones = workingZoneRepository.findByLocation(district, city);
-            log.info("Filtering by district: {} and city: {}", district, city);
+            List<EmployeeWorkingZone> workingZones = workingZoneRepository.findByLocation(ward, city);
+            log.info("Filtering by ward: {} and city: {}", ward, city);
 
             return workingZones.stream()
                     .map(EmployeeWorkingZone::getEmployee)
@@ -364,8 +364,8 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
         // Lấy thông tin khu vực làm việc từ employee's working zones
         List<EmployeeWorkingZone> workingZones = employee.getWorkingZones();
 
-        String[] districts = workingZones.stream()
-                .map(EmployeeWorkingZone::getDistrict)
+        String[] wards = workingZones.stream()
+                .map(EmployeeWorkingZone::getWard)
                 .distinct()
                 .toArray(String[]::new);
 
@@ -391,7 +391,7 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
                 employee.getSkills() == null ? Collections.emptyList() : employee.getSkills(),
                 ratingStr,
                 "AVAILABLE",
-                districts,
+                wards,
                 city,
                 completedJobs
         );

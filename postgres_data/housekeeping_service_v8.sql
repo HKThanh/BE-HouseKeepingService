@@ -69,9 +69,9 @@ CREATE TABLE employee (
 
 CREATE TABLE employee_working_zones (
     employee_id VARCHAR(36) NOT NULL REFERENCES employee(employee_id) ON DELETE CASCADE,
-    district VARCHAR(100) NOT NULL,
+    ward VARCHAR(100) NOT NULL,
     city VARCHAR(100) NOT NULL,
-    PRIMARY KEY (employee_id, district, city)
+    PRIMARY KEY (employee_id, ward, city)
 );
 
 CREATE TABLE admin_profile (
@@ -92,7 +92,6 @@ CREATE TABLE address (
     customer_id VARCHAR(36) NOT NULL REFERENCES customer(customer_id) ON DELETE CASCADE,
     full_address TEXT NOT NULL,
     ward VARCHAR(100),
-    district VARCHAR(100),
     city VARCHAR(100),
     latitude DECIMAL(9, 6),
     longitude DECIMAL(9, 6),
@@ -429,16 +428,16 @@ INSERT INTO admin_profile (admin_profile_id, account_id, full_name, is_male, dep
 ('ad100001-0000-0000-0000-000000000001', 'a1000001-0000-0000-0000-000000000003', 'Admin One', TRUE, 'Management', 'admin1@example.com', '1988-09-10', '2023-03-01');
 
 -- Thêm địa chỉ cho khách hàng
-INSERT INTO address (address_id, customer_id, full_address, ward, district, city, latitude, longitude, is_default) VALUES
-('adrs0001-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', '123 Lê Trọng Tấn, Tây Thạnh, Tân Phú, TP. Hồ Chí Minh', 'Phường Tây Thạnh', 'Quận Tân Phú', 'TP. Hồ Chí Minh', 10.7943, 106.6256, true),
-('adrs0001-0000-0000-0000-000000000002', 'c1000001-0000-0000-0000-000000000002', '456 Lê Lợi, Bến Nghé, Quận 1,TP. Hồ Chí Minh', 'Phường Bến Nghé', 'Quận 1', 'TP. Hồ Chí Minh', 10.7769, 106.7009, true),
-('adrs0001-0000-0000-0000-000000000003', 'c1000001-0000-0000-0000-000000000003', '104 Lê Lợi, Phường 1, Gò Vấp, TP. Hồ Chí Minh', 'Phường 1', 'Quận Gò Vấp', 'TP. Hồ Chí Minh', 10.8142, 106.6938, true);
+INSERT INTO address (address_id, customer_id, full_address, ward, city, latitude, longitude, is_default) VALUES
+('adrs0001-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', '123 Lê Trọng Tấn, Phường Tây Thạnh, TP. Hồ Chí Minh', 'Phường Tây Thạnh', 'TP. Hồ Chí Minh', 10.7943, 106.6256, true),
+('adrs0001-0000-0000-0000-000000000002', 'c1000001-0000-0000-0000-000000000002', '456 Lê Lợi, Phường Sài Gòn, TP. Hồ Chí Minh', 'Phường Sài Gòn', 'TP. Hồ Chí Minh', 10.7769, 106.7009, true),
+('adrs0001-0000-0000-0000-000000000003', 'c1000001-0000-0000-0000-000000000003', '104 Lê Lợi, Phường Hạnh Thông, TP. Hồ Chí Minh', 'Phường Hạnh Thông', 'TP. Hồ Chí Minh', 10.8142, 106.6938, true);
 
 -- Thêm khu vực làm việc cho nhân viên
-INSERT INTO employee_working_zones (employee_id, district, city) VALUES
-('e1000001-0000-0000-0000-000000000001', 'Quận Tân Phú', 'TP. Hồ Chí Minh'),
-('e1000001-0000-0000-0000-000000000001', 'Quận Tân Bình', 'TP. Hồ Chí Minh'),
-('e1000001-0000-0000-0000-000000000002', 'Quận Gò Vấp', 'TP. Hồ Chí Minh');
+INSERT INTO employee_working_zones (employee_id, ward, city) VALUES
+('e1000001-0000-0000-0000-000000000001', 'Phường Tây Thạnh', 'TP. Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000001', 'Phường Bảy Hiền', 'TP. Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000002', 'Phường Hạnh Thông', 'TP. Hồ Chí Minh');
 
 -- Thêm các chức năng mẫu vào bảng `features`
 INSERT INTO features (feature_name, description, module) VALUES
@@ -978,12 +977,12 @@ INSERT INTO rule_conditions (rule_id, choice_id) VALUES
  (SELECT choice_id FROM service_option_choices WHERE option_id = 10 AND label = 'Đầm'));
 
 -- Insert additional addresses for more booking locations
-INSERT INTO address (address_id, customer_id, full_address, ward, district, city, latitude, longitude, is_default) VALUES
-('adrs0001-0000-0000-0000-000000000004', 'c1000001-0000-0000-0000-000000000001', '789 Nguyễn Văn Cừ, Phường 3, Quận 5, TP. Hồ Chí Minh', 'Phường 3', 'Quận 5', 'TP. Hồ Chí Minh', 10.7594, 106.6822, false),
-('adrs0001-0000-0000-0000-000000000005', 'c1000001-0000-0000-0000-000000000002', '321 Phan Văn Trị, Phường 11, Bình Thạnh, TP. Hồ Chí Minh', 'Phường 11', 'Quận Bình Thạnh', 'TP. Hồ Chí Minh', 10.8011, 106.7067, false),
-('adrs0001-0000-0000-0000-000000000006', 'c1000001-0000-0000-0000-000000000003', '567 Lý Thường Kiệt, Phường 8, Tân Bình, TP. Hồ Chí Minh', 'Phường 8', 'Quận Tân Bình', 'TP. Hồ Chí Minh', 10.7993, 106.6554, false),
-('adrs0001-0000-0000-0000-000000000007', 'c1000001-0000-0000-0000-000000000001', '432 Võ Văn Tần, Phường 5, Quận 3, TP. Hồ Chí Minh', 'Phường 5', 'Quận 3', 'TP. Hồ Chí Minh', 10.7756, 106.6914, false),
-('adrs0001-0000-0000-0000-000000000008', 'c1000001-0000-0000-0000-000000000002', '876 Cách Mạng Tháng 8, Phường 5, Tân Bình, TP. Hồ Chí Minh', 'Phường 5', 'Quận Tân Bình', 'TP. Hồ Chí Minh', 10.7854, 106.6533, false);
+INSERT INTO address (address_id, customer_id, full_address, ward, city, latitude, longitude, is_default) VALUES
+('adrs0001-0000-0000-0000-000000000004', 'c1000001-0000-0000-0000-000000000001', '789 Nguyễn Văn Cừ, Phường Chợ Quán, TP. Hồ Chí Minh', 'Phường Chợ Quán', 'TP. Hồ Chí Minh', 10.7594, 106.6822, false),
+('adrs0001-0000-0000-0000-000000000005', 'c1000001-0000-0000-0000-000000000002', '321 Phan Văn Trị, Phường Bình Lợi Trung, TP. Hồ Chí Minh', 'Phường Bình Lợi Trung', 'TP. Hồ Chí Minh', 10.8011, 106.7067, false),
+('adrs0001-0000-0000-0000-000000000006', 'c1000001-0000-0000-0000-000000000003', '567 Lý Thường Kiệt, Phường Tân Sơn Nhất, TP. Hồ Chí Minh', 'Phường Tân Sơn Nhất', 'TP. Hồ Chí Minh', 10.7993, 106.6554, false),
+('adrs0001-0000-0000-0000-000000000007', 'c1000001-0000-0000-0000-000000000001', '432 Võ Văn Tần, Phường Bàn Cờ, TP. Hồ Chí Minh', 'Phường Bàn Cờ', 'TP. Hồ Chí Minh', 10.7756, 106.6914, false),
+('adrs0001-0000-0000-0000-000000000008', 'c1000001-0000-0000-0000-000000000002', '876 Cách Mạng Tháng 8, Phường Tân Sơn Nhất, TP. Hồ Chí Minh', 'Phường Tân Sơn Nhất', 'TP. Hồ Chí Minh', 10.7854, 106.6533, false);
 
 -- Insert 10 additional bookings
 INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status) VALUES

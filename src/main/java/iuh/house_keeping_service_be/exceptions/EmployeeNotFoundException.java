@@ -22,9 +22,23 @@ public class EmployeeNotFoundException extends ResourceNotFoundException {
     public static EmployeeNotFoundException withPhone(String phoneNumber) {
         return new EmployeeNotFoundException("Employee not found with phone: " + phoneNumber);
     }
-    
-    public static EmployeeNotFoundException inArea(String district, String city) {
-        return new EmployeeNotFoundException("No available employees found in " + district + ", " + city);
+
+    public static EmployeeNotFoundException inArea(String ward, String city) {
+        StringBuilder locationBuilder = new StringBuilder();
+
+        if (ward != null && !ward.isBlank()) {
+            locationBuilder.append(ward);
+        }
+
+        if (city != null && !city.isBlank()) {
+            if (locationBuilder.length() > 0) {
+                locationBuilder.append(", ");
+            }
+            locationBuilder.append(city);
+        }
+
+        String location = locationBuilder.length() == 0 ? "the requested area" : locationBuilder.toString();
+        return new EmployeeNotFoundException("No available employees found in " + location);
     }
     
     public static EmployeeNotFoundException withCustomMessage(String message) {

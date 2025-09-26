@@ -31,9 +31,6 @@ public class Address {
     @Column(name = "ward", length = 100)
     private String ward;
 
-    @Column(name = "district", length = 100)
-    private String district;
-
     @Column(name = "city", length = 100)
     private String city;
 
