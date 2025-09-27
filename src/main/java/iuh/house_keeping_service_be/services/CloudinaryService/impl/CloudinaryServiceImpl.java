@@ -21,6 +21,9 @@ public class CloudinaryServiceImpl implements CloudinaryService {
     @Value("${cloudinary.folders.customer:customer_avatars}")
     private String customerFolder;
 
+    @Value("${cloudinary.folders.employee:employee_avatars}")
+    private String employeeFolder;
+
     @Override
     public CloudinaryUploadResult uploadCustomerAvatar(MultipartFile file) {
         if (file == null || file.isEmpty()) {
@@ -30,6 +33,28 @@ public class CloudinaryServiceImpl implements CloudinaryService {
             Map<String, Object> options = new HashMap<>();
             if (customerFolder != null && !customerFolder.isBlank()) {
                 options.put("folder", customerFolder);
+            }
+            Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getBytes(), options);
+            String secureUrl = (String) uploadResult.get("secure_url");
+            String publicId = (String) uploadResult.get("public_id");
+            if (secureUrl == null || publicId == null) {
+                throw new IllegalStateException("Kết quả tải lên Cloudinary không hợp lệ");
+            }
+            return new CloudinaryUploadResult(secureUrl, publicId);
+        } catch (IOException e) {
+            throw new RuntimeException("Không thể tải ảnh lên Cloudinary", e);
+        }
+    }
+
+    @Override
+    public CloudinaryUploadResult uploadEmployeeAvatar(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("File tải lên không hợp lệ");
+        }
+        try {
+            Map<String, Object> options = new HashMap<>();
+            if (employeeFolder != null && !employeeFolder.isBlank()) {
+                options.put("folder", employeeFolder);
             }
             Map<?, ?> uploadResult = cloudinary.uploader().upload(file.getBytes(), options);
             String secureUrl = (String) uploadResult.get("secure_url");

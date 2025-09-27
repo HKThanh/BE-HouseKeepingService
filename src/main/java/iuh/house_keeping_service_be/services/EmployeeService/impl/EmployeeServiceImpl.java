@@ -95,4 +95,17 @@ public class EmployeeServiceImpl implements EmployeeService {
         return employeeRepository.save(employee);
     }
 
+    @Override
+    public Employee updateAvatar(String employeeId, String avatarUrl) {
+        if (avatarUrl == null || avatarUrl.isBlank()) {
+            throw new IllegalArgumentException("Ảnh đại diện không hợp lệ");
+        }
+
+        Employee employee = employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy thông tin nhân viên"));
+
+        employee.setAvatar(avatarUrl);
+        return employeeRepository.save(employee);
+    }
+
 }
