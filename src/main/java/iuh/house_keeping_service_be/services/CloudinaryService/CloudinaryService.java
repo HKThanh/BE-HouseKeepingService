@@ -5,4 +5,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 public interface CloudinaryService {
     CloudinaryUploadResult uploadCustomerAvatar(MultipartFile file);
+
+    CloudinaryUploadResult uploadEmployeeAvatar(MultipartFile file);
 }

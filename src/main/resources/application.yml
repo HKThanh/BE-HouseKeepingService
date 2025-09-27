@@ -36,3 +36,4 @@ cloudinary:
   api-secret: ${CLOUDINARY_API_SECRET}
   folders:
     customer: ${CLOUDINARY_CUSTOMER_FOLDER:customer_avatars}
+    employee: ${CLOUDINARY_EMPLOYEE_FOLDER:employee_avatars}

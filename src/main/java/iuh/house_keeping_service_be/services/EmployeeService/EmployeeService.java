@@ -19,4 +19,6 @@ public interface EmployeeService {
     Page<Employee> getAllEmployees(Pageable pageable);
 
     Employee updateEmployee(String employeeId, UpdateEmployeeRequest request);
+
+    Employee updateAvatar(String employeeId, String avatarUrl);
 }
