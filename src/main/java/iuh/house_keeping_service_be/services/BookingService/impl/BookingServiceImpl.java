@@ -326,7 +326,7 @@ public class BookingServiceImpl implements BookingService {
             .calculatedPrice(calculatedPrice)
             .expectedPrice(detail.expectedPrice())
             .priceMatches(priceMatches)
-            .recommendedStaff(service.getRecommendedStaff() != null ? service.getRecommendedStaff() : 1)
+            .recommendedStaff(Math.max(1, pricingResult.suggestedStaff()))
             .build();
     }
 
