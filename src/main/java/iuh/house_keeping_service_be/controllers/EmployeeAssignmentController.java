@@ -1,6 +1,8 @@
 package iuh.house_keeping_service_be.controllers;
 
+import iuh.house_keeping_service_be.dtos.Assignment.request.AssignmentActionRequest;
 import iuh.house_keeping_service_be.dtos.Assignment.request.AssignmentCancelRequest;
+import iuh.house_keeping_service_be.dtos.Assignment.response.AssignmentActionResponse;
 import iuh.house_keeping_service_be.dtos.Assignment.response.AssignmentDetailResponse;
 import iuh.house_keeping_service_be.dtos.Assignment.response.BookingSummary;
 import iuh.house_keeping_service_be.services.AssignmentService.AssignmentService;
@@ -144,6 +146,80 @@ public class EmployeeAssignmentController {
             return ResponseEntity.status(500).body(Map.of(
                     "success", false,
                     "message", "Lỗi khi nhận booking: " + e.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/assignments/{assignmentId}/check-in")
+    @PreAuthorize("hasAuthority('ROLE_EMPLOYEE')")
+    public ResponseEntity<?> checkInAssignment(
+            @PathVariable String assignmentId,
+            @Valid @RequestBody AssignmentActionRequest request) {
+
+        try {
+            AssignmentDetailResponse response = assignmentService.checkIn(assignmentId, request);
+            return ResponseEntity.ok(new AssignmentActionResponse(
+                    true,
+                    "Điểm danh bắt đầu công việc thành công",
+                    response
+            ));
+        } catch (IllegalStateException e) {
+            log.warn("Check-in assignment failed: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(new AssignmentActionResponse(
+                    false,
+                    e.getMessage(),
+                    null
+            ));
+        } catch (IllegalArgumentException e) {
+            log.warn("Check-in assignment invalid request: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(new AssignmentActionResponse(
+                    false,
+                    e.getMessage(),
+                    null
+            ));
+        } catch (Exception e) {
+            log.error("Error when checking in assignment: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(new AssignmentActionResponse(
+                    false,
+                    "Lỗi khi điểm danh công việc: " + e.getMessage(),
+                    null
+            ));
+        }
+    }
+
+    @PostMapping("/assignments/{assignmentId}/check-out")
+    @PreAuthorize("hasAuthority('ROLE_EMPLOYEE')")
+    public ResponseEntity<?> checkOutAssignment(
+            @PathVariable String assignmentId,
+            @Valid @RequestBody AssignmentActionRequest request) {
+
+        try {
+            AssignmentDetailResponse response = assignmentService.checkOut(assignmentId, request);
+            return ResponseEntity.ok(new AssignmentActionResponse(
+                    true,
+                    "Chấm công kết thúc công việc thành công",
+                    response
+            ));
+        } catch (IllegalStateException e) {
+            log.warn("Check-out assignment failed: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(new AssignmentActionResponse(
+                    false,
+                    e.getMessage(),
+                    null
+            ));
+        } catch (IllegalArgumentException e) {
+            log.warn("Check-out assignment invalid request: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(new AssignmentActionResponse(
+                    false,
+                    e.getMessage(),
+                    null
+            ));
+        } catch (Exception e) {
+            log.error("Error when checking out assignment: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(new AssignmentActionResponse(
+                    false,
+                    "Lỗi khi chấm công công việc: " + e.getMessage(),
+                    null
             ));
         }
     }

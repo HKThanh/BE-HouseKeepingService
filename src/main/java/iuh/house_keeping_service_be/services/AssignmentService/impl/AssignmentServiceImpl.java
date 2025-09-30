@@ -1,5 +1,6 @@
 package iuh.house_keeping_service_be.services.AssignmentService.impl;
 
+import iuh.house_keeping_service_be.dtos.Assignment.request.AssignmentActionRequest;
 import iuh.house_keeping_service_be.dtos.Assignment.request.AssignmentCancelRequest;
 import iuh.house_keeping_service_be.dtos.Assignment.response.AssignmentDetailResponse;
 import iuh.house_keeping_service_be.dtos.Assignment.response.BookingSummary;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -27,6 +29,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class AssignmentServiceImpl implements AssignmentService {
+
+    private static final DateTimeFormatter CHECK_WINDOW_FORMATTER = DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy");
 
     private final AssignmentRepository assignmentRepository;
     private final BookingRepository bookingRepository;
@@ -212,6 +216,80 @@ public class AssignmentServiceImpl implements AssignmentService {
         }
 
         return mapToAssignmentDetailResponse(assignment);
+    }
+
+    @Override
+    @Transactional
+    public AssignmentDetailResponse checkIn(String assignmentId, AssignmentActionRequest request) {
+        Assignment assignment = assignmentRepository.findByIdWithDetails(assignmentId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy công việc"));
+
+        ensureAssignmentBelongsToEmployee(assignment, request.employeeId());
+
+        if (assignment.getCheckInTime() != null) {
+            throw new IllegalStateException("Công việc đã được điểm danh bắt đầu");
+        }
+
+        if (assignment.getStatus() != AssignmentStatus.ASSIGNED) {
+            throw new IllegalStateException(String.format(
+                    "Không thể điểm danh công việc đang ở trạng thái %s",
+                    assignment.getStatus().name()
+            ));
+        }
+
+        Booking booking = assignment.getBookingDetail().getBooking();
+        if (booking == null || booking.getBookingTime() == null) {
+            throw new IllegalStateException("Không xác định được thời gian bắt đầu của lịch làm");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime bookingTime = booking.getBookingTime();
+        LocalDateTime windowStart = bookingTime.minusMinutes(10);
+        LocalDateTime windowEnd = bookingTime.plusMinutes(5);
+
+        if (now.isBefore(windowStart) || now.isAfter(windowEnd)) {
+            throw new IllegalStateException(String.format(
+                    "Chỉ được điểm danh trong khoảng từ %s đến %s",
+                    windowStart.format(CHECK_WINDOW_FORMATTER),
+                    windowEnd.format(CHECK_WINDOW_FORMATTER)
+            ));
+        }
+
+        assignment.setCheckInTime(now);
+        assignment.setStatus(AssignmentStatus.IN_PROGRESS);
+        Assignment savedAssignment = assignmentRepository.save(assignment);
+
+        updateBookingStatusToInProgressIfNeeded(booking, now);
+
+        return mapToAssignmentDetailResponse(savedAssignment);
+    }
+
+    @Override
+    @Transactional
+    public AssignmentDetailResponse checkOut(String assignmentId, AssignmentActionRequest request) {
+        Assignment assignment = assignmentRepository.findByIdWithDetails(assignmentId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy công việc"));
+
+        ensureAssignmentBelongsToEmployee(assignment, request.employeeId());
+
+        if (assignment.getStatus() != AssignmentStatus.IN_PROGRESS) {
+            throw new IllegalStateException("Chỉ có thể chấm công kết thúc khi công việc đang được thực hiện");
+        }
+
+        if (assignment.getCheckOutTime() != null) {
+            throw new IllegalStateException("Công việc đã được chấm công kết thúc");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        assignment.setCheckOutTime(now);
+        assignment.setStatus(AssignmentStatus.COMPLETED);
+
+        Assignment savedAssignment = assignmentRepository.save(assignment);
+
+        Booking booking = assignment.getBookingDetail().getBooking();
+        updateBookingStatusToCompletedIfNeeded(booking, now);
+
+        return mapToAssignmentDetailResponse(savedAssignment);
     }
 
     private LocalDateTime calculateShiftEndTime(LocalDateTime shiftStart, BookingDetail bookingDetail) {
@@ -491,5 +569,48 @@ public class AssignmentServiceImpl implements AssignmentService {
                 assignment.getCheckOutTime(),
                 booking.getNote()
         );
+    }
+
+    private void ensureAssignmentBelongsToEmployee(Assignment assignment, String employeeId) {
+        if (assignment.getEmployee() == null || assignment.getEmployee().getEmployeeId() == null
+                || !assignment.getEmployee().getEmployeeId().equals(employeeId)) {
+            throw new IllegalStateException("Nhân viên không có quyền truy cập công việc này");
+        }
+    }
+
+    private void updateBookingStatusToInProgressIfNeeded(Booking booking, LocalDateTime referenceTime) {
+        if (booking == null) {
+            return;
+        }
+
+        List<Assignment> bookingAssignments = assignmentRepository.findByBookingIdWithStatus(booking.getBookingId());
+
+        boolean allStarted = bookingAssignments.stream()
+                .filter(a -> a.getStatus() != AssignmentStatus.CANCELLED)
+                .allMatch(a -> a.getStatus() == AssignmentStatus.IN_PROGRESS || a.getStatus() == AssignmentStatus.COMPLETED);
+
+        if (allStarted && booking.getStatus() != BookingStatus.IN_PROGRESS) {
+            booking.setStatus(BookingStatus.IN_PROGRESS);
+            booking.setUpdatedAt(referenceTime);
+            bookingRepository.save(booking);
+        }
+    }
+
+    private void updateBookingStatusToCompletedIfNeeded(Booking booking, LocalDateTime referenceTime) {
+        if (booking == null) {
+            return;
+        }
+
+        List<Assignment> bookingAssignments = assignmentRepository.findByBookingIdWithStatus(booking.getBookingId());
+
+        boolean allCompleted = bookingAssignments.stream()
+                .filter(a -> a.getStatus() != AssignmentStatus.CANCELLED)
+                .allMatch(a -> a.getStatus() == AssignmentStatus.COMPLETED);
+
+        if (allCompleted && booking.getStatus() != BookingStatus.COMPLETED) {
+            booking.setStatus(BookingStatus.COMPLETED);
+            booking.setUpdatedAt(referenceTime);
+            bookingRepository.save(booking);
+        }
     }
 }
