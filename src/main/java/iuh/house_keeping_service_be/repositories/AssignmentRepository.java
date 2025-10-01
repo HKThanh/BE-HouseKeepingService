@@ -170,4 +170,6 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
             "LEFT JOIN FETCH b.address " +
             "WHERE a.assignmentId = :assignmentId")
     Optional<Assignment> findByIdWithDetails(@Param("assignmentId") String assignmentId);
+
+    boolean existsByBookingDetail_Booking_BookingIdAndEmployee_EmployeeId(String bookingId, String employeeId);
 }

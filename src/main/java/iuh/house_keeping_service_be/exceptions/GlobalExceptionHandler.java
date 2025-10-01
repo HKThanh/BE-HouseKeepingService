@@ -146,4 +146,26 @@ public class GlobalExceptionHandler {
         var response = BookingErrorResponse.validationError("Request validation failed", errors);
         return ResponseEntity.badRequest().body(response);
     }
+
+
+    @ExceptionHandler(ReviewPermissionException.class)
+    public ResponseEntity<ApiResponse<?>> handleReviewPermission(ReviewPermissionException ex) {
+        log.warn("Review permission denied: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ApiResponse<>(false, ex.getMessage(), null));
+    }
+
+    @ExceptionHandler(ReviewAlreadyExistsException.class)
+    public ResponseEntity<ApiResponse<?>> handleDuplicateReview(ReviewAlreadyExistsException ex) {
+        log.warn("Duplicate review detected: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ApiResponse<>(false, ex.getMessage(), null));
+    }
+
+    @ExceptionHandler({ReviewBookingStateException.class, ReviewAssignmentException.class})
+    public ResponseEntity<ApiResponse<?>> handleReviewBusinessExceptions(RuntimeException ex) {
+        log.warn("Review validation failed: {}", ex.getMessage());
+        return ResponseEntity.badRequest()
+                .body(new ApiResponse<>(false, ex.getMessage(), null));
+    }
 }
