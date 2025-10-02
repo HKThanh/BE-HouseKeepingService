@@ -37,6 +37,7 @@ public class BookingServiceImpl implements BookingService {
     private final PaymentRepository paymentRepository;
     private final PaymentMethodRepository paymentMethodRepository;
     private final AssignmentRepository assignmentRepository;
+    private final ChatRoomRepository chatRoomRepository;
     private final AddressRepository addressRepository;
     private final EmployeeRepository employeeRepository;
     private final CustomerRepository customerRepository;
@@ -103,7 +104,11 @@ public class BookingServiceImpl implements BookingService {
                     ? assignmentRepository.saveAll(assignments)
                     : Collections.emptyList();
             Payment savedPayment = paymentRepository.save(payment);
-            
+
+            if (hasAssignments) {
+                savedAssignments.forEach(this::initializeChatRoomIfAbsent);
+            }
+
             log.info("Booking created successfully with ID: {}", savedBooking.getBookingId());
             
             // Step 8: Return creation summary
@@ -686,6 +691,35 @@ public class BookingServiceImpl implements BookingService {
         }
         
         return assignments;
+    }
+
+    private void initializeChatRoomIfAbsent(Assignment assignment) {
+        if (assignment == null || assignment.getAssignmentId() == null) {
+            return;
+        }
+
+        if (chatRoomRepository.findByAssignmentAssignmentId(assignment.getAssignmentId()).isPresent()) {
+            return;
+        }
+
+        BookingDetail bookingDetail = assignment.getBookingDetail();
+        Booking booking = bookingDetail != null ? bookingDetail.getBooking() : null;
+        Customer customer = booking != null ? booking.getCustomer() : null;
+        Account customerAccount = customer != null ? customer.getAccount() : null;
+        Employee employee = assignment.getEmployee();
+        Account employeeAccount = employee != null ? employee.getAccount() : null;
+
+        if (customerAccount == null || employeeAccount == null) {
+            log.warn("Cannot initialize chat room for assignment {} due to missing participant accounts", assignment.getAssignmentId());
+            return;
+        }
+
+        ChatRoom chatRoom = new ChatRoom();
+        chatRoom.setAssignment(assignment);
+        chatRoom.setCustomerAccount(customerAccount);
+        chatRoom.setEmployeeAccount(employeeAccount);
+
+        chatRoomRepository.save(chatRoom);
     }
 
     private Payment createPaymentRecord(Booking booking, int paymentMethodId) {

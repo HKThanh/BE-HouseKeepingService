@@ -38,6 +38,7 @@ public class AssignmentServiceImpl implements AssignmentService {
     private final EmployeeRepository employeeRepository;
     private final EmployeeUnavailabilityRepository employeeUnavailabilityRepository;
     private final AddressRepository addressRepository;
+    private final ChatRoomRepository chatRoomRepository;
 //    private final NotificationService notificationService;
 
     @Override
@@ -203,9 +204,9 @@ public class AssignmentServiceImpl implements AssignmentService {
         assignment.setBookingDetail(bookingDetail);
         assignment.setEmployee(employee);
         assignment.setStatus(AssignmentStatus.ASSIGNED);
-        assignmentRepository.save(assignment);
+        Assignment savedAssignment = assignmentRepository.save(assignment);
 
-        bookingDetail.getAssignments().add(assignment);
+        bookingDetail.getAssignments().add(savedAssignment);
 
         boolean allAssigned = booking.getBookingDetails().stream()
                 .allMatch(bd -> bd.getAssignments().size() >= bd.getQuantity());
@@ -215,7 +216,38 @@ public class AssignmentServiceImpl implements AssignmentService {
             bookingRepository.save(booking);
         }
 
-        return mapToAssignmentDetailResponse(assignment);
+        initializeChatRoomIfAbsent(savedAssignment);
+
+        return mapToAssignmentDetailResponse(savedAssignment);
+    }
+
+    private void initializeChatRoomIfAbsent(Assignment assignment) {
+        if (assignment == null || assignment.getAssignmentId() == null) {
+            return;
+        }
+
+        if (chatRoomRepository.findByAssignmentAssignmentId(assignment.getAssignmentId()).isPresent()) {
+            return;
+        }
+
+        BookingDetail bookingDetail = assignment.getBookingDetail();
+        Booking booking = bookingDetail != null ? bookingDetail.getBooking() : null;
+        Customer customer = booking != null ? booking.getCustomer() : null;
+        Account customerAccount = customer != null ? customer.getAccount() : null;
+        Employee employee = assignment.getEmployee();
+        Account employeeAccount = employee != null ? employee.getAccount() : null;
+
+        if (customerAccount == null || employeeAccount == null) {
+            log.warn("Cannot initialize chat room for assignment {} due to missing participant accounts", assignment.getAssignmentId());
+            return;
+        }
+
+        ChatRoom chatRoom = new ChatRoom();
+        chatRoom.setAssignment(assignment);
+        chatRoom.setCustomerAccount(customerAccount);
+        chatRoom.setEmployeeAccount(employeeAccount);
+
+        chatRoomRepository.save(chatRoom);
     }
 
     @Override

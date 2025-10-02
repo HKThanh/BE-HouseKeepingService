@@ -21,13 +21,15 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     payload_data TEXT,
     sent_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     read_at TIMESTAMP WITH TIME ZONE,
-    is_read BOOLEAN DEFAULT FALSE,
-    is_deleted BOOLEAN DEFAULT FALSE,
-    is_revoked BOOLEAN DEFAULT FALSE,
-    is_reply BOOLEAN DEFAULT FALSE,
-    reply_to_message_id VARCHAR(36) REFERENCES chat_messages(chat_message_id) ON DELETE SET NULL,
+    read_by_account_id VARCHAR(36),
+    parent_message_id VARCHAR(36) REFERENCES chat_messages(chat_message_id) ON DELETE SET NULL,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    deleted_by_account_id VARCHAR(36),
+    recalled_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_chat_messages_room_id ON chat_messages (chat_room_id);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_sender ON chat_messages (sender_account_id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_parent ON chat_messages (parent_message_id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_deleted_at ON chat_messages (deleted_at);
