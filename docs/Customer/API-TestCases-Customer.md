@@ -382,4 +382,4 @@ The request body includes:
 
 ## Notes
 - These test cases are minimal and can be expanded with additional scenarios.
-- Ensure the test environment includes representative customer data from `housekeeping_service_v8.sql`.
+- Ensure the test environment includes representative customer data from `01_housekeeping_service.sql`.

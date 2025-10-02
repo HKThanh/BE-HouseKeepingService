@@ -27,7 +27,7 @@ All endpoints require:
 ---
 
 ## Database Test Data
-Based on `housekeeping_service_v8.sql`:
+Based on `01_housekeeping_service.sql`:
 - **Services**:
   - Service ID 1: "Dọn dẹp theo giờ" (50,000đ/Giờ, 2.0 giờ, recommended 1 staff)
   - Service ID 2: "Tổng vệ sinh" (100,000đ/Gói, 2.0 giờ, recommended 3 staff)
@@ -743,7 +743,7 @@ Based on `housekeeping_service_v8.sql`:
 ---
 
 ## Notes
-- **Test Environment**: Database should be configured with test data including services, service options, choices, and pricing rules from housekeeping_service_v8.sql.
+- **Test Environment**: Database should be configured with test data including services, service options, choices, and pricing rules from 01_housekeeping_service.sql.
 - **Authentication**: All endpoints require valid JWT tokens.
 - **Permission**: Users must have "service.view" permission to access these endpoints.
 - **Service Status**: Only active services can have their options retrieved or prices calculated.

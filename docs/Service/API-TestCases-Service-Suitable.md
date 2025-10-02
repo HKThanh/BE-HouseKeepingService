@@ -29,7 +29,7 @@ All endpoints require:
 ---
 
 ## Database Test Data
-Based on housekeeping_service_v8.sql:
+Based on 01_housekeeping_service.sql:
 - **Services**:
   - Service ID 1: "Dọn dẹp theo giờ" (50,000đ/hour, 2.0 hours, recommended staff: 1)
   - Service ID 2: "Tổng vệ sinh" (400,000đ/package, 4.0 hours, recommended staff: 3)
@@ -432,7 +432,7 @@ Based on housekeeping_service_v8.sql:
 ---
 
 ## Notes
-- **Test Environment**: Database should be configured with test data including services, service options, employees, and working zones from housekeeping_service_v8.sql.
+- **Test Environment**: Database should be configured with test data including services, service options, employees, and working zones from 01_housekeeping_service.sql.
 - **Authentication**: All endpoints require valid JWT tokens.
 - **Authorization**: PreAuthorize annotation ensures proper role-based access control for suitable employees endpoint.
 - **Service Options**: Options are returned with proper display order and choice hierarchy.

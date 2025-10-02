@@ -765,7 +765,7 @@ Each test case includes:
 
 ### Test Case 21: Real Database Integration
 - **Test Case ID**: TC_REVIEW_021
-- **Description**: Verify integration with actual database data from housekeeping_service_v8.sql
+- **Description**: Verify integration with actual database data from 01_housekeeping_service.sql
 - **Covered Data**:
   - **Employees**: Jane Smith (e1000001-0000-0000-0000-000000000001), Bob Wilson (e1000001-0000-0000-0000-000000000002)
   - **Customers**: John Doe, Mary Jones, Jane Smith Customer
@@ -783,7 +783,7 @@ Each test case includes:
 
 ## Notes
 - **Test Date Context**: All test cases assume current date is October 1, 2025
-- **Real Data Integration**: Uses actual IDs, accounts, and service data from housekeeping_service_v8.sql
+- **Real Data Integration**: Uses actual IDs, accounts, and service data from 01_housekeeping_service.sql
 - **Employee Rating System**:
   - LOWEST: ≤ 2.0 average rating
   - LOW: 2.0 - 2.9 average rating  

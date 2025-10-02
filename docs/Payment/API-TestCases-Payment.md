@@ -30,7 +30,7 @@ All endpoints require:
 ---
 
 ## Database Test Data
-Based on housekeeping_service_v8.sql:
+Based on 01_housekeeping_service.sql:
 - **Sample Customer**: john_doe (ID: a1000001-0000-0000-0000-000000000001)
 - **Sample Employee**: jane_smith (ID: a1000001-0000-0000-0000-000000000002)
 - **Sample Booking**: booking_001 with amount 500000 VND
@@ -602,7 +602,7 @@ Based on housekeeping_service_v8.sql:
 ---
 
 ## Notes
-- **Test Environment**: Database should be configured with test data from housekeeping_service_v8.sql.
+- **Test Environment**: Database should be configured with test data from 01_housekeeping_service.sql.
 - **Authentication**: Most endpoints require valid JWT tokens except webhook endpoint and methods endpoint.
 - **Authorization**: 
   - Payment creation: CUSTOMER role required

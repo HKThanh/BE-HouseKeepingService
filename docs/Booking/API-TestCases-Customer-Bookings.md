@@ -35,7 +35,7 @@ All endpoints require:
 ---
 
 ## Database Test Data
-Based on housekeeping_service_v8.sql:
+Based on 01_housekeeping_service.sql:
 - **Sample Customer**: john_doe (c1000001-0000-0000-0000-000000000001)
 - **Customer has multiple bookings** with various statuses:
   - COMPLETED: b0000001-0000-0000-0000-000000000001 (80,000 VND)

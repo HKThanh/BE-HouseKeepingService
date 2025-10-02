@@ -42,7 +42,7 @@ All endpoints require:
 ---
 
 ## Database Test Data
-Based on housekeeping_service_v8.sql:
+Based on 01_housekeeping_service.sql:
 - **Sample Customer**: john_doe (c1000001-0000-0000-0000-000000000001)
 - **Sample Employee**: jane_smith (e1000001-0000-0000-0000-000000000001)
 - **Sample Address**: adrs0001-0000-0000-0000-000000000001 (default address)

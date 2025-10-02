@@ -666,7 +666,7 @@ All endpoints require:
 
 ### Test Case 20: Real Database Integration
 - **Test Case ID**: TC_EMP_ASSIGN_020
-- **Description**: Verify integration with actual database data from housekeeping_service_v8.sql
+- **Description**: Verify integration with actual database data from 01_housekeeping_service.sql
 - **Covered Data**:
   - **Employees**: Jane Smith (e1000001-0000-0000-0000-000000000001), Bob Wilson (e1000001-0000-0000-0000-000000000002)
   - **Customers**: John Doe, Mary Jones, Jane Smith Customer
@@ -684,7 +684,7 @@ All endpoints require:
 
 ## Notes
 - **Test Date Context**: All test cases assume current date is September 22, 2025
-- **Real Data Integration**: Uses actual IDs, addresses, and service data from housekeeping_service_v8.sql
+- **Real Data Integration**: Uses actual IDs, addresses, and service data from 01_housekeeping_service.sql
 - **Employee Profiles**:
   - Jane Smith: Skills (Cleaning, Organizing), Zones (Tân Phú, Tân Bình)
   - Bob Wilson: Skills (Deep Cleaning, Laundry), Zone (Gò Vấp)
