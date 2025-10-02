@@ -16,11 +16,17 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     chat_message_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4(),
     chat_room_id VARCHAR(36) NOT NULL REFERENCES chat_rooms(chat_room_id) ON DELETE CASCADE,
     sender_account_id VARCHAR(36) NOT NULL REFERENCES account(account_id) ON DELETE CASCADE,
-    message TEXT NOT NULL,
+    message_text TEXT,
+    payload_type VARCHAR(255),
+    payload_data TEXT,
     sent_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    is_read BOOLEAN DEFAULT FALSE,
     read_at TIMESTAMP WITH TIME ZONE,
-    read_by_account_id VARCHAR(36),
+    is_read BOOLEAN DEFAULT FALSE,
+    is_deleted BOOLEAN DEFAULT FALSE,
+    is_revoked BOOLEAN DEFAULT FALSE,
+    is_reply BOOLEAN DEFAULT FALSE,
+    reply_to_message_id VARCHAR(36) REFERENCES chat_messages(chat_message_id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_chat_messages_room_id ON chat_messages (chat_room_id);
