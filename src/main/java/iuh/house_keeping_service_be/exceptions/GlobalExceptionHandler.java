@@ -168,4 +168,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest()
                 .body(new ApiResponse<>(false, ex.getMessage(), null));
     }
+
+    @ExceptionHandler(ChatMessageOperationException.class)
+    public ResponseEntity<ApiResponse<?>> handleChatMessageOperation(ChatMessageOperationException e) {
+        log.warn("Chat message operation failed: {}", e.getMessage());
+        ApiResponse<?> errorResponse = new ApiResponse<>(false, e.getMessage(), null);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+    }
+
 }
