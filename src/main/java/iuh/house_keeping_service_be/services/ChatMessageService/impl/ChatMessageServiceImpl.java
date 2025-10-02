@@ -3,7 +3,9 @@ package iuh.house_keeping_service_be.services.ChatMessageService.impl;
 import iuh.house_keeping_service_be.dtos.ChatMessage.request.ChatMessageDeleteRequest;
 import iuh.house_keeping_service_be.dtos.ChatMessage.request.ChatMessageRecallRequest;
 import iuh.house_keeping_service_be.dtos.ChatMessage.request.ChatMessageReplyRequest;
+import iuh.house_keeping_service_be.dtos.ChatMessage.request.ChatMessageSendRequest;
 import iuh.house_keeping_service_be.dtos.ChatMessage.response.ChatMessageResponse;
+import iuh.house_keeping_service_be.dtos.ChatMessage.response.ChatMessageSocketPayload;
 import iuh.house_keeping_service_be.exceptions.ChatMessageOperationException;
 import iuh.house_keeping_service_be.exceptions.ResourceNotFoundException;
 import iuh.house_keeping_service_be.models.Account;
@@ -11,9 +13,11 @@ import iuh.house_keeping_service_be.models.ChatMessage;
 import iuh.house_keeping_service_be.models.ChatRoom;
 import iuh.house_keeping_service_be.repositories.AccountRepository;
 import iuh.house_keeping_service_be.repositories.ChatMessageRepository;
+import iuh.house_keeping_service_be.repositories.ChatRoomRepository;
 import iuh.house_keeping_service_be.services.ChatMessageService.ChatMessageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,26 +32,22 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
     private final ChatMessageRepository chatMessageRepository;
     private final AccountRepository accountRepository;
+    private final ChatRoomRepository chatRoomRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    @Override
-    @Transactional
-    public ChatMessageResponse replyMessage(String parentMessageId, ChatMessageReplyRequest request) {
-        ChatMessage parentMessage = chatMessageRepository.findById(parentMessageId)
+    public ChatMessageResponse sendMessage(String chatRoomId, ChatMessageSendRequest request) {
+        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
                 .orElseThrow(() -> ResourceNotFoundException.withCustomMessage(
-                        "Không tìm thấy tin nhắn để trả lời: " + parentMessageId
+                        "Không tìm thấy phòng chat: " + chatRoomId
                 ));
-
-        if (parentMessage.isDeleted()) {
-            throw new ChatMessageOperationException("Không thể trả lời tin nhắn đã bị xóa");
-        }
-
         Account sender = accountRepository.findById(request.senderAccountId())
                 .orElseThrow(() -> ResourceNotFoundException.withCustomMessage(
                         "Không tìm thấy tài khoản gửi: " + request.senderAccountId()
                 ));
 
-        ChatRoom chatRoom = parentMessage.getChatRoom();
         validateParticipant(chatRoom, sender.getAccountId());
+
+        ChatMessage parentMessage = resolveParentMessage(chatRoom, request.parentMessageId());
 
         ChatMessage message = new ChatMessage();
         message.setChatRoom(chatRoom);
@@ -58,8 +58,34 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         message.setParentMessage(parentMessage);
 
         ChatMessage saved = chatMessageRepository.save(message);
-        log.debug("Created reply message {} for parent {}", saved.getChatMessageId(), parentMessageId);
-        return toResponse(saved);
+        chatRoom.setLastMessageAt(saved.getSentAt());
+        chatRoomRepository.save(chatRoom);
+
+        ChatMessageResponse response = toResponse(saved);
+        publishSocketEvent(chatRoom.getChatRoomId(), ChatMessageSocketPayload.EventType.CREATED, response);
+        log.debug("Created message {} in chat room {}", saved.getChatMessageId(), chatRoomId);
+        return response;
+    }
+
+    @Override
+    @Transactional
+    public ChatMessageResponse replyMessage(String parentMessageId, ChatMessageReplyRequest request) {
+        ChatMessage parentMessage = chatMessageRepository.findById(parentMessageId)
+                .orElseThrow(() -> ResourceNotFoundException.withCustomMessage(
+                        "Không tìm thấy tin nhắn để trả lời: " + parentMessageId
+                ));
+
+        ChatMessageSendRequest sendRequest = new ChatMessageSendRequest(
+                request.senderAccountId(),
+                request.messageText(),
+                request.payloadType(),
+                request.payloadData(),
+                parentMessageId
+        );
+
+        ChatMessageResponse response = sendMessage(parentMessage.getChatRoom().getChatRoomId(), sendRequest);
+        log.debug("Created reply message for parent {}", parentMessageId);
+        return response;
     }
 
     @Override
@@ -83,7 +109,9 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             log.debug("Message {} deleted by {}", messageId, actor.getAccountId());
         }
 
-        return toResponse(message);
+        ChatMessageResponse response = toResponse(message);
+        publishSocketEvent(message.getChatRoom().getChatRoomId(), ChatMessageSocketPayload.EventType.DELETED, response);
+        return response;
     }
 
     @Override
@@ -113,7 +141,30 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         message.markRecalled(request.accountId());
         chatMessageRepository.save(message);
         log.debug("Message {} recalled by {}", messageId, request.accountId());
-        return toResponse(message);
+        ChatMessageResponse response = toResponse(message);
+        publishSocketEvent(message.getChatRoom().getChatRoomId(), ChatMessageSocketPayload.EventType.RECALLED, response);
+        return response;
+    }
+
+    private ChatMessage resolveParentMessage(ChatRoom chatRoom, String parentMessageId) {
+        if (parentMessageId == null || parentMessageId.isBlank()) {
+            return null;
+        }
+
+        ChatMessage parentMessage = chatMessageRepository.findById(parentMessageId)
+                .orElseThrow(() -> ResourceNotFoundException.withCustomMessage(
+                        "Không tìm thấy tin nhắn để trả lời: " + parentMessageId
+                ));
+
+        if (!parentMessage.getChatRoom().getChatRoomId().equals(chatRoom.getChatRoomId())) {
+            throw new ChatMessageOperationException("Tin nhắn cha không thuộc phòng chat này");
+        }
+
+        if (parentMessage.isDeleted()) {
+            throw new ChatMessageOperationException("Không thể trả lời tin nhắn đã bị xóa");
+        }
+
+        return parentMessage;
     }
 
     private void validateParticipant(ChatRoom chatRoom, String accountId) {
@@ -129,6 +180,18 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         if (!isCustomer && !isEmployee) {
             throw new ChatMessageOperationException("Tài khoản không thuộc phòng chat này");
         }
+    }
+
+    private void publishSocketEvent(String chatRoomId, ChatMessageSocketPayload.EventType eventType, ChatMessageResponse response) {
+        if (chatRoomId == null) {
+            log.warn("Không thể phát sự kiện WebSocket vì chatRoomId null");
+            return;
+        }
+
+        messagingTemplate.convertAndSend(
+                "/topic/chatrooms/" + chatRoomId,
+                new ChatMessageSocketPayload(eventType, response)
+        );
     }
 
     private ChatMessageResponse toResponse(ChatMessage message) {
