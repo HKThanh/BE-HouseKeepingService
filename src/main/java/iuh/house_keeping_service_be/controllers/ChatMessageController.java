@@ -3,6 +3,7 @@ package iuh.house_keeping_service_be.controllers;
 import iuh.house_keeping_service_be.dtos.ChatMessage.request.ChatMessageDeleteRequest;
 import iuh.house_keeping_service_be.dtos.ChatMessage.request.ChatMessageRecallRequest;
 import iuh.house_keeping_service_be.dtos.ChatMessage.request.ChatMessageReplyRequest;
+import iuh.house_keeping_service_be.dtos.ChatMessage.request.ChatMessageSendRequest;
 import iuh.house_keeping_service_be.dtos.ChatMessage.response.ChatMessageResponse;
 import iuh.house_keeping_service_be.dtos.EmployeeSchedule.ApiResponse;
 import iuh.house_keeping_service_be.services.ChatMessageService.ChatMessageService;
@@ -20,6 +21,16 @@ import org.springframework.web.bind.annotation.*;
 public class ChatMessageController {
 
     private final ChatMessageService chatMessageService;
+
+    @PostMapping("/{chatRoomId}")
+    public ResponseEntity<ApiResponse<ChatMessageResponse>> sendMessage(
+            @PathVariable String chatRoomId,
+            @Valid @RequestBody ChatMessageSendRequest request) {
+        log.info("Sending message to chat room {} by {}", chatRoomId, request.senderAccountId());
+        ChatMessageResponse response = chatMessageService.sendMessage(chatRoomId, request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new ApiResponse<>(true, "Gửi tin nhắn thành công", response));
+    }
 
     @PostMapping("/{messageId}/reply")
     public ResponseEntity<ApiResponse<ChatMessageResponse>> replyMessage(

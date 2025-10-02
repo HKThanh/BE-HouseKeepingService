@@ -35,6 +35,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     private final ChatRoomRepository chatRoomRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
+    @Transactional
     public ChatMessageResponse sendMessage(String chatRoomId, ChatMessageSendRequest request) {
         ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId)
                 .orElseThrow(() -> ResourceNotFoundException.withCustomMessage(
