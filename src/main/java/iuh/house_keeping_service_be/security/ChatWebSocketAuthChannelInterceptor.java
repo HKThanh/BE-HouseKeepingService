@@ -44,39 +44,38 @@ public class ChatWebSocketAuthChannelInterceptor implements ChannelInterceptor {
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
-        StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
+        log.debug("Pre-send message: {}", message);
 
-        if (accessor != null) {
-            StompCommand command = accessor.getCommand();
+        StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
+        StompCommand command = accessor.getCommand();
 
-            if (StompCommand.CONNECT.equals(command) || StompCommand.SUBSCRIBE.equals(command)) {
-                String authHeader = resolveAuthorizationHeader(accessor);
+        if (StompCommand.CONNECT.equals(command) || StompCommand.SUBSCRIBE.equals(command)) {
+            String authHeader = resolveAuthorizationHeader(accessor);
 
-                if (StringUtils.hasText(authHeader) && authHeader.startsWith("Bearer ")) {
-                    String token = authHeader.substring(7);
-                    try {
-                        String username = jwtUtil.extractUsername(token);
-                        UserDetails userDetails = customUserDetailsService.loadUserByUsername(username);
+            if (StringUtils.hasText(authHeader) && authHeader.startsWith("Bearer ")) {
+                String token = authHeader.substring(7);
+                try {
+                    String username = jwtUtil.extractUsername(token);
+                    UserDetails userDetails = customUserDetailsService.loadUserByUsername(username);
 
-                        if (jwtUtil.validateToken(token, userDetails.getUsername())) {
-                            UsernamePasswordAuthenticationToken authenticationToken =
-                                    new UsernamePasswordAuthenticationToken(userDetails, null,
-                                            userDetails.getAuthorities());
-                            accessor.setUser(authenticationToken);
-                        } else {
-                            log.warn("Invalid JWT token during WebSocket authentication for user: {}", username);
-                            throw new IllegalArgumentException("Invalid JWT token");
-                        }
-                    } catch (Exception ex) {
-                        log.error("Failed to authenticate WebSocket user: {}", ex.getMessage());
-                        throw ex;
+                    if (jwtUtil.validateToken(token, userDetails.getUsername())) {
+                        UsernamePasswordAuthenticationToken authenticationToken =
+                                new UsernamePasswordAuthenticationToken(userDetails, null,
+                                        userDetails.getAuthorities());
+                        accessor.setUser(authenticationToken);
+                    } else {
+                        log.warn("Invalid JWT token during WebSocket authentication for user: {}", username);
+                        throw new IllegalArgumentException("Invalid JWT token");
                     }
+                } catch (Exception ex) {
+                    log.error("Failed to authenticate WebSocket user: {}", ex.getMessage());
+                    throw ex;
                 }
             }
+        }
 
-            if (StompCommand.SUBSCRIBE.equals(command)) {
-                validateSubscription(accessor);
-            }
+        if (StompCommand.SUBSCRIBE.equals(command)) {
+            validateSubscription(accessor);
         }
 
         return message;

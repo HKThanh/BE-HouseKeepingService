@@ -17,13 +17,21 @@ public class CorsConfig {
 
         // Use allowedOriginPatterns instead of allowedOrigins when credentials are true
         configuration.setAllowedOriginPatterns(Arrays.asList(
-            "http://localhost:*"    // All localhost ports
+            "http://localhost:*",    // All localhost ports
+            "https://web.postman.co",
+            "https://app.getpostman.com",
+            "http://*.postman.com",
+            "https://*.postman.com"
         ));
 
         configuration.setAllowedOrigins(Arrays.asList(
             "http://localhost:3000",  // React dev server
             "http://localhost:5173",  // Vite dev server
-            "http://localhost:8080"  // Local development
+            "http://localhost:8080", // Local development
+            "https://web.postman.co",
+            "https://app.getpostman.com",
+            "http://*.postman.com",
+            "https://*.postman.com"
         ));
 
         // Allow all HTTP methods

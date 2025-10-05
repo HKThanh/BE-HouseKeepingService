@@ -21,7 +21,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws/chat")
-                .setAllowedOriginPatterns("http://localhost:*");
+                .setAllowedOriginPatterns(
+                        "http://localhost:*",
+                        "https://web.postman.co",
+                        "https://app.getpostman.com"
+                );
     }
 
     @Override
