@@ -11,6 +11,7 @@ import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
+import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -42,42 +43,67 @@ public class ChatWebSocketAuthChannelInterceptor implements ChannelInterceptor {
         this.chatRoomRepository = chatRoomRepository;
     }
 
-    @Override
+        @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
         log.debug("Pre-send message: {}", message);
-
+    
         StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
         StompCommand command = accessor.getCommand();
-
-        if (StompCommand.CONNECT.equals(command) || StompCommand.SUBSCRIBE.equals(command)) {
-            String authHeader = resolveAuthorizationHeader(accessor);
-
-            if (StringUtils.hasText(authHeader) && authHeader.startsWith("Bearer ")) {
-                String token = authHeader.substring(7);
-                try {
-                    String username = jwtUtil.extractUsername(token);
-                    UserDetails userDetails = customUserDetailsService.loadUserByUsername(username);
-
-                    if (jwtUtil.validateToken(token, userDetails.getUsername())) {
-                        UsernamePasswordAuthenticationToken authenticationToken =
-                                new UsernamePasswordAuthenticationToken(userDetails, null,
-                                        userDetails.getAuthorities());
-                        accessor.setUser(authenticationToken);
-                    } else {
-                        log.warn("Invalid JWT token during WebSocket authentication for user: {}", username);
-                        throw new IllegalArgumentException("Invalid JWT token");
-                    }
-                } catch (Exception ex) {
-                    log.error("Failed to authenticate WebSocket user: {}", ex.getMessage());
-                    throw ex;
+    
+        if (StompCommand.CONNECT.equals(command)) {
+            try {
+                String authHeader = resolveAuthorizationHeader(accessor);
+    
+                if (!StringUtils.hasText(authHeader)) {
+                    log.warn("No authorization header provided for WebSocket connection");
+                    // Thay vì throw exception, return error message
+                    accessor.setHeader("stompCommand", StompCommand.ERROR);
+                    accessor.setHeader("message", "Authorization required");
+                    return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
                 }
+    
+                if (!authHeader.startsWith("Bearer ")) {
+                    log.warn("Invalid authorization header format");
+                    accessor.setHeader("stompCommand", StompCommand.ERROR);
+                    accessor.setHeader("message", "Invalid authorization format");
+                    return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+                }
+    
+                String token = authHeader.substring(7);
+                String username = jwtUtil.extractUsername(token);
+                UserDetails userDetails = customUserDetailsService.loadUserByUsername(username);
+    
+                if (jwtUtil.validateToken(token, userDetails.getUsername())) {
+                    UsernamePasswordAuthenticationToken authenticationToken =
+                            new UsernamePasswordAuthenticationToken(userDetails, null,
+                                    userDetails.getAuthorities());
+                    accessor.setUser(authenticationToken);
+                    log.debug("WebSocket authentication successful for user: {}", username);
+                } else {
+                    log.warn("Invalid JWT token during WebSocket authentication");
+                    accessor.setHeader("stompCommand", StompCommand.ERROR);
+                    accessor.setHeader("message", "Invalid JWT token");
+                    return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+                }
+            } catch (Exception ex) {
+                log.error("Failed to authenticate WebSocket connection: {}", ex.getMessage());
+                accessor.setHeader("stompCommand", StompCommand.ERROR);
+                accessor.setHeader("message", "Authentication failed");
+                return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
             }
         }
-
+    
         if (StompCommand.SUBSCRIBE.equals(command)) {
-            validateSubscription(accessor);
+            try {
+                validateSubscription(accessor);
+            } catch (AccessDeniedException ex) {
+                log.warn("Subscription denied: {}", ex.getMessage());
+                accessor.setHeader("stompCommand", StompCommand.ERROR);
+                accessor.setHeader("message", ex.getMessage());
+                return MessageBuilder.createMessage(new byte[0], accessor.getMessageHeaders());
+            }
         }
-
+    
         return message;
     }
 

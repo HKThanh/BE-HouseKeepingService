@@ -17,21 +17,12 @@ public class CorsConfig {
 
         // Use allowedOriginPatterns instead of allowedOrigins when credentials are true
         configuration.setAllowedOriginPatterns(Arrays.asList(
-            "http://localhost:*",    // All localhost ports
-            "https://web.postman.co",
-            "https://app.getpostman.com",
-            "http://*.postman.com",
-            "https://*.postman.com"
-        ));
-
-        configuration.setAllowedOrigins(Arrays.asList(
-            "http://localhost:3000",  // React dev server
-            "http://localhost:5173",  // Vite dev server
-            "http://localhost:8080", // Local development
-            "https://web.postman.co",
-            "https://app.getpostman.com",
-            "http://*.postman.com",
-            "https://*.postman.com"
+                "http://localhost:*",
+                "https://web.postman.co",
+                "https://app.getpostman.com",
+                "https://*.postman.com",
+                "https://websocketking.com",
+                "*"
         ));
 
         // Allow all HTTP methods
@@ -45,6 +36,17 @@ public class CorsConfig {
 
         // Cache preflight response for 1 hour
         configuration.setMaxAge(3600L);
+
+        configuration.setExposedHeaders(Arrays.asList(
+            "Authorization", 
+            "Cache-Control", 
+            "Content-Type",
+            "Sec-WebSocket-Accept",
+            "Sec-WebSocket-Extensions",
+            "Sec-WebSocket-Key",
+            "Sec-WebSocket-Protocol",
+            "Sec-WebSocket-Version"
+        ));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

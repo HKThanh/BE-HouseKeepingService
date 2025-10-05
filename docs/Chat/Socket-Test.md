@@ -47,10 +47,16 @@ Each test case includes:
   - Chat system is initialized
 - **Input**:
   - **WebSocket URL**: `ws://localhost:8080/ws/chat`
-  - **Headers**:
-    ```
-    Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJqb2huX2RvZSIsImV4cCI6MTY5NzIwMDAwMH0.signature
-    ```
+  - **Connection Methods**:
+    1. **Authorization Header** (Recommended):
+       ```
+       WebSocket Headers:
+       Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJqb2huX2RvZSIsImV4cCI6MTY5NzIwMDAwMH0.signature
+       ```
+    2. **Query Parameter** (Fallback for limited clients):
+       ```
+       WebSocket URL: ws://localhost:8080/ws/chat?token=eyJhbGciOiJIUzI1NiJ9...
+       ```
   - **STOMP Command**:
     ```
     CONNECT
@@ -58,7 +64,9 @@ Each test case includes:
     host:localhost:8080
     accept-version:1.1,1.0
     heart-beat:10000,10000
+
     ```
+    *Note: Double newline required at end of STOMP frame*
 - **Expected Output**:
   ```
   CONNECTED
@@ -75,10 +83,16 @@ Each test case includes:
   - WebSocket server is running
 - **Input**:
   - **WebSocket URL**: `ws://localhost:8080/ws/chat`
-  - **Headers**:
-    ```
-    Authorization: Bearer invalid_token_123
-    ```
+  - **Connection Methods**:
+    1. **Authorization Header**:
+       ```
+       WebSocket Headers:
+       Authorization: Bearer invalid_token_123
+       ```
+    2. **Query Parameter**:
+       ```
+       WebSocket URL: ws://localhost:8080/ws/chat?token=invalid_token_123
+       ```
   - **STOMP Command**:
     ```
     CONNECT
@@ -86,11 +100,12 @@ Each test case includes:
     host:localhost:8080
     accept-version:1.1,1.0
     heart-beat:10000,10000
+
     ```
 - **Expected Output**:
   ```
   ERROR
-  message:Invalid JWT token
+  message:Authentication failed: Invalid or expired JWT token
   ```
 - **Status**: Connection Rejected
 
@@ -108,11 +123,12 @@ Each test case includes:
     host:localhost:8080
     accept-version:1.1,1.0
     heart-beat:10000,10000
+
     ```
 - **Expected Output**:
   ```
   ERROR
-  message:Authorization required
+  message:Authentication failed: Authorization header is required
   ```
 - **Status**: Connection Rejected
 
@@ -124,19 +140,24 @@ Each test case includes:
 - **Test Case ID**: TC_SOCKET_004
 - **Description**: Verify successful subscription to chat room where user is a participant
 - **Preconditions**:
-  - Customer is authenticated via WebSocket
+  - Customer is authenticated via WebSocket CONNECT
   - Chat room exists with customer as participant
   - Assignment-based chat room between customer and employee
+  - JWT token stored in session attributes during handshake
 - **Input**:
   - **STOMP Command**:
     ```
     SUBSCRIBE
     id:sub-1
     destination:/topic/chatrooms/cr000001-0000-0000-0000-000000000001
+    Authorization:Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJqb2huX2RvZSIsImV4cCI6MTY5NzIwMDAwMH0.signature
+
     ```
+    *Note: Authorization header can be included in SUBSCRIBE for session persistence*
 - **Expected Output**:
   ```
   No immediate response (subscription successful)
+  Server logs: "Subscription validated for user: john_doe to chat room: cr000001-0000-0000-0000-000000000001"
   ```
 - **Status**: Subscription Active
 
@@ -144,7 +165,7 @@ Each test case includes:
 - **Test Case ID**: TC_SOCKET_005
 - **Description**: Verify subscription rejection when user is not a chat room participant
 - **Preconditions**:
-  - Customer is authenticated via WebSocket
+  - Customer is authenticated via WebSocket CONNECT
   - Chat room exists but customer is not a participant
   - Attempting to subscribe to another user's chat room
 - **Input**:
@@ -153,6 +174,8 @@ Each test case includes:
     SUBSCRIBE
     id:sub-2
     destination:/topic/chatrooms/cr000002-0000-0000-0000-000000000001
+    Authorization:Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJqb2huX2RvZSIsImV4cCI6MTY5NzIwMDAwMH0.signature
+
     ```
 - **Expected Output**:
   ```
@@ -166,7 +189,7 @@ Each test case includes:
 - **Test Case ID**: TC_SOCKET_006
 - **Description**: Verify error handling when subscribing to non-existent chat room
 - **Preconditions**:
-  - Customer is authenticated via WebSocket
+  - Customer is authenticated via WebSocket CONNECT
   - Chat room ID does not exist in database
 - **Input**:
   - **STOMP Command**:
@@ -174,6 +197,8 @@ Each test case includes:
     SUBSCRIBE
     id:sub-3
     destination:/topic/chatrooms/NONEXISTENT
+    Authorization:Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJqb2huX2RvZSIsImV4cCI6MTY5NzIwMDAwMH0.signature
+
     ```
 - **Expected Output**:
   ```
@@ -187,23 +212,29 @@ Each test case includes:
 - **Test Case ID**: TC_SOCKET_007
 - **Description**: Verify user can subscribe to multiple authorized chat rooms simultaneously
 - **Preconditions**:
-  - Employee is authenticated via WebSocket
+  - Employee is authenticated via WebSocket CONNECT
   - Employee is participant in multiple chat rooms
   - Multiple assignments for the same employee
+  - JWT token stored in session for user validation
 - **Input**:
   - **STOMP Commands**:
     ```
     SUBSCRIBE
     id:sub-4
     destination:/topic/chatrooms/cr000001-0000-0000-0000-000000000001
-    
+    Authorization:Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJib2Jfd2lsc29uIiwiZXhwIjoxNjk3MjAwMDAwfQ.signature
+
     SUBSCRIBE
     id:sub-5
     destination:/topic/chatrooms/cr000003-0000-0000-0000-000000000001
+    Authorization:Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJib2Jfd2lsc29uIiwiZXhwIjoxNjk3MjAwMDAwfQ.signature
+
     ```
 - **Expected Output**:
   ```
   No immediate responses (both subscriptions successful)
+  Server logs: "Subscription validated for user: bob_wilson to chat room: cr000001..."
+  Server logs: "Subscription validated for user: bob_wilson to chat room: cr000003..."
   ```
 - **Status**: Multiple Subscriptions Active
 
@@ -688,7 +719,36 @@ Each test case includes:
 - **Security**: All WebSocket operations require valid JWT authentication
 - **Real-time Guarantees**: Events should be delivered within 2 seconds under normal network conditions  
 - **Chat Room Access**: Based on assignment relationships from the housekeeping service
-- **Event Types**: 
+
+### Authentication Methods (Updated October 5, 2025):
+1. **Authorization Header** (Primary method):
+   - Set in WebSocket handshake headers: `Authorization: Bearer <JWT_TOKEN>`
+   - Automatically stored in session attributes during handshake
+   - Recommended for all WebSocket clients that support custom headers
+
+2. **Query Parameter** (Fallback method):
+   - URL format: `ws://localhost:8080/ws/chat?token=<JWT_TOKEN>`
+   - Useful for clients with limited header support
+   - Token automatically extracted and stored in session attributes
+
+3. **STOMP Frame Headers** (Session persistence):
+   - Include `Authorization:Bearer <JWT_TOKEN>` in CONNECT and SUBSCRIBE frames
+   - Helps maintain user context across STOMP commands
+   - Prevents "missing user information" errors during subscription
+
+### Session Management:
+- JWT tokens are stored in WebSocket session attributes during handshake
+- User authentication state persists across multiple STOMP commands
+- Session attributes include: `jwt_token`, `AUTHENTICATED_USER`, `USERNAME`
+- Enhanced logging shows session ID, user info, and command processing
+
+### Error Handling:
+- Detailed error messages for authentication failures
+- Graceful handling of incomplete frames and malformed STOMP commands
+- Server logs provide comprehensive debugging information
+- WebSocket connections remain stable during authentication errors
+
+### Event Types**: 
   - `CREATED`: New message sent
   - `DELETED`: Message deleted by participant  
   - `RECALLED`: Message recalled by sender within time window
@@ -696,3 +756,10 @@ Each test case includes:
 - **Error Recovery**: WebSocket connections auto-reconnect on network issues
 - **Message Ordering**: Server timestamp ensures proper message sequencing
 - **Broadcasting Scope**: Events only sent to participants of the specific chat room
+
+### Testing Recommendations:
+1. Test native WebSocket connection first with simple echo
+2. Use proper STOMP frame format with double newlines
+3. Include Authorization in both handshake and STOMP frames
+4. Monitor server logs for detailed debugging information
+5. Test with multiple clients for real-time broadcasting verification
