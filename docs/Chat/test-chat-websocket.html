@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat WebSocket Test - House Keeping Service</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.6.1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; }
+        .section { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .form-group { margin-bottom: 10px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input[type="text"], input[type="password"] { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        button { padding: 8px 16px; margin-right: 10px; border: none; border-radius: 4px; cursor: pointer; }
+        .connect-btn { background-color: #4CAF50; color: white; }
+        .disconnect-btn { background-color: #f44336; color: white; }
+        .action-btn { background-color: #2196F3; color: white; }
+        .typing-btn { background-color: #FF9800; color: white; }
+        #messages { border: 1px solid #ddd; height: 300px; overflow-y: auto; padding: 10px; background-color: #fafafa; border-radius: 4px; margin-bottom: 10px; }
+        .message { margin-bottom: 5px; padding: 8px; border-radius: 4px; }
+        .sent { background-color: #e3f2fd; text-align: right; }
+        .received { background-color: #f3e5f5; }
+        .system { background-color: #e8f5e8; font-style: italic; }
+        .error { background-color: #ffebee; color: #c62828; }
+        .status { text-align: center; font-weight: bold; margin: 10px 0; }
+        .connected { color: #4CAF50; }
+        .disconnected { color: #f44336; }
+        .typing-indicator { font-style: italic; color: #666; margin-bottom: 5px; }
+        .tabs { display: flex; margin-bottom: 20px; }
+        .tab { padding: 10px; cursor: pointer; background: #f1f1f1; border: 1px solid #ddd; }
+        .tab.active { background: white; border-bottom: none; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Chat WebSocket Test</h1>
+        <p>Test the WebSocket chat functionality for the House Keeping Service platform.</p>
+        
+        <!-- Connection Section -->
+        <div class="section">
+            <h3>Connection</h3>
+            <div class="form-group">
+                <label for="token">JWT Token:</label>
+                <input type="password" id="token" placeholder="Enter your JWT token from login API">
+                <small>Get token via: POST /api/v1/auth/login</small>
+            </div>
+            <div class="form-group">
+                <button class="connect-btn" onclick="connect()">Connect to WebSocket</button>
+                <button class="disconnect-btn" onclick="disconnect()">Disconnect</button>
+                <button class="action-btn" onclick="testServerConnection()">Test Server</button>
+            </div>
+        </div>
+
+        <!-- Chat Room Section -->
+        <div class="section">
+            <h3>Chat Room</h3>
+            <div class="form-group">
+                <label for="chatRoomId">Chat Room ID:</label>
+                <input type="text" id="chatRoomId" value="cr000001-0000-0000-0000-000000000001">
+            </div>
+            <div class="form-group">
+                <button class="action-btn" onclick="subscribe()">Subscribe to Chat Room</button>
+                <button class="action-btn" onclick="joinChatRoom()">Join Chat Room</button>
+                <button class="action-btn" onclick="leaveChatRoom()">Leave Chat Room</button>
+            </div>
+        </div>
+
+        <!-- Messages Section -->
+        <div class="section">
+            <h3>Messages</h3>
+            <div id="messages"></div>
+            <div class="form-group">
+                <label for="messageInput">Message:</label>
+                <input type="text" id="messageInput" placeholder="Type your message..." onkeypress="handleKeyPress(event)">
+                <button class="action-btn" onclick="sendMessage()">Send Message</button>
+            </div>
+            <div class="form-group">
+                <button class="typing-btn" onclick="startTyping()">Start Typing</button>
+                <button class="typing-btn" onclick="stopTyping()">Stop Typing</button>
+                <span id="typingStatus"></span>
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div id="status" class="status disconnected">Disconnected</div>
+
+        <!-- Tabs for Advanced Testing -->
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('messages')">Messages</div>
+            <div class="tab" onclick="showTab('logs')">Debug Logs</div>
+        </div>
+        
+        <div id="messages-tab" class="tab-content active">
+            <!-- Messages content is above -->
+        </div>
+        
+        <div id="logs-tab" class="tab-content">
+            <h3>Debug Logs</h3>
+            <div id="debugLogs" style="border: 1px solid #ddd; height: 200px; overflow-y: auto; padding: 10px; background-color: #f9f9f9; font-family: monospace; font-size: 12px;"></div>
+            <button onclick="clearLogs()">Clear Logs</button>
+        </div>
+    </div>
+
+    <script>
+        let stompClient = null;
+        let subscription = null;
+        let typingSubscription = null;
+        let errorSubscription = null;
+        let isTyping = false;
+        let reconnectAttempts = 0;
+        let maxReconnectAttempts = 5;
+        let reconnectInterval = null;
+
+        function setStatus(message, type = 'disconnected') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${type}`;
+        }
+
+        function addMessage(content, type = 'received') {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+            messageDiv.innerHTML = `<strong>${new Date().toLocaleTimeString()}:</strong> ${content}`;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function addLog(message) {
+            const logsDiv = document.getElementById('debugLogs');
+            const logEntry = document.createElement('div');
+            logEntry.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            logsDiv.appendChild(logEntry);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+
+        function clearLogs() {
+            document.getElementById('debugLogs').innerHTML = '';
+        }
+
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        function connect() {
+            const token = document.getElementById('token').value.trim();
+            if (!token) {
+                alert('Please enter a JWT token');
+                return;
+            }
+
+            if (stompClient && stompClient.connected) {
+                addMessage('Already connected to WebSocket', 'system');
+                return;
+            }
+
+            setStatus('Connecting...', 'disconnected');
+            addLog('Attempting to connect to WebSocket...');
+            
+            try {
+                const socket = new SockJS('http://localhost:8080/ws/chat');
+                stompClient = Stomp.over(socket);
+
+                // Configure heartbeat to prevent disconnections
+                stompClient.heartbeat.outgoing = 10000;
+                stompClient.heartbeat.incoming = 10000;
+
+                // Enhanced debug logging
+                stompClient.debug = function(str) {
+                    addLog('STOMP: ' + str);
+                };
+
+                const headers = {
+                    'Authorization': 'Bearer ' + token
+                };
+
+                addLog('Connecting with headers: ' + JSON.stringify(headers));
+
+                stompClient.connect(headers, 
+                    function onConnected(frame) {
+                        setStatus('Connected to WebSocket', 'connected');
+                        addMessage('Successfully connected to chat WebSocket', 'system');
+                        addLog('Connected successfully: ' + frame);
+                        
+                        // Subscribe to error queue with proper error handling
+                        try {
+                            errorSubscription = stompClient.subscribe('/user/queue/errors', function(message) {
+                                try {
+                                    const error = JSON.parse(message.body);
+                                    addMessage('Server Error: ' + error.message, 'error');
+                                    addLog('Received error: ' + error.message);
+                                } catch (e) {
+                                    addMessage('Server Error: ' + message.body, 'error');
+                                    addLog('Received raw error: ' + message.body);
+                                }
+                            });
+                            addLog('Subscribed to error queue successfully');
+                        } catch (e) {
+                            addLog('Warning: Could not subscribe to error queue: ' + e.message);
+                        }
+                        
+                    }, 
+                    function onError(error) {
+                        setStatus('Connection failed', 'disconnected');
+                        addMessage('Connection failed: ' + (error.message || error), 'error');
+                        addLog('Connection error: ' + JSON.stringify(error));
+                        
+                        // Reset client
+                        stompClient = null;
+                        subscription = null;
+                        typingSubscription = null;
+                        errorSubscription = null;
+                    }
+                );
+            } catch (e) {
+                addLog('Exception during connection: ' + e.message);
+                setStatus('Connection failed', 'disconnected');
+            }
+        }
+
+        function disconnect() {
+            if (stompClient !== null) {
+                addLog('Disconnecting from WebSocket...');
+                
+                try {
+                    // Unsubscribe from all subscriptions first
+                    if (subscription) {
+                        subscription.unsubscribe();
+                        subscription = null;
+                    }
+                    if (typingSubscription) {
+                        typingSubscription.unsubscribe();
+                        typingSubscription = null;
+                    }
+                    if (errorSubscription) {
+                        errorSubscription.unsubscribe();
+                        errorSubscription = null;
+                    }
+                    
+                    // Then disconnect
+                    stompClient.disconnect(function() {
+                        setStatus('Disconnected', 'disconnected');
+                        addMessage('Disconnected from WebSocket', 'system');
+                        addLog('Disconnected successfully');
+                        stompClient = null;
+                    });
+                } catch (e) {
+                    addLog('Error during disconnect: ' + e.message);
+                    // Force cleanup
+                    stompClient = null;
+                    subscription = null;
+                    typingSubscription = null;
+                    errorSubscription = null;
+                    setStatus('Disconnected', 'disconnected');
+                }
+            }
+        }
+
+        function subscribe() {
+            if (stompClient === null || !stompClient.connected) {
+                alert('Please connect to WebSocket first');
+                return;
+            }
+
+            const chatRoomId = document.getElementById('chatRoomId').value.trim();
+            if (!chatRoomId) {
+                alert('Please enter a chat room ID');
+                return;
+            }
+
+            try {
+                const destination = '/topic/chatrooms/' + chatRoomId;
+                const token = document.getElementById('token').value.trim();
+
+                // Unsubscribe from previous subscriptions
+                if (subscription) {
+                    subscription.unsubscribe();
+                    addLog('Unsubscribed from previous chat room');
+                }
+                if (typingSubscription) {
+                    typingSubscription.unsubscribe();
+                    addLog('Unsubscribed from previous typing indicators');
+                }
+
+                // Subscribe to main chat messages with proper headers
+                const headers = {
+                    'Authorization': 'Bearer ' + token
+                };
+
+                addLog('Subscribing to: ' + destination);
+
+                subscription = stompClient.subscribe(destination, function(message) {
+                    try {
+                        addLog('Raw message received: ' + message.body);
+                        const messageData = JSON.parse(message.body);
+                        
+                        // Handle different message formats
+                        if (messageData.eventType && messageData.message) {
+                            // Handle ChatMessageSocketPayload format
+                            const msg = messageData.message;
+                            const senderName = msg.senderName || 'Unknown';
+                            const content = msg.messageText || msg.content || 'No content';
+                            addMessage(`<strong>${senderName}:</strong> ${content}`, 'received');
+                            addLog('Received chat event: ' + messageData.eventType + ' from ' + senderName);
+                        } else if (messageData.senderName && messageData.content) {
+                            // Handle simple message format
+                            addMessage(`<strong>${messageData.senderName}:</strong> ${messageData.content}`, 'received');
+                            addLog('Received simple message from: ' + messageData.senderName);
+                        } else if (messageData.content) {
+                            // Handle content-only messages
+                            addMessage(`<strong>Message:</strong> ${messageData.content}`, 'received');
+                            addLog('Received content-only message');
+                        } else {
+                            // Handle any other format
+                            addMessage('Received: ' + JSON.stringify(messageData), 'received');
+                            addLog('Received unknown format message');
+                        }
+                    } catch (e) {
+                        addLog('Error parsing message: ' + e.message);
+                        addMessage('Received raw: ' + message.body, 'received');
+                    }
+                }, headers);
+
+                // Subscribe to typing indicators
+                const typingDestination = destination + '/typing';
+                typingSubscription = stompClient.subscribe(typingDestination, function(message) {
+                    try {
+                        const typingData = JSON.parse(message.body);
+                        updateTypingIndicator(typingData);
+                        addLog('Typing indicator: ' + JSON.stringify(typingData));
+                    } catch (e) {
+                        addLog('Error parsing typing indicator: ' + e.message);
+                    }
+                }, headers);
+
+                addMessage(`✅ Subscribed to chat room: ${chatRoomId}`, 'system');
+                addLog(`Successfully subscribed to ${destination} and ${typingDestination}`);
+                
+            } catch (error) {
+                addLog('Error during subscription: ' + error.message);
+                addMessage('Failed to subscribe: ' + error.message, 'error');
+            }
+        }
+
+        function joinChatRoom() {
+            if (stompClient === null || !stompClient.connected) {
+                alert('Please connect first');
+                return;
+            }
+
+            const chatRoomId = document.getElementById('chatRoomId').value.trim();
+            if (!chatRoomId) {
+                alert('Please enter a chat room ID');
+                return;
+            }
+
+            try {
+                addLog('Sending join request for chat room: ' + chatRoomId);
+                stompClient.send('/app/chat/join/' + chatRoomId, {}, '{}');
+                addMessage('🚪 Joining chat room: ' + chatRoomId, 'system');
+                addLog('Join request sent successfully');
+            } catch (error) {
+                addLog('Error sending join request: ' + error.message);
+                addMessage('Failed to join chat room: ' + error.message, 'error');
+            }
+        }
+
+        function leaveChatRoom() {
+            if (stompClient === null || !stompClient.connected) {
+                alert('Please connect first');
+                return;
+            }
+
+            const chatRoomId = document.getElementById('chatRoomId').value.trim();
+            if (!chatRoomId) {
+                alert('Please enter a chat room ID');
+                return;
+            }
+
+            try {
+                addLog('Sending leave request for chat room: ' + chatRoomId);
+                stompClient.send('/app/chat/leave/' + chatRoomId, {}, '{}');
+                addMessage('🚪 Left chat room: ' + chatRoomId, 'system');
+                addLog('Leave request sent successfully');
+            } catch (error) {
+                addLog('Error sending leave request: ' + error.message);
+                addMessage('Failed to leave chat room: ' + error.message, 'error');
+            }
+        }
+
+        function sendMessage() {
+            if (stompClient === null || !stompClient.connected) {
+                alert('Please connect to WebSocket first');
+                addLog('Cannot send message - not connected');
+                return;
+            }
+
+            const messageInput = document.getElementById('messageInput');
+            const content = messageInput.value.trim();
+            if (!content) {
+                alert('Please enter a message');
+                return;
+            }
+
+            const chatRoomId = document.getElementById('chatRoomId').value.trim();
+            if (!chatRoomId) {
+                alert('Please enter a chat room ID');
+                return;
+            }
+
+            try {
+                // Create message payload matching the SimpleMessage record format
+                const message = {
+                    chatRoomId: chatRoomId,
+                    content: content
+                };
+
+                addLog('Sending message: ' + JSON.stringify(message));
+                
+                // Send message using the WebSocket controller endpoint
+                stompClient.send('/app/chat/send', {}, JSON.stringify(message));
+                
+                // Add to UI immediately for better UX
+                addMessage(`<strong>You:</strong> ${content}`, 'sent');
+                addLog('Message sent successfully to /app/chat/send');
+                
+                // Clear input
+                messageInput.value = '';
+                
+                // Stop typing after sending
+                if (isTyping) {
+                    stopTyping();
+                }
+                
+            } catch (error) {
+                addLog('Error sending message: ' + error.message);
+                addMessage('Failed to send message: ' + error.message, 'error');
+                
+                // Check if connection is still alive
+                if (!stompClient.connected) {
+                    setStatus('Connection lost', 'disconnected');
+                    addMessage('Connection lost. Please reconnect.', 'error');
+                }
+            }
+        }
+
+        function startTyping() {
+            if (stompClient === null || !stompClient.connected) {
+                alert('Please connect first');
+                return;
+            }
+
+            const chatRoomId = document.getElementById('chatRoomId').value.trim();
+            if (!chatRoomId) {
+                alert('Please enter a chat room ID');
+                return;
+            }
+
+            stompClient.send('/app/chat/typing/' + chatRoomId, {}, JSON.stringify({ isTyping: true }));
+            isTyping = true;
+            document.getElementById('typingStatus').textContent = 'Typing...';
+            addLog('Started typing in chat room: ' + chatRoomId);
+        }
+
+        function stopTyping() {
+            if (stompClient === null || !stompClient.connected) {
+                return;
+            }
+
+            const chatRoomId = document.getElementById('chatRoomId').value.trim();
+            if (!chatRoomId) {
+                return;
+            }
+
+            stompClient.send('/app/chat/typing/' + chatRoomId, {}, JSON.stringify({ isTyping: false }));
+            isTyping = false;
+            document.getElementById('typingStatus').textContent = '';
+            addLog('Stopped typing in chat room: ' + chatRoomId);
+        }
+
+        function updateTypingIndicator(typingData) {
+            const typingStatus = document.getElementById('typingStatus');
+            if (typingData.isTyping) {
+                typingStatus.textContent = `${typingData.username} is typing...`;
+            } else {
+                typingStatus.textContent = '';
+            }
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        // Auto-fill token from URL parameter if provided
+        window.onload = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const token = urlParams.get('token');
+            if (token) {
+                document.getElementById('token').value = token;
+                addMessage('Token loaded from URL parameter', 'system');
+            }
+            
+            // Check library loading
+            if (typeof SockJS !== 'undefined') {
+                addLog('✅ SockJS library loaded successfully');
+            } else {
+                addLog('❌ SockJS library failed to load');
+            }
+            
+            if (typeof Stomp !== 'undefined') {
+                addLog('✅ STOMP library loaded successfully');
+            } else {
+                addLog('❌ STOMP library failed to load');
+            }
+        };
+
+        // Monitor connection health
+        function checkConnection() {
+            if (stompClient && stompClient.connected) {
+                addLog('Connection health check: OK');
+                return true;
+            } else if (stompClient) {
+                addLog('Connection health check: DISCONNECTED');
+                setStatus('Connection lost', 'disconnected');
+                return false;
+            }
+            return false;
+        }
+
+        // Auto-reconnect function
+        function attemptReconnect() {
+            if (reconnectAttempts < maxReconnectAttempts) {
+                reconnectAttempts++;
+                addLog(`Attempting to reconnect (${reconnectAttempts}/${maxReconnectAttempts})...`);
+                addMessage(`Reconnecting... (attempt ${reconnectAttempts})`, 'system');
+                
+                setTimeout(() => {
+                    connect();
+                }, 2000 * reconnectAttempts); // Exponential backoff
+            } else {
+                addLog('Max reconnection attempts reached');
+                addMessage('Unable to reconnect. Please check your connection and try manually.', 'error');
+            }
+        }
+
+        // Periodic connection check
+        setInterval(() => {
+            if (stompClient && !stompClient.connected && reconnectAttempts < maxReconnectAttempts) {
+                attemptReconnect();
+            }
+        }, 30000); // Check every 30 seconds
+
+        function testServerConnection() {
+            addLog('Testing server connection...');
+            
+            fetch('http://localhost:8080/actuator/health')
+                .then(response => {
+                    if (response.ok) {
+                        addMessage('✅ Server is reachable', 'system');
+                        addLog('Server health check: OK');
+                        return response.json();
+                    } else {
+                        throw new Error('Server responded with status: ' + response.status);
+                    }
+                })
+                .then(data => {
+                    addLog('Server health data: ' + JSON.stringify(data));
+                })
+                .catch(error => {
+                    addMessage('❌ Server connection failed: ' + error.message, 'error');
+                    addLog('Server connection test failed: ' + error.message);
+                });
+        }
+    </script>
+</body>
+</html>

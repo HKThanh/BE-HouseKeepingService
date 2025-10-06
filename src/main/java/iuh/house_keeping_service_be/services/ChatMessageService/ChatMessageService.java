@@ -14,4 +14,7 @@ public interface ChatMessageService {
     ChatMessageResponse deleteMessage(String messageId, ChatMessageDeleteRequest request);
 
     ChatMessageResponse recallMessage(String messageId, ChatMessageRecallRequest request);
+    
+    // Method to allow dynamic joining of chat rooms for testing
+    boolean addParticipantToChatRoom(String chatRoomId, String accountId);
 }

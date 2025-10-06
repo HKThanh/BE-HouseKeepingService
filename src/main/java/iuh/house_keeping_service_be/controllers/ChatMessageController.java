@@ -6,6 +6,8 @@ import iuh.house_keeping_service_be.dtos.ChatMessage.request.ChatMessageReplyReq
 import iuh.house_keeping_service_be.dtos.ChatMessage.request.ChatMessageSendRequest;
 import iuh.house_keeping_service_be.dtos.ChatMessage.response.ChatMessageResponse;
 import iuh.house_keeping_service_be.dtos.EmployeeSchedule.ApiResponse;
+import iuh.house_keeping_service_be.models.ChatRoom;
+import iuh.house_keeping_service_be.repositories.ChatRoomRepository;
 import iuh.house_keeping_service_be.services.ChatMessageService.ChatMessageService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 public class ChatMessageController {
 
     private final ChatMessageService chatMessageService;
+    private final ChatRoomRepository chatRoomRepository;
 
     @PostMapping("/{chatRoomId}")
     public ResponseEntity<ApiResponse<ChatMessageResponse>> sendMessage(
@@ -58,5 +61,39 @@ public class ChatMessageController {
         log.info("Recalling message {} by {}", messageId, request.accountId());
         ChatMessageResponse response = chatMessageService.recallMessage(messageId, request);
         return ResponseEntity.ok(new ApiResponse<>(true, "Thu hồi tin nhắn thành công", response));
+    }
+
+    // Debug endpoint to inspect chat room participants
+    @GetMapping("/debug/chatroom/{chatRoomId}")
+    public ResponseEntity<ApiResponse<Object>> debugChatRoom(@PathVariable String chatRoomId) {
+        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId).orElse(null);
+        if (chatRoom == null) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        Object debugInfo = new Object() {
+            public final String chatRoomId = chatRoom.getChatRoomId();
+            public final String customerAccountId = chatRoom.getCustomerAccount() != null ? 
+                chatRoom.getCustomerAccount().getAccountId() : null;
+            public final String customerUsername = chatRoom.getCustomerAccount() != null ? 
+                chatRoom.getCustomerAccount().getUsername() : null;
+            public final String employeeAccountId = chatRoom.getEmployeeAccount() != null ? 
+                chatRoom.getEmployeeAccount().getAccountId() : null;
+            public final String employeeUsername = chatRoom.getEmployeeAccount() != null ? 
+                chatRoom.getEmployeeAccount().getUsername() : null;
+        };
+        
+        return ResponseEntity.ok(new ApiResponse<>(true, "Chat room debug info", debugInfo));
+    }
+
+    // Debug endpoint to add participants to chat rooms
+    @PostMapping("/debug/chatroom/{chatRoomId}/participants/{accountId}")
+    public ResponseEntity<ApiResponse<String>> addParticipant(@PathVariable String chatRoomId, @PathVariable String accountId) {
+        boolean success = chatMessageService.addParticipantToChatRoom(chatRoomId, accountId);
+        if (success) {
+            return ResponseEntity.ok(new ApiResponse<>(true, "Participant added successfully", "Account " + accountId + " added to chat room " + chatRoomId));
+        } else {
+            return ResponseEntity.badRequest().body(new ApiResponse<>(false, "Failed to add participant", "Could not add account " + accountId + " to chat room " + chatRoomId));
+        }
     }
 }

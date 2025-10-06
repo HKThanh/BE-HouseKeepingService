@@ -168,19 +168,92 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         return parentMessage;
     }
 
+    @Override
+    @Transactional
+    public boolean addParticipantToChatRoom(String chatRoomId, String accountId) {
+        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomId).orElse(null);
+        if (chatRoom == null) {
+            log.warn("Cannot add participant to non-existent chat room: {}", chatRoomId);
+            return false;
+        }
+        
+        Account account = accountRepository.findById(accountId).orElse(null);
+        if (account == null) {
+            log.warn("Cannot add non-existent account to chat room: {}", accountId);
+            return false;
+        }
+        
+        // Check if user is already a participant
+        boolean isCustomer = chatRoom.getCustomerAccount() != null 
+            && chatRoom.getCustomerAccount().getAccountId().equals(accountId);
+        boolean isEmployee = chatRoom.getEmployeeAccount() != null 
+            && chatRoom.getEmployeeAccount().getAccountId().equals(accountId);
+            
+        if (isCustomer || isEmployee) {
+            log.debug("Account {} is already a participant in chat room {}", accountId, chatRoomId);
+            return true;
+        }
+        
+        // Add as customer if no customer exists, otherwise as employee if no employee exists
+        if (chatRoom.getCustomerAccount() == null) {
+            chatRoom.setCustomerAccount(account);
+            chatRoomRepository.save(chatRoom);
+            log.info("Added account {} as customer to chat room {}", accountId, chatRoomId);
+            return true;
+        } else if (chatRoom.getEmployeeAccount() == null) {
+            chatRoom.setEmployeeAccount(account);
+            chatRoomRepository.save(chatRoom);
+            log.info("Added account {} as employee to chat room {}", accountId, chatRoomId);
+            return true;
+        }
+        
+        log.warn("Chat room {} already has both customer and employee, cannot add account {}", 
+                chatRoomId, accountId);
+        return false;
+    }
+
     private void validateParticipant(ChatRoom chatRoom, String accountId) {
         if (chatRoom == null) {
             throw new ResourceNotFoundException("Phòng chat không hợp lệ");
         }
+
+        log.debug("Validating participant - AccountId: {}", accountId);
+        log.debug("ChatRoom - CustomerAccount: {}, EmployeeAccount: {}", 
+                 chatRoom.getCustomerAccount() != null ? chatRoom.getCustomerAccount().getAccountId() : "null",
+                 chatRoom.getEmployeeAccount() != null ? chatRoom.getEmployeeAccount().getAccountId() : "null");
 
         boolean isCustomer = chatRoom.getCustomerAccount() != null
                 && chatRoom.getCustomerAccount().getAccountId().equals(accountId);
         boolean isEmployee = chatRoom.getEmployeeAccount() != null
                 && chatRoom.getEmployeeAccount().getAccountId().equals(accountId);
 
+        log.debug("Validation results - isCustomer: {}, isEmployee: {}", isCustomer, isEmployee);
+
         if (!isCustomer && !isEmployee) {
-            throw new ChatMessageOperationException("Tài khoản không thuộc phòng chat này");
+            // Try to add the participant to the chat room automatically
+            log.info("Account {} not found in chat room {}, attempting to add dynamically", accountId, chatRoom.getChatRoomId());
+            
+            boolean added = addParticipantToChatRoom(chatRoom.getChatRoomId(), accountId);
+            if (!added) {
+                log.error("Account {} is not a participant in chat room {} and could not be added. Customer: {}, Employee: {}", 
+                         accountId, chatRoom.getChatRoomId(),
+                         chatRoom.getCustomerAccount() != null ? chatRoom.getCustomerAccount().getAccountId() : "null",
+                         chatRoom.getEmployeeAccount() != null ? chatRoom.getEmployeeAccount().getAccountId() : "null");
+                throw new ChatMessageOperationException("Tài khoản không thuộc phòng chat này");
+            }
+            
+            // Refresh the chat room data after adding participant
+            ChatRoom updatedChatRoom = chatRoomRepository.findById(chatRoom.getChatRoomId())
+                .orElseThrow(() -> new ResourceNotFoundException("Phòng chat không hợp lệ"));
+            
+            // Update the reference to the updated chat room
+            chatRoom.setCustomerAccount(updatedChatRoom.getCustomerAccount());
+            chatRoom.setEmployeeAccount(updatedChatRoom.getEmployeeAccount());
+            
+            log.info("Successfully added account {} to chat room {}", accountId, chatRoom.getChatRoomId());
         }
+        
+        log.debug("Participant validation successful for account: {}", accountId);
     }
 
     private void publishSocketEvent(String chatRoomId, ChatMessageSocketPayload.EventType eventType, ChatMessageResponse response) {
