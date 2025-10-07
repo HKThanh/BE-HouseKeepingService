@@ -11,6 +11,7 @@ import iuh.house_keeping_service_be.repositories.*;
 import iuh.house_keeping_service_be.repositories.projections.ZoneCoordinate;
 import iuh.house_keeping_service_be.services.AssignmentService.AssignmentService;
 //import iuh.house_keeping_service_be.services.NotificationService.NotificationService;
+import iuh.house_keeping_service_be.services.ChatService.ChatService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -38,6 +39,7 @@ public class AssignmentServiceImpl implements AssignmentService {
     private final EmployeeRepository employeeRepository;
     private final EmployeeUnavailabilityRepository employeeUnavailabilityRepository;
     private final AddressRepository addressRepository;
+    private final ChatService chatService;
 //    private final NotificationService notificationService;
 
     @Override
@@ -206,6 +208,15 @@ public class AssignmentServiceImpl implements AssignmentService {
         assignmentRepository.save(assignment);
 
         bookingDetail.getAssignments().add(assignment);
+
+        Customer bookingCustomer = booking.getCustomer();
+        if (bookingCustomer != null) {
+            try {
+                chatService.ensureConversation(employee.getEmployeeId(), bookingCustomer.getCustomerId());
+            } catch (Exception ex) {
+                log.warn("Không thể khởi tạo cuộc hội thoại cho booking {}: {}", booking.getBookingId(), ex.getMessage());
+            }
+        }
 
         boolean allAssigned = booking.getBookingDetails().stream()
                 .allMatch(bd -> bd.getAssignments().size() >= bd.getQuantity());
