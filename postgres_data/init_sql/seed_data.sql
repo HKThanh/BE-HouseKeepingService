@@ -155,6 +155,11 @@ INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status, 
 ('as000001-0000-0000-0000-000000000001', 'bd000001-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000002', 'COMPLETED', '2025-08-20 09:00:00+07', '2025-08-20 13:00:00+07'),
 ('as000001-0000-0000-0000-000000000002', 'bd000001-0000-0000-0000-000000000002', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED', NULL, NULL);
 
+-- Đánh dấu assignment thứ hai là đã được nhân viên nhận để kích hoạt hội thoại chat.
+UPDATE assignments
+SET status = 'IN_PROGRESS', check_in_time = '2025-08-28 14:05:00+07'
+WHERE assignment_id = 'as000001-0000-0000-0000-000000000002';
+
 -- Khối IV: Thêm dữ liệu cho Thanh toán và Đánh giá
 -- =================================================================================
 
@@ -638,6 +643,10 @@ INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity
 INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status, check_in_time) VALUES
 ('assgn004-0000-0000-0000-000000000001', 'bd000007-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED', NULL);
 
+-- Phân công bổ sung: Jane Smith nhận booking HKS000005 của khách hàng Mary Jones.
+INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status, check_in_time) VALUES
+    ('assgn005-0000-0000-0000-000000000001', 'bd000005-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000001', 'IN_PROGRESS', '2025-10-05 14:05:00+07');
+
 -- Insert payments for some bookings
 INSERT INTO payments (payment_id, booking_id, amount, payment_status, transaction_code, paid_at) VALUES
 ('pay00004-0000-0000-0000-000000000001', 'book0007-0000-0000-0000-000000000001', 500000, 'PAID', 'TXN20240926001', '2024-09-26 15:30:00+07'),
@@ -648,3 +657,56 @@ INSERT INTO employee_unavailability (unavailability_id, employee_id, start_time,
 ('unavl001-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000002', '2024-09-25 00:00:00+07', '2024-09-25 23:59:59+07', 'Nghỉ phép cá nhân', true),
 ('unavl002-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000001', '2024-09-30 14:00:00+07', '2024-09-30 18:00:00+07', 'Khám bệnh định kỳ', true);
 
+-- =================================================================================
+-- KHỐI VII: DỮ LIỆU MẪU CHO CHAT REAL-TIME GIỮA CUSTOMER VÀ EMPLOYEE
+-- =================================================================================
+
+-- Tạo hai cuộc hội thoại mẫu: một cho booking đã hoàn thành và một cho booking đang được xử lý.
+INSERT INTO conversations (conversation_id, employee_id, customer_id, created_at, updated_at, last_message_at) VALUES
+                                                                                                                   ('conv0001-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000002', 'c1000001-0000-0000-0000-000000000001',
+                                                                                                                    '2025-08-20 08:45:00+07', '2025-08-20 13:05:00+07', '2025-08-20 13:05:00+07'),
+                                                                                                                   ('conv0002-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000002',
+                                                                                                                    '2025-10-05 13:40:00+07', '2025-10-05 14:25:00+07', '2025-10-05 14:25:00+07');
+
+-- Hội thoại 1: Khách John Doe trao đổi với nhân viên Bob Wilson về việc dọn dẹp sau khi hoàn thành.
+INSERT INTO chat_messages (message_id, conversation_id, sender_account_id, message_type, content, file_url, file_name, file_size,
+                           is_revoked, revoked_at, reply_to_message_id, sent_at, updated_at)
+VALUES
+    ('msg0001-0000-0000-0000-000000000001', 'conv0001-0000-0000-0000-000000000001', 'a1000001-0000-0000-0000-000000000001',
+     'TEXT', 'Chào Bob, anh có thể đến sớm 10 phút để chuẩn bị giúp tôi không?', NULL, NULL, NULL,
+     false, NULL, NULL, '2025-08-20 08:50:00+07', '2025-08-20 08:50:00+07'),
+    ('msg0001-0000-0000-0000-000000000002', 'conv0001-0000-0000-0000-000000000001', 'a1000001-0000-0000-0000-000000000005',
+     'TEXT', 'Được chứ anh John, em sẽ có mặt lúc 8:50 nhé.', NULL, NULL, NULL,
+     false, NULL, 'msg0001-0000-0000-0000-000000000001', '2025-08-20 08:52:00+07', '2025-08-20 08:52:00+07'),
+    ('msg0001-0000-0000-0000-000000000003', 'conv0001-0000-0000-0000-000000000001', 'a1000001-0000-0000-0000-000000000001',
+     'FILE', NULL, 'https://res.cloudinary.com/demo/image/upload/sample-floor-plan.pdf', 'so_do_phong_khach.pdf', 5242880,
+     false, NULL, NULL, '2025-08-20 08:55:00+07', '2025-08-20 08:55:00+07'),
+    ('msg0001-0000-0000-0000-000000000004', 'conv0001-0000-0000-0000-000000000001', 'a1000001-0000-0000-0000-000000000005',
+     'TEXT', 'File nhận được rồi, em sẽ ưu tiên khu vực phòng khách như anh dặn.', NULL, NULL, NULL,
+     false, NULL, 'msg0001-0000-0000-0000-000000000003', '2025-08-20 08:57:00+07', '2025-08-20 08:57:00+07'),
+    ('msg0001-0000-0000-0000-000000000005', 'conv0001-0000-0000-0000-000000000001', 'a1000001-0000-0000-0000-000000000001',
+     'TEXT', 'Cảm ơn em nhiều!', NULL, NULL, NULL,
+     true, '2025-08-20 09:10:00+07', 'msg0001-0000-0000-0000-000000000004', '2025-08-20 09:05:00+07', '2025-08-20 09:10:00+07'),
+    ('msg0001-0000-0000-0000-000000000006', 'conv0001-0000-0000-0000-000000000001', 'a1000001-0000-0000-0000-000000000005',
+     'TEXT', 'Không có gì anh nhé. Hẹn gặp lại lần sau!', NULL, NULL, NULL,
+     false, NULL, NULL, '2025-08-20 13:05:00+07', '2025-08-20 13:05:00+07');
+
+-- Hội thoại 2: Cuộc trò chuyện thời gian thực giữa Jane Smith (nhân viên) và Mary Jones trước khi bắt đầu ca làm.
+INSERT INTO chat_messages (message_id, conversation_id, sender_account_id, message_type, content, file_url, file_name, file_size,
+                           is_revoked, revoked_at, reply_to_message_id, sent_at, updated_at)
+VALUES
+    ('msg0002-0000-0000-0000-000000000001', 'conv0002-0000-0000-0000-000000000001', 'a1000001-0000-0000-0000-000000000002',
+     'TEXT', 'Em đã nhận lịch HKS000005 rồi, chị cần chuẩn bị gì thêm không ạ?', NULL, NULL, NULL,
+     false, NULL, NULL, '2025-10-05 14:05:00+07', '2025-10-05 14:05:00+07'),
+    ('msg0002-0000-0000-0000-000000000002', 'conv0002-0000-0000-0000-000000000001', 'a1000001-0000-0000-0000-000000000002',
+     'FILE', NULL, 'https://res.cloudinary.com/demo/image/upload/sample-cleaning-checklist.xlsx', 'checklist_ve_sinh.xlsx', 1048576,
+     false, NULL, NULL, '2025-10-05 14:06:30+07', '2025-10-05 14:06:30+07'),
+    ('msg0002-0000-0000-0000-000000000003', 'conv0002-0000-0000-0000-000000000001', 'a1000001-0000-0000-0000-000000000004',
+     'TEXT', 'Chào Jane, chị sẽ chuẩn bị đầy đủ dụng cụ theo checklist nhé.', NULL, NULL, NULL,
+     false, NULL, 'msg0002-0000-0000-0000-000000000001', '2025-10-05 14:12:00+07', '2025-10-05 14:12:00+07'),
+    ('msg0002-0000-0000-0000-000000000004', 'conv0002-0000-0000-0000-000000000001', 'a1000001-0000-0000-0000-000000000004',
+     'TEXT', 'Nếu cần thêm hóa chất, chị sẽ nhắn trước 30 phút nhé.', NULL, NULL, NULL,
+     false, NULL, 'msg0002-0000-0000-0000-000000000003', '2025-10-05 14:18:00+07', '2025-10-05 14:18:00+07'),
+    ('msg0002-0000-0000-0000-000000000005', 'conv0002-0000-0000-0000-000000000001', 'a1000001-0000-0000-0000-000000000002',
+     'TEXT', 'Tuyệt vời, em sẽ đến đúng giờ ạ!', NULL, NULL, NULL,
+     false, NULL, 'msg0002-0000-0000-0000-000000000004', '2025-10-05 14:25:00+07', '2025-10-05 14:25:00+07');
