@@ -1,401 +1,6 @@
--- Kích hoạt extension cho UUID
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- =================================================================================
--- KHỐI I: QUẢN LÝ TÀI KHOẢN VÀ HỒ SƠ (ACCOUNT & PROFILES)
--- =================================================================================
-
--- Bảng ACCOUNT giờ đây đại diện cho một người dùng duy nhất trong hệ thống.
-CREATE TABLE account (
-    account_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4(),
-    username VARCHAR(50) UNIQUE NOT NULL, -- Username là duy nhất trên toàn hệ thống
-    password VARCHAR(255) NOT NULL,
-    phone_number VARCHAR(20) UNIQUE, -- Số điện thoại cũng là duy nhất
-    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'INACTIVE')),
-    is_phone_verified BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    last_login TIMESTAMP WITH TIME ZONE
-);
-
--- Bảng định nghĩa các vai trò có trong hệ thống
-CREATE TABLE roles (
-    role_id INT PRIMARY KEY,
-    role_name VARCHAR(20) UNIQUE NOT NULL CHECK (role_name IN ('ADMIN', 'EMPLOYEE', 'CUSTOMER'))
-);
-
 -- Thêm các vai trò mặc định
 INSERT INTO roles (role_id, role_name) VALUES (1, 'CUSTOMER'), (2, 'EMPLOYEE'), (3, 'ADMIN');
 
--- Bảng trung gian để gán vai trò cho tài khoản. Một tài khoản có thể có nhiều vai trò.
-CREATE TABLE account_roles (
-    account_id VARCHAR(36) NOT NULL REFERENCES account(account_id) ON DELETE CASCADE,
-    role_id INT NOT NULL REFERENCES roles(role_id),
-    PRIMARY KEY (account_id, role_id)
-);
-
--- Các bảng hồ sơ vẫn liên kết với bảng ACCOUNT.
--- Sự tồn tại của một record trong bảng này ngầm định tài khoản đó có vai trò tương ứng.
-CREATE TABLE customer (
-    customer_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4(),
-    account_id VARCHAR(36) NOT NULL UNIQUE REFERENCES account(account_id) ON DELETE CASCADE,
-    avatar VARCHAR(255),
-    full_name VARCHAR(100) NOT NULL,
-    is_male BOOLEAN,
-    email VARCHAR(100) UNIQUE,
-    birthdate DATE,
-    rating varchar(10) CHECK (rating IN ('LOWEST', 'LOW', 'MEDIUM', 'HIGH', 'HIGHEST')),
-    vip_level int CHECK (vip_level BETWEEN 1 AND 5),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE employee (
-    employee_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4(),
-    account_id VARCHAR(36) NOT NULL UNIQUE REFERENCES account(account_id) ON DELETE CASCADE,
-    avatar VARCHAR(255),
-    full_name VARCHAR(100) NOT NULL,
-    is_male BOOLEAN,
-    email VARCHAR(100) UNIQUE,
-    birthdate DATE,
-    hired_date DATE,
-    skills TEXT[],
-    bio TEXT,
-    rating varchar(10) CHECK (rating IN ('LOWEST', 'LOW', 'MEDIUM', 'HIGH', 'HIGHEST')),
-    employee_status VARCHAR(20) DEFAULT 'AVAILABLE' CHECK (employee_status IN ('AVAILABLE', 'BUSY', 'ON_LEAVE')),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE employee_working_zones (
-    employee_id VARCHAR(36) NOT NULL REFERENCES employee(employee_id) ON DELETE CASCADE,
-    ward VARCHAR(100) NOT NULL,
-    city VARCHAR(100) NOT NULL,
-    PRIMARY KEY (employee_id, ward, city)
-);
-
-CREATE TABLE admin_profile (
-    admin_profile_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4(),
-    account_id VARCHAR(36) NOT NULL UNIQUE REFERENCES account(account_id) ON DELETE CASCADE,
-    full_name VARCHAR(100) NOT NULL,
-    is_male BOOLEAN,
-    department VARCHAR(50),
-    contact_info VARCHAR(255),
-    birthdate DATE,
-    hire_date DATE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE address (
-    address_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4(),
-    customer_id VARCHAR(36) NOT NULL REFERENCES customer(customer_id) ON DELETE CASCADE,
-    full_address TEXT NOT NULL,
-    ward VARCHAR(100),
-    city VARCHAR(100),
-    latitude DECIMAL(9, 6),
-    longitude DECIMAL(9, 6),
-    is_default BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- =================================================================================
--- CÁC KHỐI CÒN LẠI (BOOKINGS, SERVICES, PAYMENTS...)
--- =================================================================================
-
--- Bảng mới để quản lý các danh mục dịch vụ
-CREATE TABLE service_categories (
-    category_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    parent_category_id INT REFERENCES service_categories(category_id), -- Để tạo cấu trúc cha-con
-    category_name VARCHAR(100) NOT NULL,
-    description TEXT,
-    is_active BOOLEAN DEFAULT TRUE,
-    icon_url VARCHAR(255),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE service (
-    service_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    name VARCHAR(100) NOT NULL,
-    description TEXT,
-    base_price DECIMAL(10, 2) NOT NULL,
-    unit VARCHAR(20) NOT NULL, -- Ví dụ: 'hour', 'm2', 'package'
-    estimated_duration_hours DECIMAL(5, 2), -- Thời gian dự kiến (giờ)
-    recommended_staff INT NOT NULL DEFAULT 1,
-    icon_url VARCHAR(255),
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-ALTER TABLE service
-    ADD COLUMN category_id INT REFERENCES service_categories(category_id);
-
--- Đặt dịch vụ
-CREATE TABLE bookings (
-    booking_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4(),
-    customer_id VARCHAR(36) NOT NULL REFERENCES customer(customer_id),
-    address_id VARCHAR(36) NOT NULL REFERENCES address(address_id),
-    booking_code VARCHAR(10) UNIQUE, -- Mã đặt lịch dễ nhớ cho người dùng
-    booking_time TIMESTAMP WITH TIME ZONE NOT NULL, -- Thời gian khách hàng muốn thực hiện
-    note TEXT,
-    total_amount DECIMAL(10, 2),
-    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'AWAITING_EMPLOYEE', 'CONFIRMED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED')),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE booking_details (
-    booking_detail_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4(),
-    booking_id VARCHAR(36) NOT NULL REFERENCES bookings(booking_id) ON DELETE CASCADE,
-    service_id INT NOT NULL REFERENCES service(service_id),
-    quantity INT DEFAULT 1,
-    price_per_unit DECIMAL(10, 2),
-    sub_total DECIMAL(10, 2), -- (price_per_unit * quantity)
-    CONSTRAINT unique_booking_service UNIQUE (booking_id, service_id)
-);
-
-ALTER TABLE booking_details 
-ADD COLUMN selected_choice_ids TEXT;
-
--- Các tuỳ chọn cho dịch vụ
-CREATE TABLE service_options (
-    option_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    service_id INT NOT NULL REFERENCES service(service_id) ON DELETE CASCADE,
-    label TEXT NOT NULL,
-    option_type VARCHAR(30) NOT NULL
-     CHECK (option_type IN (
-                            'SINGLE_CHOICE_RADIO',
-                            'SINGLE_CHOICE_DROPDOWN',
-                            'MULTIPLE_CHOICE_CHECKBOX',
-                            'QUANTITY_INPUT',
-                            'TEXT_INPUT'
-         )),
-    display_order INT,
-    is_required BOOLEAN DEFAULT TRUE,
-    parent_option_id INT REFERENCES service_options(option_id),
-    parent_choice_id INT,
-    validation_rules JSONB
-);
-
-CREATE TABLE service_option_choices (
-    choice_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    option_id INT NOT NULL REFERENCES service_options(option_id) ON DELETE CASCADE,
-    label TEXT NOT NULL,
-    is_default BOOLEAN DEFAULT FALSE,
-    display_order INT
-);
-
-ALTER TABLE service_options
-ADD CONSTRAINT fk_parent_choice
-FOREIGN KEY (parent_choice_id)
-REFERENCES service_option_choices(choice_id);
-
--- Tính toán giá tổng
-CREATE TABLE pricing_rules (
-    rule_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    service_id INT NOT NULL REFERENCES service(service_id),
-    rule_name VARCHAR(255) UNIQUE NOT NULL, -- Tên quy tắc, ví dụ: "Phụ thu nhà phố diện tích lớn"
-    condition_logic VARCHAR(10) DEFAULT 'ALL' CHECK (condition_logic IN ('ALL', 'ANY')), -- ALL=AND, ANY=OR
-    priority INT DEFAULT 0, -- Độ ưu tiên áp dụng
-    price_adjustment DECIMAL(10, 2) DEFAULT 0,
-    staff_adjustment INT DEFAULT 0,
-    duration_adjustment_hours DECIMAL(5, 2) DEFAULT 0
-);
-
--- Bảng mới: điều kiện để kích hoạt một quy tắc giá
-CREATE TABLE rule_conditions (
-    rule_id INT NOT NULL REFERENCES pricing_rules(rule_id) ON DELETE CASCADE,
-    choice_id INT NOT NULL REFERENCES service_option_choices(choice_id) ON DELETE CASCADE,
-    PRIMARY KEY (rule_id, choice_id)
-);
-
-CREATE TABLE recurring_bookings (
-    recurring_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4(),
-    customer_id VARCHAR(36) NOT NULL REFERENCES customer(customer_id),
-    address_id VARCHAR(36) NOT NULL REFERENCES address(address_id),
-    service_id INT NOT NULL REFERENCES service(service_id),
-    -- Quy tắc lặp lại
-    frequency_type VARCHAR(20) NOT NULL CHECK (frequency_type IN ('WEEKLY', 'MONTHLY')),
-    interval INT DEFAULT 1, -- Ví dụ: Lặp lại mỗi 1 tuần, hoặc mỗi 2 tuần
-    day_of_week INT, -- 1=Thứ Hai, ..., 7=Chủ Nhật (nếu là WEEKLY)
-    day_of_month INT, -- Ngày trong tháng (nếu là MONTHLY)
-    start_time TIME NOT NULL, -- Thời gian bắt đầu công việc
-    -- Thời gian áp dụng
-    start_date DATE NOT NULL,
-    end_date DATE, -- Có thể NULL nếu là vô thời hạn
-    is_active BOOLEAN DEFAULT TRUE
-);
-
---Bảng phân công nhân viên cho một dịch vụ cụ thể trong một lần đặt lịch
-CREATE TABLE assignments (
-    assignment_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4(),
-    booking_detail_id VARCHAR(36) NOT NULL REFERENCES booking_details(booking_detail_id) ON DELETE CASCADE,
-    employee_id VARCHAR(36) NOT NULL REFERENCES employee(employee_id),
-    status VARCHAR(20) DEFAULT 'ASSIGNED' CHECK (status IN ('ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'NO_SHOW')),
-    check_in_time TIMESTAMP WITH TIME ZONE,
-    check_out_time TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (booking_detail_id, employee_id)
-);
-
-CREATE TABLE employee_unavailability (
-     unavailability_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4(),
-     employee_id VARCHAR(36) NOT NULL REFERENCES employee(employee_id) ON DELETE CASCADE,
-     start_time TIMESTAMP WITH TIME ZONE NOT NULL,
-     end_time TIMESTAMP WITH TIME ZONE NOT NULL,
-     reason TEXT, -- Lý do: "Lịch cá nhân", "Nghỉ phép", "Khám bệnh"
-     is_approved BOOLEAN DEFAULT TRUE, -- Có thể cần Admin duyệt nếu là nghỉ phép dài
-     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- =================================================================================
--- KHỐI III: CÁC TÍNH NĂNG NÂNG CAO (ADVANCED FEATURES)
--- Các bảng này được giữ nguyên.
--- =================================================================================
-
-CREATE TABLE checklist_templates (
-    template_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    service_id INT REFERENCES service(service_id),
-    name VARCHAR(255) NOT NULL,
-    description TEXT
-);
-
-CREATE TABLE checklist_template_items (
-    item_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    template_id INT NOT NULL REFERENCES checklist_templates(template_id) ON DELETE CASCADE,
-    item_description TEXT NOT NULL,
-    item_order INT
-);
-
-CREATE TABLE booking_checklist_items (
-    booking_checklist_item_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4(),
-    booking_id VARCHAR(36) NOT NULL REFERENCES bookings(booking_id) ON DELETE CASCADE,
-    item_description TEXT NOT NULL,
-    is_completed BOOLEAN DEFAULT FALSE,
-    completed_at TIMESTAMP WITH TIME ZONE,
-    employee_id VARCHAR(36) REFERENCES employee(employee_id)
-);
-
-CREATE TABLE booking_media (
-    media_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4(),
-    booking_id VARCHAR(36) NOT NULL REFERENCES bookings(booking_id) ON DELETE CASCADE,
-    assignment_id VARCHAR(36) REFERENCES assignments(assignment_id),
-    media_url VARCHAR(255) NOT NULL,
-    media_type VARCHAR(20) NOT NULL CHECK (media_type IN ('BEFORE', 'AFTER')),
-    uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-
--- =================================================================================
--- KHỐI IV: THANH TOÁN, ĐÁNH GIÁ VÀ HỖ TRỢ
--- Các bảng này được giữ nguyên.
--- =================================================================================
-
-CREATE TABLE payments (
-    payment_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4(),
-    booking_id VARCHAR(36) NOT NULL REFERENCES bookings(booking_id),
-    amount DECIMAL(10, 2) NOT NULL,
-    --payment_method VARCHAR(20) CHECK (payment_method IN ('CASH', 'TRANSFER', 'MOMO', 'VNPAY')),
-    payment_status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (payment_status IN ('PENDING', 'PAID', 'FAILED', 'CANCELLED', 'REFUNDED')),
-    transaction_code VARCHAR(100),
-    paid_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE payment_methods (
-    method_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    method_code VARCHAR(20) UNIQUE NOT NULL, -- Ví dụ: 'CASH', 'MOMO', 'VNPAY'
-    method_name VARCHAR(100) NOT NULL, -- Ví dụ: 'Thanh toán tiền mặt', 'Ví điện tử Momo'
-    --icon_url VARCHAR(255), -- URL logo của hình thức thanh toán
-    is_active BOOLEAN DEFAULT TRUE, -- Cho phép Admin bật/tắt một hình thức
-    description TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-ALTER TABLE payments
-    ADD COLUMN method_id INT REFERENCES payment_methods(method_id);
-
-CREATE TABLE review (
-    review_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    booking_id VARCHAR(36) NOT NULL REFERENCES bookings(booking_id),
-    customer_id VARCHAR(36) NOT NULL REFERENCES customer(customer_id),
-    employee_id VARCHAR(36) NOT NULL REFERENCES employee(employee_id),
-    comment TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE review_criteria (
-    criteria_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    criteria_name VARCHAR(100) UNIQUE NOT NULL -- Ví dụ: "Thái độ", "Đúng giờ", "Chất lượng công việc"
-);
-
-CREATE TABLE review_details (
-    review_id INT NOT NULL REFERENCES review(review_id) ON DELETE CASCADE,
-    criteria_id INT NOT NULL REFERENCES review_criteria(criteria_id),
-    rating DECIMAL(2, 1) NOT NULL CHECK (rating BETWEEN 1 AND 5),
-    PRIMARY KEY (review_id, criteria_id)
-);
-
-CREATE TABLE support_ticket (
-    ticket_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4(),
-    customer_id VARCHAR(36) REFERENCES customer(customer_id),
-    booking_id VARCHAR(36) REFERENCES bookings(booking_id),
-    subject VARCHAR(100) NOT NULL,
-    description TEXT NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED')),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE promotions (
-    promotion_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    promo_code VARCHAR(50) UNIQUE NOT NULL,
-    description TEXT,
-    discount_type VARCHAR(20) NOT NULL CHECK (discount_type IN ('PERCENTAGE', 'FIXED_AMOUNT')),
-    discount_value DECIMAL(10, 2) NOT NULL,
-    max_discount_amount DECIMAL(10, 2), -- Mức giảm giá tối đa (cho loại PERCENTAGE)
-    start_date TIMESTAMP WITH TIME ZONE,
-    end_date TIMESTAMP WITH TIME ZONE,
-    usage_limit INT,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-ALTER TABLE bookings
-ADD COLUMN promotion_id INT REFERENCES promotions(promotion_id);
-
--- =================================================================================
--- KHỐI V: HỆ THỐNG PHÂN QUYỀN ĐỘNG (DYNAMIC PERMISSIONS)
--- Các bảng mới để hỗ trợ ý tưởng phân quyền linh hoạt cho Admin.
--- =================================================================================
-
--- Bảng định nghĩa tất cả các chức năng có trong hệ thống
-CREATE TABLE features (
-    feature_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    feature_name VARCHAR(100) UNIQUE NOT NULL, -- Tên định danh (code) của chức năng, Vd: 'booking.create'
-
-    description TEXT, -- Mô tả thân thiện, Vd: 'Tạo một lịch đặt mới'
-    module VARCHAR(50) -- Gom nhóm chức năng theo module, Vd: 'Booking', 'Account', 'Payment'
-);
-
--- Bảng trung gian để gán quyền (chức năng) cho vai trò và quản lý trạng thái
-CREATE TABLE role_features (
-    role_id INT NOT NULL REFERENCES roles(role_id) ON DELETE CASCADE,
-    feature_id INT NOT NULL REFERENCES features(feature_id) ON DELETE CASCADE,
-    is_enabled BOOLEAN DEFAULT TRUE, -- TRUE: chức năng được phép, FALSE: chức năng bị vô hiệu hóa
-    PRIMARY KEY (role_id, feature_id)
-);
-
--- =================================================================================
-
--- Thêm dữ liệu vào bảng `account` từ dữ liệu gốc của v4
--- Account của jane_smith được gộp lại thành một vì SĐT là duy nhất.
--- Account của mary_jones và bob_wilson (nhân viên không có account) được tạo mới.
 INSERT INTO account (account_id, username, password, phone_number, status, is_phone_verified) VALUES
 ('a1000001-0000-0000-0000-000000000001', 'john_doe', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0901234567', 'ACTIVE', true),
 ('a1000001-0000-0000-0000-000000000002', 'jane_smith', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0912345678', 'ACTIVE', true),
@@ -690,91 +295,91 @@ INSERT INTO service_option_choices (option_id, label, display_order) VALUES
 (14, 'Ngày hôm sau', 2);
 
 INSERT INTO pricing_rules (service_id, rule_name, condition_logic, priority, price_adjustment, staff_adjustment, duration_adjustment_hours) VALUES
-    (2, 'Phụ thu nhà phố lớn', 'ALL', 10, 250000, 1, 2.0),
-    (1, 'Giặt chăn ga', 'ALL', 5, 30000, 0, 0.5),
-    (1, 'Rửa chén', 'ALL', 5, 15000, 0, 0.5),
-    (1, 'Lau cửa kính', 'ALL', 5, 40000, 0, 1.0),
-    (3, 'Vệ sinh nệm', 'ALL', 5, 150000, 0, 1.0),
-    (3, 'Vệ sinh rèm', 'ALL', 5, 100000, 0, 1.0),
-    (4, 'Máy lạnh âm trần', 'ALL', 5, 50000, 0, 0.5),
-    (5, 'Gấp quần áo', 'ALL', 5, 10000, 0, 1.0),
-    (7, 'Mua nguyên liệu nấu ăn', 'ALL', 5, 30000, 0, 1.0);
+(2, 'Phụ thu nhà phố lớn', 'ALL', 10, 250000, 1, 2.0),
+(1, 'Giặt chăn ga', 'ALL', 5, 30000, 0, 0.5),
+(1, 'Rửa chén', 'ALL', 5, 15000, 0, 0.5),
+(1, 'Lau cửa kính', 'ALL', 5, 40000, 0, 1.0),
+(3, 'Vệ sinh nệm', 'ALL', 5, 150000, 0, 1.0),
+(3, 'Vệ sinh rèm', 'ALL', 5, 100000, 0, 1.0),
+(4, 'Máy lạnh âm trần', 'ALL', 5, 50000, 0, 0.5),
+(5, 'Gấp quần áo', 'ALL', 5, 10000, 0, 1.0),
+(7, 'Mua nguyên liệu nấu ăn', 'ALL', 5, 30000, 0, 1.0);
 
 -- Gán điều kiện cho các quy tắc trên
 -- Phụ thu nhà phố lớn: yêu cầu nhà phố và diện tích trên 80m²
 INSERT INTO rule_conditions (rule_id, choice_id)
 VALUES (
-           (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu nhà phố lớn'),
-           (SELECT choice_id FROM service_option_choices WHERE option_id = 1 AND label = 'Nhà phố')
-       );
+(SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu nhà phố lớn'),
+(SELECT choice_id FROM service_option_choices WHERE option_id = 1 AND label = 'Nhà phố')
+);
 
 INSERT INTO rule_conditions (rule_id, choice_id)
 VALUES (
-           (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu nhà phố lớn'),
-           (SELECT choice_id FROM service_option_choices WHERE option_id = 3 AND label = 'Trên 80m²')
-       );
+(SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu nhà phố lớn'),
+(SELECT choice_id FROM service_option_choices WHERE option_id = 3 AND label = 'Trên 80m²')
+);
 
 -- Giặt chăn ga
 INSERT INTO rule_conditions (rule_id, choice_id)
 VALUES (
-           (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Giặt chăn ga'),
-           (SELECT choice_id FROM service_option_choices WHERE option_id = 5 AND label = 'Giặt chăn ga')
-       );
+(SELECT rule_id FROM pricing_rules WHERE rule_name = 'Giặt chăn ga'),
+(SELECT choice_id FROM service_option_choices WHERE option_id = 5 AND label = 'Giặt chăn ga')
+);
 
 -- Rửa chén
 INSERT INTO rule_conditions (rule_id, choice_id)
 VALUES (
-           (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Rửa chén'),
-           (SELECT choice_id FROM service_option_choices WHERE option_id = 5 AND label = 'Rửa chén')
-       );
+(SELECT rule_id FROM pricing_rules WHERE rule_name = 'Rửa chén'),
+(SELECT choice_id FROM service_option_choices WHERE option_id = 5 AND label = 'Rửa chén')
+);
 
 -- Lau cửa kính
 INSERT INTO rule_conditions (rule_id, choice_id)
 VALUES (
-           (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Lau cửa kính'),
-           (SELECT choice_id FROM service_option_choices WHERE option_id = 5 AND label = 'Lau cửa kính')
-       );
+(SELECT rule_id FROM pricing_rules WHERE rule_name = 'Lau cửa kính'),
+(SELECT choice_id FROM service_option_choices WHERE option_id = 5 AND label = 'Lau cửa kính')
+);
 
 -- Vệ sinh nệm
 INSERT INTO rule_conditions (rule_id, choice_id)
 VALUES (
-           (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Vệ sinh nệm'),
-           (SELECT choice_id FROM service_option_choices WHERE option_id = 6 AND label = 'Nệm')
-       );
+(SELECT rule_id FROM pricing_rules WHERE rule_name = 'Vệ sinh nệm'),
+(SELECT choice_id FROM service_option_choices WHERE option_id = 6 AND label = 'Nệm')
+);
 
 -- Vệ sinh rèm
 INSERT INTO rule_conditions (rule_id, choice_id)
 VALUES (
-           (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Vệ sinh rèm'),
-           (SELECT choice_id FROM service_option_choices WHERE option_id = 6 AND label = 'Rèm')
-       );
+(SELECT rule_id FROM pricing_rules WHERE rule_name = 'Vệ sinh rèm'),
+(SELECT choice_id FROM service_option_choices WHERE option_id = 6 AND label = 'Rèm')
+);
 
 -- Máy lạnh âm trần
 INSERT INTO rule_conditions (rule_id, choice_id)
 VALUES (
-           (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Máy lạnh âm trần'),
-           (SELECT choice_id FROM service_option_choices WHERE option_id = 7 AND label = 'Âm trần/Cassette')
-       );
+(SELECT rule_id FROM pricing_rules WHERE rule_name = 'Máy lạnh âm trần'),
+(SELECT choice_id FROM service_option_choices WHERE option_id = 7 AND label = 'Âm trần/Cassette')
+);
 
 -- Gấp quần áo
 INSERT INTO rule_conditions (rule_id, choice_id)
 VALUES (
-           (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Gấp quần áo'),
-           (SELECT choice_id FROM service_option_choices WHERE option_id = 9 AND label = 'Có')
-       );
+(SELECT rule_id FROM pricing_rules WHERE rule_name = 'Gấp quần áo'),
+(SELECT choice_id FROM service_option_choices WHERE option_id = 9 AND label = 'Có')
+);
 
 -- Mua nguyên liệu nấu ăn
 INSERT INTO rule_conditions (rule_id, choice_id)
 VALUES (
-           (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Mua nguyên liệu nấu ăn'),
-           (SELECT choice_id FROM service_option_choices WHERE option_id = 12 AND label = 'Có')
-       );
+(SELECT rule_id FROM pricing_rules WHERE rule_name = 'Mua nguyên liệu nấu ăn'),
+(SELECT choice_id FROM service_option_choices WHERE option_id = 12 AND label = 'Có')
+);
 
 INSERT INTO payment_methods (method_code, method_name, is_active) VALUES
-    ('CASH', 'Thanh toán tiền mặt', TRUE),
-    ('MOMO', 'Ví điện tử Momo', TRUE),
-    ('VNPAY', 'Cổng thanh toán VNPAY', TRUE),
-    ('BANK_TRANSFER', 'Chuyển khoản ngân hàng', TRUE);
+('CASH', 'Thanh toán tiền mặt', TRUE),
+('MOMO', 'Ví điện tử Momo', TRUE),
+('VNPAY', 'Cổng thanh toán VNPAY', TRUE),
+('BANK_TRANSFER', 'Chuyển khoản ngân hàng', TRUE);
 
 -- Add more bookings with their corresponding booking details and assignments
 -- Each booking will have exactly 1 booking detail
@@ -888,53 +493,53 @@ UPDATE pricing_rules SET price_adjustment = 40000 WHERE rule_name = 'Mua nguyên
 
 -- Update existing booking details to reflect new pricing
 UPDATE booking_details SET
-    price_per_unit = 500000,
-    sub_total = 500000
+price_per_unit = 500000,
+sub_total = 500000
 WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000001';
 
 UPDATE booking_details SET
-    price_per_unit = 60000,
-    sub_total = 120000
+price_per_unit = 60000,
+sub_total = 120000
 WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000002';
 
 UPDATE booking_details SET
-    price_per_unit = 200000,
-    sub_total = 200000
+price_per_unit = 200000,
+sub_total = 200000
 WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000003';
 
 UPDATE booking_details SET
-    price_per_unit = 150000,
-    sub_total = 150000
+price_per_unit = 150000,
+sub_total = 150000
 WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000004';
 
 UPDATE booking_details SET
-    price_per_unit = 80000,
-    sub_total = 160000
+price_per_unit = 80000,
+sub_total = 160000
 WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000005';
 
 UPDATE booking_details SET
-    price_per_unit = 25000,
-    sub_total = 50000
+price_per_unit = 25000,
+sub_total = 50000
 WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000006';
 
 UPDATE booking_details SET
-    price_per_unit = 350000,
-    sub_total = 350000
+price_per_unit = 350000,
+sub_total = 350000
 WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000007';
 
 UPDATE booking_details SET
-    price_per_unit = 50000,
-    sub_total = 50000
+price_per_unit = 50000,
+sub_total = 50000
 WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000008';
 
 UPDATE booking_details SET
-    price_per_unit = 60000,
-    sub_total = 180000
+price_per_unit = 60000,
+sub_total = 180000
 WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000009';
 
 UPDATE booking_details SET
-    price_per_unit = 700000,
-    sub_total = 700000
+price_per_unit = 700000,
+sub_total = 700000
 WHERE booking_detail_id = 'bd000001-0000-0000-0000-000000000010';
 
 -- Update booking total amounts accordingly
@@ -959,22 +564,22 @@ UPDATE payments SET amount = 630000 WHERE payment_id = 'pay00001-0000-0000-0000-
 
 -- Add new pricing rules for quantity-based services
 INSERT INTO pricing_rules (service_id, rule_name, condition_logic, priority, price_adjustment, staff_adjustment, duration_adjustment_hours) VALUES
-((SELECT service_id FROM service WHERE name = 'Vệ sinh máy lạnh'), 'Phụ thu máy tủ đứng', 'ALL', 8, 150000, 0, 1.0),
-((SELECT service_id FROM service WHERE name = 'Giặt hấp cao cấp'), 'Phụ thu áo dài', 'ALL', 5, 50000, 0, 0.5),
-((SELECT service_id FROM service WHERE name = 'Giặt hấp cao cấp'), 'Phụ thu đầm dạ hội', 'ALL', 5, 100000, 0, 1.0);
+                        ((SELECT service_id FROM service WHERE name = 'Vệ sinh máy lạnh'), 'Phụ thu máy tủ đứng', 'ALL', 8, 150000, 0, 1.0),
+                        ((SELECT service_id FROM service WHERE name = 'Giặt hấp cao cấp'), 'Phụ thu áo dài', 'ALL', 5, 50000, 0, 0.5),
+                        ((SELECT service_id FROM service WHERE name = 'Giặt hấp cao cấp'), 'Phụ thu đầm dạ hội', 'ALL', 5, 100000, 0, 1.0);
 
 -- Add rule conditions for new pricing rules
 INSERT INTO rule_conditions (rule_id, choice_id) VALUES
 ((SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu máy tủ đứng'),
- (SELECT choice_id FROM service_option_choices WHERE option_id = 7 AND label = 'Tủ đứng'));
+(SELECT choice_id FROM service_option_choices WHERE option_id = 7 AND label = 'Tủ đứng'));
 
 INSERT INTO rule_conditions (rule_id, choice_id) VALUES
 ((SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu áo dài'),
- (SELECT choice_id FROM service_option_choices WHERE option_id = 10 AND label = 'Áo dài'));
+(SELECT choice_id FROM service_option_choices WHERE option_id = 10 AND label = 'Áo dài'));
 
 INSERT INTO rule_conditions (rule_id, choice_id) VALUES
 ((SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu đầm dạ hội'),
- (SELECT choice_id FROM service_option_choices WHERE option_id = 10 AND label = 'Đầm'));
+(SELECT choice_id FROM service_option_choices WHERE option_id = 10 AND label = 'Đầm'));
 
 -- Insert additional addresses for more booking locations
 INSERT INTO address (address_id, customer_id, full_address, ward, city, latitude, longitude, is_default) VALUES
@@ -1043,4 +648,3 @@ INSERT INTO payments (payment_id, booking_id, amount, payment_status, transactio
 INSERT INTO employee_unavailability (unavailability_id, employee_id, start_time, end_time, reason, is_approved) VALUES
 ('unavl001-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000002', '2024-09-25 00:00:00+07', '2024-09-25 23:59:59+07', 'Nghỉ phép cá nhân', true),
 ('unavl002-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000001', '2024-09-30 14:00:00+07', '2024-09-30 18:00:00+07', 'Khám bệnh định kỳ', true);
-

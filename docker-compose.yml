@@ -46,7 +46,7 @@ services:
       - POSTGRES_PASSWORD=${DB_PASSWORD}
     volumes:
       - ./postgres_data/data:/var/lib/postgresql/data
-      - ./postgres_data/housekeeping_service_v8.sql:/docker-entrypoint-initdb.d/housekeeping_service_v8.sql
+      - ./postgres_data/init_sql:/docker-entrypoint-initdb.d
     networks:
       - house_keeping_network
     healthcheck:
