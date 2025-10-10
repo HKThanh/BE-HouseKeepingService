@@ -31,8 +31,12 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
     public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response, WebSocketHandler wsHandler,
                                    Map<String, Object> attributes) {
         String token = resolveToken(request);
+
+        log.info("Attempting WebSocket handshake with token: {}", token != null ? "present" : "absent");
+
         if (!StringUtils.hasText(token)) {
             log.warn("WebSocket handshake rejected - missing token");
+            setUnauthorizedResponse(response, "Mã thông báo không hợp lệ");
             return false;
         }
 
@@ -40,10 +44,11 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
             String username = jwtUtil.extractUsername(token);
             if (!jwtUtil.validateToken(token, username)) {
                 log.warn("WebSocket handshake rejected - invalid token for user {}", username);
+                setUnauthorizedResponse(response, "Mã thông báo không hợp lệ");
                 return false;
             }
 
-            Account account = accountRepository.findByUsername(username)
+            Account account = accountRepository.findByUsernameWithRoles(username)
                     .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy tài khoản"));
 
             attributes.put("accountId", account.getAccountId());
@@ -56,6 +61,7 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
             return true;
         } catch (Exception ex) {
             log.warn("WebSocket handshake rejected - {}", ex.getMessage());
+            setUnauthorizedResponse(response, ex.getMessage());
             return false;
         }
     }
@@ -63,17 +69,16 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
     @Override
     public void afterHandshake(ServerHttpRequest request, ServerHttpResponse response, WebSocketHandler wsHandler,
                                Exception exception) {
-        // No-op
     }
 
     private String resolveToken(ServerHttpRequest request) {
+        String header = request.getHeaders().getFirst("Authorization");
+        if (StringUtils.hasText(header) && header.startsWith("Bearer ")) {
+            return header.substring(7);
+        }
+
         if (request instanceof ServletServerHttpRequest servletRequest) {
             HttpServletRequest httpServletRequest = servletRequest.getServletRequest();
-            String header = httpServletRequest.getHeader("Authorization");
-            if (StringUtils.hasText(header) && header.startsWith("Bearer ")) {
-                return header.substring(7);
-            }
-
             String tokenParam = httpServletRequest.getParameter("token");
             if (!StringUtils.hasText(tokenParam)) {
                 tokenParam = httpServletRequest.getParameter("access_token");
@@ -84,5 +89,14 @@ public class JwtHandshakeInterceptor implements HandshakeInterceptor {
 
         }
         return null;
+    }
+
+    private void setUnauthorizedResponse(ServerHttpResponse response, String message) {
+        if (response != null) {
+            response.setStatusCode(org.springframework.http.HttpStatus.UNAUTHORIZED);
+            if (StringUtils.hasText(message)) {
+                response.getHeaders().set("X-WebSocket-Error", message);
+            }
+        }
     }
 }

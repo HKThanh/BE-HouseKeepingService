@@ -15,6 +15,9 @@ import java.util.Optional;
 public interface AccountRepository extends JpaRepository<Account, String> {
     Optional<Account> findByUsername(String username);
 
+    @Query("SELECT DISTINCT a FROM Account a LEFT JOIN FETCH a.roles WHERE a.username = :username")
+    Optional<Account> findByUsernameWithRoles(@Param("username") String username);
+
     Optional<Account> findByPhoneNumber(String phoneNumber);
 
     List<Account> findAccountsByUsernameAndPassword(String username, String password);
