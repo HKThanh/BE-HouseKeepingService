@@ -159,6 +159,12 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
             "WHERE a.bookingDetail.booking.bookingId = :bookingId")
     List<Assignment> findByBookingIdWithStatus(@Param("bookingId") String bookingId);
 
+    @Query("SELECT DISTINCT a FROM Assignment a " +
+            "JOIN FETCH a.employee e " +
+            "JOIN FETCH e.account " +
+            "JOIN a.bookingDetail bd " +
+            "WHERE bd.booking.bookingId = :bookingId")
+    List<Assignment> findAssignmentsWithEmployeesByBookingId(@Param("bookingId") String bookingId);
 
     @Query("SELECT a FROM Assignment a " +
             "LEFT JOIN FETCH a.bookingDetail bd " +
