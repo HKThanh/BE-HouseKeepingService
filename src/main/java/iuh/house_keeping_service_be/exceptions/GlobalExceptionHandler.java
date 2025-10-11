@@ -32,6 +32,18 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorResponse, HttpStatus.NOT_FOUND); // Trả về mã 404
     }
 
+    @ExceptionHandler(ChatAccessDeniedException.class)
+    public ResponseEntity<ApiResponse<?>> handleChatAccessDenied(ChatAccessDeniedException ex) {
+        ApiResponse<?> response = new ApiResponse<>(false, ex.getMessage(), null);
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+    }
+
+    @ExceptionHandler(ChatValidationException.class)
+    public ResponseEntity<ApiResponse<?>> handleChatValidation(ChatValidationException ex) {
+        ApiResponse<?> response = new ApiResponse<>(false, ex.getMessage(), null);
+        return ResponseEntity.badRequest().body(response);
+    }
+
     @ExceptionHandler(BookingValidationException.class)
     public ResponseEntity<BookingErrorResponse> handleBookingValidation(BookingValidationException ex) {
         log.warn("Booking validation failed: {}", ex.getMessage());
