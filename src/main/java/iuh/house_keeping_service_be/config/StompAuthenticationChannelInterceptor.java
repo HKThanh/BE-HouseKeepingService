@@ -35,9 +35,14 @@ public class StompAuthenticationChannelInterceptor implements ChannelInterceptor
             return message;
         }
 
-        if (StompCommand.CONNECT.equals(accessor.getCommand())) {
+        StompCommand command = accessor.getCommand();
+        if (command == null) {
+            return message;
+        }
+
+        if (StompCommand.CONNECT.equals(command)) {
             authenticate(accessor);
-        } else if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
+        } else if (StompCommand.SUBSCRIBE.equals(command)) {
             authorizeSubscription(accessor);
         }
 
@@ -54,13 +59,14 @@ public class StompAuthenticationChannelInterceptor implements ChannelInterceptor
             throw new MessagingException("Token không hợp lệ");
         }
         UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-        log.debug("Authenticated STOMP session for user {}", username);
+        log.info("Authenticated STOMP session for user {}", username);
         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                 userDetails,
                 null,
                 userDetails.getAuthorities()
         );
         accessor.setUser(authentication);
+        log.debug("STOMP session {} is now authenticated", accessor.getSessionId());
     }
 
     private void authorizeSubscription(StompHeaderAccessor accessor) {
@@ -79,7 +85,8 @@ public class StompAuthenticationChannelInterceptor implements ChannelInterceptor
         if (!conversationService.isParticipant(conversationId, account.getAccountId())) {
             throw new MessagingException("Không có quyền truy cập cuộc hội thoại này");
         }
-        log.debug("Authorized subscription to conversation {} for user {}", conversationId, username);
+        log.info("User {} subscribed to conversation {}", username, conversationId);
+        log.debug("Subscription headers: {}", accessor.toNativeHeaderMap());
     }
 
     private String resolveUsername(Authentication authentication) {

@@ -28,8 +28,11 @@ public class ChatWebSocketController {
             log.warn("Received chat message without authenticated principal");
             return;
         }
+        log.info("Received chat message from user {} for conversation {}", principal.getName(), request.conversationId());
         MessageResponse response = messageService.sendMessage(request, principal.getName());
+        log.debug("Broadcasting message {} to conversation {}", response.messageId(), request.conversationId());
         messagingTemplate.convertAndSend("/topic/conversations/" + request.conversationId(), response);
+        log.info("Sent message frame for conversation {} to /topic/conversations/{}", request.conversationId(), request.conversationId());
     }
 
     @MessageExceptionHandler
