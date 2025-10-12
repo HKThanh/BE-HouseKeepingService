@@ -172,4 +172,9 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
     Optional<Assignment> findByIdWithDetails(@Param("assignmentId") String assignmentId);
 
     boolean existsByBookingDetail_Booking_BookingIdAndEmployee_EmployeeId(String bookingId, String employeeId);
+
+    boolean existsByBookingDetail_Booking_BookingIdAndEmployee_EmployeeIdAndStatusIn(
+            String bookingId,
+            String employeeId,
+            Iterable<AssignmentStatus> statuses);
 }
