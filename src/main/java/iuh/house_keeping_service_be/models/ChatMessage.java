@@ -47,7 +47,7 @@ public class ChatMessage {
     private ChatMessage replyTo;
 
     @Column(name = "is_revoke", nullable = false)
-    private boolean revoke = false;
+    private boolean isRevoke = false;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

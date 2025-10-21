@@ -17,7 +17,8 @@ public class CorsConfig {
 
         // Use allowedOriginPatterns instead of allowedOrigins when credentials are true
         configuration.setAllowedOriginPatterns(Arrays.asList(
-            "http://localhost:*"    // All localhost ports
+            "http://localhost:*",    // All localhost ports
+                "*"
         ));
 
         configuration.setAllowedOrigins(Arrays.asList(
