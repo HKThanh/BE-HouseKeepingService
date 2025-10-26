@@ -340,7 +340,6 @@ public class AssignmentServiceImpl implements AssignmentService {
         try {
             // Update assignment status
             assignment.setStatus(AssignmentStatus.CANCELLED);
-            assignment.setUpdatedAt(now);
             assignmentRepository.save(assignment);
 
             // Update booking status if all assignments are cancelled
@@ -564,7 +563,7 @@ public class AssignmentServiceImpl implements AssignmentService {
                 bookingDetail.getQuantity(),
                 bookingDetail.getSubTotal(),
                 assignment.getStatus(),
-                assignment.getCreatedAt(),
+                null, // assignedAt - timestamp field removed from Assignment
                 assignment.getCheckInTime(),
                 assignment.getCheckOutTime(),
                 booking.getNote()
