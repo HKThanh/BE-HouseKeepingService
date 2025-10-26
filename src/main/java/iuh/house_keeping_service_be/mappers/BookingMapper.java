@@ -36,7 +36,7 @@ public class BookingMapper {
                                     List<BookingDetailInfo> detailInfos,
                                     PaymentInfo paymentInfo,
                                     PromotionInfo promotionInfo) {
-        return new BookingData(
+        BookingData data = new BookingData(
             booking.getBookingId(),
             booking.getBookingCode(),
             booking.getCustomer().getCustomerId(),
@@ -47,11 +47,16 @@ public class BookingMapper {
             booking.getTotalAmount(),
             BookingDTOFormatter.formatPrice(booking.getTotalAmount()),
             booking.getStatus().toString(),
+            booking.getTitle(),
+            booking.getImageUrl(),
+            booking.getIsVerified(),
+            booking.getAdminComment(),
             promotionInfo,
             detailInfos,
             paymentInfo,
             booking.getCreatedAt()
         );
+        return data;
     }
 
     public BookingResponse toResponse(Booking booking) {
@@ -66,6 +71,10 @@ public class BookingMapper {
         );
 
         return BookingResponse.success(bookingData);
+    }
+
+    public BookingResponse toBookingResponse(Booking booking) {
+        return toResponse(booking);
     }
 
     public CustomerAddressInfo toCustomerAddressInfo(Address address) {

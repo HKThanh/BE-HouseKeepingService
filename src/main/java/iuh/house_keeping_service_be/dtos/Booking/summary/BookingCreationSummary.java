@@ -23,6 +23,12 @@ public class BookingCreationSummary {
     private LocalDateTime bookingTime;
     private LocalDateTime createdAt;
     
+    // Booking post fields
+    private String title;
+    private String imageUrl;
+    private Boolean isVerified;
+    private String adminComment;
+    
     // Related information
     private CustomerAddressInfo customerInfo;
     private List<BookingDetailInfo> serviceDetails;

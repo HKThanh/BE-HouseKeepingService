@@ -57,6 +57,18 @@ public class Booking {
     @JoinColumn(name = "promotion_id")
     private Promotion promotion;
 
+    @Column(name = "title", length = 255)
+    private String title;
+
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
+
+    @Column(name = "is_verified", nullable = false)
+    private Boolean isVerified = true;
+
+    @Column(name = "admin_comment", columnDefinition = "TEXT")
+    private String adminComment;
+
     @CreationTimestamp
     @Column(name = "created_at")
     private LocalDateTime createdAt;

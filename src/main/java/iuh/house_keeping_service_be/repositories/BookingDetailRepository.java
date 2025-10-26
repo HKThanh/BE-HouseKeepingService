@@ -18,6 +18,9 @@ public interface BookingDetailRepository extends JpaRepository<BookingDetail, St
            "WHERE bd.booking.bookingId = :bookingId")
     List<BookingDetail> findByBookingIdWithService(@Param("bookingId") String bookingId);
     
+    // Find by booking ID
+    List<BookingDetail> findByBooking_BookingId(String bookingId);
+    
     // Find by service ID
     @Query("SELECT bd FROM BookingDetail bd WHERE bd.service.serviceId = :serviceId")
     List<BookingDetail> findByServiceId(@Param("serviceId") Integer serviceId);

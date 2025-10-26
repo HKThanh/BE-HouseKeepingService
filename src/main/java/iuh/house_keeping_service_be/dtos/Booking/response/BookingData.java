@@ -27,6 +27,11 @@ public class BookingData {
     private String formattedTotalAmount;
     private String status;
     
+    private String title;
+    private String imageUrl;
+    private Boolean isVerified;
+    private String adminComment;
+    
     private PromotionInfo promotion;
     private List<BookingDetailInfo> bookingDetails;
     private PaymentInfo payment;

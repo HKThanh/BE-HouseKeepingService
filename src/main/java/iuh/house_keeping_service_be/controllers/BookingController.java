@@ -3,11 +3,16 @@ package iuh.house_keeping_service_be.controllers;
 import iuh.house_keeping_service_be.config.JwtUtil;
 import iuh.house_keeping_service_be.dtos.Booking.internal.BookingValidationResult;
 import iuh.house_keeping_service_be.dtos.Booking.request.BookingCreateRequest;
+import iuh.house_keeping_service_be.dtos.Booking.request.BookingCancelRequest;
+import iuh.house_keeping_service_be.dtos.Booking.request.ConvertBookingToPostRequest;
+import iuh.house_keeping_service_be.dtos.Booking.request.BookingVerificationRequest;
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingHistoryResponse;
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingResponse;
 import iuh.house_keeping_service_be.dtos.Booking.summary.BookingCreationSummary;
 import iuh.house_keeping_service_be.dtos.Service.ServiceDetailResponse;
 import iuh.house_keeping_service_be.models.Address;
+import iuh.house_keeping_service_be.models.Customer;
+import iuh.house_keeping_service_be.repositories.CustomerRepository;
 import iuh.house_keeping_service_be.services.AddressService.AddressService;
 import iuh.house_keeping_service_be.services.AdminService.PermissionService;
 import iuh.house_keeping_service_be.services.BookingService.BookingService;
@@ -34,6 +39,7 @@ public class BookingController {
     private final PermissionService permissionService;
     private final BookingService bookingService;
     private final JwtUtil jwtUtil;
+    private final CustomerRepository customerRepository;
 
     @GetMapping("/{customerId}/default-address")
     public ResponseEntity<?> getDefaultAddress(@PathVariable String customerId
@@ -148,6 +154,143 @@ public class BookingController {
         } catch (Exception e) {
             log.error("Error retrieving bookings for customer {}: {}", customerId, e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Page.empty());
+        }
+    }
+
+    @PutMapping("/{bookingId}/convert-to-post")
+    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER')")
+    public ResponseEntity<?> convertBookingToPost(
+            @PathVariable String bookingId,
+            @Valid @RequestBody ConvertBookingToPostRequest request) {
+        
+        log.info("Converting booking {} to post", bookingId);
+        
+        try {
+            BookingResponse response = bookingService.convertBookingToPost(bookingId, request);
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Chuyển booking thành bài post thành công",
+                "data", response
+            ));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            log.error("Error converting booking to post: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            log.error("Unexpected error converting booking to post: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "success", false,
+                "message", "Đã xảy ra lỗi khi chuyển booking thành bài post"
+            ));
+        }
+    }
+
+    @PutMapping("/{bookingId}/cancel")
+    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER')")
+    public ResponseEntity<?> cancelBooking(
+            @PathVariable String bookingId,
+            @Valid @RequestBody BookingCancelRequest request,
+            @RequestHeader("Authorization") String authHeader) {
+        
+        log.info("Customer cancelling booking {}", bookingId);
+        
+        // Extract customer ID from JWT token
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", "Token không hợp lệ"
+            ));
+        }
+
+        String token = authHeader.substring(7);
+        String username = jwtUtil.extractUsername(token);
+
+        if (username == null || !jwtUtil.validateToken(token, username)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                "success", false,
+                "message", "Token không hợp lệ"
+            ));
+        }
+
+        // Get customer from username
+        Customer customer = customerRepository.findByAccount_Username(username)
+            .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin khách hàng"));
+        
+        BookingResponse response = bookingService.cancelBooking(bookingId, customer.getCustomerId(), request.reason());
+        
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "message", "Huỷ booking thành công",
+            "data", response
+        ));
+    }
+
+    @GetMapping("/admin/unverified")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    public ResponseEntity<?> getUnverifiedBookings(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        
+        log.info("Admin fetching unverified bookings (page: {}, size: {})", page, size);
+        
+        try {
+            if (page < 0) page = 0;
+            if (size <= 0 || size > 100) size = 10;
+            
+            Pageable pageable = PageRequest.of(page, size);
+            Page<BookingResponse> unverifiedBookings = bookingService.getUnverifiedBookings(pageable);
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "data", unverifiedBookings.getContent(),
+                "currentPage", unverifiedBookings.getNumber(),
+                "totalItems", unverifiedBookings.getTotalElements(),
+                "totalPages", unverifiedBookings.getTotalPages()
+            ));
+        } catch (Exception e) {
+            log.error("Error fetching unverified bookings: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "success", false,
+                "message", "Đã xảy ra lỗi khi lấy danh sách booking chưa xác minh"
+            ));
+        }
+    }
+
+    @PutMapping("/admin/{bookingId}/verify")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    public ResponseEntity<?> verifyBooking(
+            @PathVariable String bookingId,
+            @Valid @RequestBody BookingVerificationRequest request) {
+        
+        log.info("Admin verifying booking {}: approve={}", bookingId, request.approve());
+        
+        try {
+            BookingResponse response = bookingService.verifyBooking(bookingId, request);
+            
+            String message = request.approve() 
+                ? "Chấp nhận bài post thành công" 
+                : "Từ chối bài post thành công";
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", message,
+                "data", response
+            ));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            log.error("Error verifying booking: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            log.error("Unexpected error verifying booking: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "success", false,
+                "message", "Đã xảy ra lỗi khi xác minh booking"
+            ));
         }
     }
 }

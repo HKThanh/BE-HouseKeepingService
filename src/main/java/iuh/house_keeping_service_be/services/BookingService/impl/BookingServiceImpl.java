@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class BookingServiceImpl implements BookingService {
-    
+
     // Repositories
     private final BookingRepository bookingRepository;
     private final BookingDetailRepository bookingDetailRepository;
@@ -45,7 +45,7 @@ public class BookingServiceImpl implements BookingService {
     private final ServiceOptionChoiceRepository serviceOptionChoiceRepository;
     private final PricingRuleRepository pricingRuleRepository;
     private final RuleConditionRepository ruleConditionRepository;
-    
+
     // Other Services
     private final ServiceService serviceService;
     private final BookingMapper bookingMapper;
@@ -54,7 +54,7 @@ public class BookingServiceImpl implements BookingService {
     @Transactional
     public BookingCreationSummary createBooking(BookingCreateRequest request) {
         log.info("Creating booking for customer with {} services", request.bookingDetails().size());
-        
+
         try {
             // Step 1: Validate booking request (no need for clients to call validate endpoint first)
             ValidationOutcome validationOutcome = performValidation(request);
@@ -77,14 +77,30 @@ public class BookingServiceImpl implements BookingService {
             if (hasAssignments) {
                 validateEmployeeAvailabilityFinal(request);
             }
-            
+
             // Step 3: Create booking entity
             Booking booking = createBookingEntity(request, validation);
 
             if (!hasAssignments) {
                 booking.setStatus(BookingStatus.AWAITING_EMPLOYEE);
             }
-            
+
+            // Set isVerified based on assignments
+            // If no assignments (empty list), set isVerified = false (becomes a post needing admin approval)
+            // If has assignments, set isVerified = true (normal booking)
+            booking.setIsVerified(hasAssignments);
+
+            // Set title and imageUrl from request if provided
+            if (request.title() != null && !request.title().trim().isEmpty()) {
+                booking.setTitle(request.title());
+            }
+            if (request.imageUrl() != null && !request.imageUrl().trim().isEmpty()) {
+                booking.setImageUrl(request.imageUrl());
+            }
+
+            log.info("Booking isVerified={}, hasAssignments={}, title={}, imageUrl={}",
+                    booking.getIsVerified(), hasAssignments, booking.getTitle(), booking.getImageUrl());
+
             // Step 4: Create booking details
             List<BookingDetail> bookingDetails = createBookingDetails(booking, request, validation);
 
@@ -95,7 +111,7 @@ public class BookingServiceImpl implements BookingService {
 
             // Step 6: Create payment record
             Payment payment = createPaymentRecord(booking, request.paymentMethodId());
-            
+
             // Step 7: Save all entities
             Booking savedBooking = bookingRepository.save(booking);
             List<BookingDetail> savedDetails = bookingDetailRepository.saveAll(bookingDetails);
@@ -103,12 +119,12 @@ public class BookingServiceImpl implements BookingService {
                     ? assignmentRepository.saveAll(assignments)
                     : Collections.emptyList();
             Payment savedPayment = paymentRepository.save(payment);
-            
+
             log.info("Booking created successfully with ID: {}", savedBooking.getBookingId());
-            
+
             // Step 8: Return creation summary
             return createBookingCreationSummary(savedBooking, savedDetails, savedAssignments, savedPayment);
-            
+
         } catch (BookingValidationException | EmployeeConflictException e) {
             // Re-throw validation and conflict exceptions
             throw e;
@@ -121,10 +137,10 @@ public class BookingServiceImpl implements BookingService {
     @Override
     public BookingResponse getBookingDetails(String bookingId) {
         log.info("Fetching booking details for ID: {}", bookingId);
-        
+
         Booking booking = bookingRepository.findBookingWithDetails(bookingId)
-            .orElseThrow(() -> BookingNotFoundException.withId(bookingId));
-        
+                .orElseThrow(() -> BookingNotFoundException.withId(bookingId));
+
         return bookingMapper.toResponse(booking);
     }
 
@@ -142,7 +158,7 @@ public class BookingServiceImpl implements BookingService {
         List<ConflictInfo> conflicts = new ArrayList<>();
 
         CustomerAddressContext addressContext;
-        
+
         try {
             addressContext = validateCustomerAndAddress(request);
         } catch (AddressNotFoundException | CustomerNotFoundException | IllegalArgumentException e) {
@@ -160,16 +176,16 @@ public class BookingServiceImpl implements BookingService {
 
             // Validate booking time
             validateBookingTime(request.bookingTime(), errors);
-            
+
             // Validate services and calculate prices
             List<ServiceValidationInfo> serviceValidations = validateServices(request.bookingDetails(), errors);
             BigDecimal calculatedTotalAmount = serviceValidations.stream()
-                .map(ServiceValidationInfo::getCalculatedPrice)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-            
+                    .map(ServiceValidationInfo::getCalculatedPrice)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
             // Apply promotion if provided
             BigDecimal finalAmount = applyPromotion(request.promoCode(), calculatedTotalAmount, customer, errors);
-            
+
             if (!errors.isEmpty()) {
                 return new ValidationOutcome(BookingValidationResult.error(errors), addressContext);
             }
@@ -198,7 +214,7 @@ public class BookingServiceImpl implements BookingService {
 
             BookingValidationResult successResult = BookingValidationResult.success(finalAmount, serviceValidations, customer, addressContext.address(), addressContext.isNewAddress());
             return new ValidationOutcome(successResult, addressContext);
-            
+
         } catch (Exception e) {
             log.error("Error during booking validation: {}", e.getMessage(), e);
             errors.add("Validation error: " + e.getMessage());
@@ -247,87 +263,84 @@ public class BookingServiceImpl implements BookingService {
 
     private void validateBookingTime(LocalDateTime bookingTime, List<String> errors) {
         LocalDateTime now = LocalDateTime.now();
-        
+
         // Check if booking time is in the future
         if (bookingTime.isBefore(now.plusHours(2))) {
             errors.add("Booking time must be at least 2 hours from now");
         }
-        
+
         // Check if booking time is within business hours (8 AM - 8 PM)
         int hour = bookingTime.getHour();
         if (hour < 8 || hour > 20) {
             errors.add("Booking time must be between 8:00 AM and 8:00 PM");
         }
-        
-        // Check if booking is not too far in the future (within 30 days)
-        if (bookingTime.isAfter(now.plusDays(30))) {
-            errors.add("Booking time cannot be more than 30 days from now");
-        }
+
+
     }
 
     private List<ServiceValidationInfo> validateServices(List<BookingDetailRequest> detailRequests, List<String> errors) {
         return detailRequests.stream()
-            .map(detail -> validateSingleService(detail, errors))
-            .collect(Collectors.toList());
+                .map(detail -> validateSingleService(detail, errors))
+                .collect(Collectors.toList());
     }
 
     private ServiceValidationInfo validateSingleService(BookingDetailRequest detail, List<String> errors) {
         Optional<Service> serviceOpt =
-            serviceRepository.findBookableService(detail.serviceId());
-        
+                serviceRepository.findBookableService(detail.serviceId());
+
         if (serviceOpt.isEmpty()) {
             errors.add("Service not found or not bookable: " + detail.serviceId());
             return ServiceValidationInfo.invalid(detail.serviceId(), "Service not found or not bookable");
         }
-        
+
         var service = serviceOpt.get();
-        
+
         // Validate choice IDs
         List<Integer> validChoiceIds = List.of();
         List<Integer> invalidChoiceIds = List.of();
-        
+
         if (detail.selectedChoiceIds() != null && !detail.selectedChoiceIds().isEmpty()) {
             List<Integer> foundChoiceIds = serviceOptionChoiceRepository
-                .validateChoiceIdsForService(detail.serviceId(), detail.selectedChoiceIds());
-            
+                    .validateChoiceIdsForService(detail.serviceId(), detail.selectedChoiceIds());
+
             validChoiceIds = new ArrayList<>(foundChoiceIds);
             invalidChoiceIds = detail.selectedChoiceIds().stream()
-                .filter(id -> !foundChoiceIds.contains(id))
-                .toList();
-            
+                    .filter(id -> !foundChoiceIds.contains(id))
+                    .toList();
+
             if (!invalidChoiceIds.isEmpty()) {
                 errors.add("Invalid choice IDs for service " + detail.serviceId() + ": " + invalidChoiceIds);
             }
         }
-        
+
         // Calculate actual price using ServiceService
         ServicePricingResult pricingResult = calculateServicePricing(detail, service, validChoiceIds);
         BigDecimal calculatedPrice = pricingResult.totalPrice();
-        
+
         // Compare with expected price (tolerance of 1000 VND)
         BigDecimal priceDifference = calculatedPrice.subtract(detail.expectedPrice()).abs();
         boolean priceMatches = priceDifference.compareTo(new BigDecimal("1000")) <= 0;
-        
+
         if (!priceMatches) {
-            errors.add(String.format("Price mismatch for service %d. Expected: %s, Calculated: %s", 
-                detail.serviceId(), 
-                BookingDTOFormatter.formatPrice(detail.expectedPrice()),
-                BookingDTOFormatter.formatPrice(calculatedPrice)));
+            errors.add(String.format("Price mismatch for service %d. Expected: %s, Calculated: %s",
+                    detail.serviceId(),
+                    BookingDTOFormatter.formatPrice(detail.expectedPrice()),
+                    BookingDTOFormatter.formatPrice(calculatedPrice)));
         }
-        
+
         return ServiceValidationInfo.builder()
-            .serviceId(detail.serviceId())
-            .serviceName(service.getName())
-            .exists(true)
-            .active(service.getIsActive())
-            .basePrice(service.getBasePrice())
-            .validChoiceIds(validChoiceIds)
-            .invalidChoiceIds(invalidChoiceIds)
-            .calculatedPrice(calculatedPrice)
-            .expectedPrice(detail.expectedPrice())
-            .priceMatches(priceMatches)
-            .recommendedStaff(Math.max(1, pricingResult.suggestedStaff()))
-            .build();
+                .serviceId(detail.serviceId())
+                .serviceName(service.getName())
+                .exists(true)
+                .active(service.getIsActive())
+                .basePrice(service.getBasePrice())
+                .validChoiceIds(validChoiceIds)
+                .invalidChoiceIds(invalidChoiceIds)
+                .calculatedPrice(calculatedPrice)
+                .expectedPrice(detail.expectedPrice())
+                .priceMatches(priceMatches)
+                .recommendedStaff(Math.max(1, pricingResult.suggestedStaff()))
+                .build();
     }
 
     private ServicePricingResult calculateServicePricing(BookingDetailRequest detail,
@@ -348,11 +361,11 @@ public class BookingServiceImpl implements BookingService {
                     : (detail.selectedChoiceIds() != null ? detail.selectedChoiceIds() : List.of());
 
             CalculatePriceRequest priceRequest = new CalculatePriceRequest(
-                detail.serviceId(),
-                selectionForPricing,
-                detail.quantity()
+                    detail.serviceId(),
+                    selectionForPricing,
+                    detail.quantity()
             );
-            
+
             // Call existing calculatePrice method
             CalculatePriceResponse priceResponse = serviceService.calculatePrice(priceRequest);
 
@@ -475,78 +488,78 @@ public class BookingServiceImpl implements BookingService {
         if (promoCode == null || promoCode.trim().isEmpty()) {
             return amount;
         }
-        
+
         Optional<Promotion> promotionOpt = promotionRepository.findAvailablePromotion(promoCode, LocalDateTime.now());
         if (promotionOpt.isEmpty()) {
             errors.add("Promotion code is invalid or expired: " + promoCode);
             return amount;
         }
-        
+
         Promotion promotion = promotionOpt.get();
-        
+
         // Check customer usage limit (if applicable)
         long customerUsage = promotionRepository.countPromoCodeUsageByCustomer(promoCode, customer.getCustomerId());
         if (customerUsage > 0) { // Assuming one-time use per customer
             errors.add("Promotion code has already been used by this customer");
             return amount;
         }
-        
+
         // Calculate discount
         BigDecimal discount = BigDecimal.ZERO;
         if (promotion.getDiscountType() == DiscountType.FIXED_AMOUNT) {
             discount = promotion.getDiscountValue();
         } else if (promotion.getDiscountType() == DiscountType.PERCENTAGE) {
             discount = amount.multiply(promotion.getDiscountValue()).divide(new BigDecimal("100"));
-            
+
             // Apply max discount limit
-            if (promotion.getMaxDiscountAmount() != null && 
-                discount.compareTo(promotion.getMaxDiscountAmount()) > 0) {
+            if (promotion.getMaxDiscountAmount() != null &&
+                    discount.compareTo(promotion.getMaxDiscountAmount()) > 0) {
                 discount = promotion.getMaxDiscountAmount();
             }
         }
-        
+
         BigDecimal finalAmount = amount.subtract(discount);
         return finalAmount.max(BigDecimal.ZERO); // Ensure amount is not negative
     }
 
     private void validateEmployeeAssignments(List<AssignmentRequest> assignments,
-                                           LocalDateTime bookingTime, 
-                                           List<ConflictInfo> conflicts) {
+                                             LocalDateTime bookingTime,
+                                             List<ConflictInfo> conflicts) {
         for (AssignmentRequest assignment : assignments) {
             Employee employee = employeeRepository.findById(assignment.employeeId()).orElse(null);
             if (employee == null) {
                 conflicts.add(new ConflictInfo(
-                    "EMPLOYEE_NOT_FOUND",
-                    assignment.employeeId(),
-                    bookingTime,
-                    bookingTime,
-                    "Employee not found"
+                        "EMPLOYEE_NOT_FOUND",
+                        assignment.employeeId(),
+                        bookingTime,
+                        bookingTime,
+                        "Employee not found"
                 ));
                 continue;
             }
-            
+
             // Check employee availability
             checkEmployeeAvailability(employee, assignment.serviceId(), bookingTime, conflicts);
         }
     }
 
     private void checkEmployeeAvailability(Employee employee, Integer serviceId,
-                                         LocalDateTime bookingTime, 
-                                         List<ConflictInfo> conflicts) {
+                                           LocalDateTime bookingTime,
+                                           List<ConflictInfo> conflicts) {
         // Get service duration for time range calculation
         Optional<Service> serviceOpt = serviceRepository.findById(serviceId);
         if (serviceOpt.isEmpty()) return;
-        
+
         var service = serviceOpt.get();
         LocalDateTime endTime = bookingTime.plusHours(service.getEstimatedDurationHours().longValue());
-        
+
         // Check for conflicting assignments
         List<Assignment> conflictingAssignments = assignmentRepository.findConflictingAssignments(
-            employee.getEmployeeId(), bookingTime, endTime);
-        
+                employee.getEmployeeId(), bookingTime, endTime);
+
         if (!conflictingAssignments.isEmpty()) {
             Assignment conflict = conflictingAssignments.get(0);
-            
+
             // Try to get employee name safely
             String employeeName = "Unknown Employee";
             try {
@@ -558,14 +571,14 @@ public class BookingServiceImpl implements BookingService {
             } catch (Exception e) {
                 log.warn("Could not get employee name for {}: {}", employee.getEmployeeId(), e.getMessage());
             }
-                
+
             conflicts.add(new ConflictInfo(
-                "ASSIGNMENT_CONFLICT",
-                employee.getEmployeeId(),
-                conflict.getBookingDetail().getBooking().getBookingTime(),
-                conflict.getBookingDetail().getBooking().getBookingTime().plusHours(
-                    conflict.getBookingDetail().getService().getEstimatedDurationHours().longValue()),
-                "Employee " + employeeName + " has another assignment during this time"
+                    "ASSIGNMENT_CONFLICT",
+                    employee.getEmployeeId(),
+                    conflict.getBookingDetail().getBooking().getBookingTime(),
+                    conflict.getBookingDetail().getBooking().getBookingTime().plusHours(
+                            conflict.getBookingDetail().getService().getEstimatedDurationHours().longValue()),
+                    "Employee " + employeeName + " has another assignment during this time"
             ));
         }
     }
@@ -574,7 +587,7 @@ public class BookingServiceImpl implements BookingService {
         // Final check for employee availability right before saving
         List<ConflictInfo> conflicts = new ArrayList<>();
         validateEmployeeAssignments(request.assignments(), request.bookingTime(), conflicts);
-        
+
         if (!conflicts.isEmpty()) {
             throw EmployeeConflictException.withConflicts(conflicts);
         }
@@ -582,13 +595,13 @@ public class BookingServiceImpl implements BookingService {
 
     private Booking createBookingEntity(BookingCreateRequest request, BookingValidationResult validation) {
         Booking booking = new Booking();
-        
+
         // Set basic fields
         booking.setBookingTime(request.bookingTime());
         booking.setNote(request.note());
         booking.setTotalAmount(validation.getCalculatedTotalAmount());
         booking.setStatus(BookingStatus.PENDING);
-        
+
         // Set customer and address
         Address bookingAddress = validation.getAddress();
         if (validation.isUsingNewAddress()) {
@@ -613,78 +626,78 @@ public class BookingServiceImpl implements BookingService {
         // Set promotion if applicable
         if (request.promoCode() != null && !request.promoCode().trim().isEmpty()) {
             promotionRepository.findByPromoCode(request.promoCode())
-                .ifPresent(booking::setPromotion);
+                    .ifPresent(booking::setPromotion);
         }
-        
+
         return booking;
     }
 
-    private List<BookingDetail> createBookingDetails(Booking booking, 
-                                                   BookingCreateRequest request, 
-                                                   BookingValidationResult validation) {
+    private List<BookingDetail> createBookingDetails(Booking booking,
+                                                     BookingCreateRequest request,
+                                                     BookingValidationResult validation) {
         List<BookingDetail> details = new ArrayList<>();
-        
+
         for (int i = 0; i < request.bookingDetails().size(); i++) {
             BookingDetailRequest detailRequest = request.bookingDetails().get(i);
             ServiceValidationInfo serviceValidation = validation.getServiceValidations().get(i);
-            
+
             BookingDetail detail = new BookingDetail();
             detail.setBooking(booking);
-            
+
             // Set service
             Service service = serviceRepository.findById(detailRequest.serviceId())
-                .orElseThrow(() -> ServiceNotFoundException.withId(detailRequest.serviceId()));
+                    .orElseThrow(() -> ServiceNotFoundException.withId(detailRequest.serviceId()));
             detail.setService(service);
-            
+
             detail.setQuantity(detailRequest.quantity());
             BigDecimal calculatedPrice = serviceValidation.getCalculatedPrice();
             BigDecimal pricePerUnit = calculateUnitPrice(calculatedPrice, detailRequest.quantity());
             detail.setPricePerUnit(pricePerUnit);
             detail.setSubTotal(calculatedPrice);
-            
+
             // Set selected choice IDs as comma-separated string
             if (detailRequest.selectedChoiceIds() != null && !detailRequest.selectedChoiceIds().isEmpty()) {
-                detail.setSelectedChoiceIds(String.join(",", 
-                    detailRequest.selectedChoiceIds().stream()
-                        .map(String::valueOf)
-                        .toList()));
+                detail.setSelectedChoiceIds(String.join(",",
+                        detailRequest.selectedChoiceIds().stream()
+                                .map(String::valueOf)
+                                .toList()));
             }
-            
+
             details.add(detail);
         }
-        
+
         return details;
     }
 
-    private List<Assignment> createAssignments(List<BookingDetail> bookingDetails, 
-                                             BookingCreateRequest request) {
+    private List<Assignment> createAssignments(List<BookingDetail> bookingDetails,
+                                               BookingCreateRequest request) {
         List<Assignment> assignments = new ArrayList<>();
-        
+
         // Group assignments by service ID
         Map<Integer, List<AssignmentRequest>> assignmentsByService = new HashMap<>();
         for (AssignmentRequest assignment : request.assignments()) {
             assignmentsByService.computeIfAbsent(assignment.serviceId(), k -> new ArrayList<>())
-                .add(assignment);
+                    .add(assignment);
         }
-        
+
         for (BookingDetail detail : bookingDetails) {
             List<AssignmentRequest> serviceAssignments = assignmentsByService.get(detail.getService().getServiceId());
-            
+
             if (serviceAssignments != null) {
                 for (AssignmentRequest assignmentRequest : serviceAssignments) {
                     Employee employee = employeeRepository.findById(assignmentRequest.employeeId())
-                        .orElseThrow(() -> EmployeeNotFoundException.withId(assignmentRequest.employeeId()));
-                    
+                            .orElseThrow(() -> EmployeeNotFoundException.withId(assignmentRequest.employeeId()));
+
                     Assignment assignment = new Assignment();
                     assignment.setBookingDetail(detail);
                     assignment.setEmployee(employee);
                     assignment.setStatus(AssignmentStatus.ASSIGNED);
-                    
+
                     assignments.add(assignment);
                 }
             }
         }
-        
+
         return assignments;
     }
 
@@ -694,51 +707,55 @@ public class BookingServiceImpl implements BookingService {
         payment.setAmount(booking.getTotalAmount());
         payment.setPaymentStatus(PaymentStatus.PENDING);
         payment.setPaymentMethod(paymentMethodRepository.findById(paymentMethodId)
-            .orElseThrow());
-        
+                .orElseThrow());
+
         // Generate simple transaction code
         payment.setTransactionCode("TXN_" + System.currentTimeMillis());
-        
+
         return payment;
     }
 
-    private BookingCreationSummary createBookingCreationSummary(Booking booking, 
-                                                              List<BookingDetail> details, 
-                                                              List<Assignment> assignments, 
-                                                              Payment payment) {
+    private BookingCreationSummary createBookingCreationSummary(Booking booking,
+                                                                List<BookingDetail> details,
+                                                                List<Assignment> assignments,
+                                                                Payment payment) {
         // Map to DTOs
         CustomerAddressInfo addressInfo = bookingMapper.toCustomerAddressInfo(booking.getAddress());
         List<BookingDetailInfo> detailInfos = details.stream()
-            .map(bookingMapper::toBookingDetailInfo)
-            .toList();
+                .map(bookingMapper::toBookingDetailInfo)
+                .toList();
         PaymentInfo paymentInfo = bookingMapper.toPaymentInfo(payment);
-        PromotionInfo promotionInfo = booking.getPromotion() != null ? 
-            bookingMapper.toPromotionInfo(booking.getPromotion()) : null;
-        
+        PromotionInfo promotionInfo = booking.getPromotion() != null ?
+                bookingMapper.toPromotionInfo(booking.getPromotion()) : null;
+
         // Create summary
         BookingCreationSummary summary = BookingCreationSummary.builder()
-            .bookingId(booking.getBookingId())
-            .bookingCode(booking.getBookingCode())
-            .status(booking.getStatus().toString())
-            .totalAmount(booking.getTotalAmount())
-            .formattedTotalAmount(BookingDTOFormatter.formatPrice(booking.getTotalAmount()))
-            .bookingTime(booking.getBookingTime())
-            .customerInfo(addressInfo)
-            .serviceDetails(detailInfos)
-            .paymentInfo(paymentInfo)
-            .promotionApplied(promotionInfo)
-            .assignedEmployees(assignments.stream()
-                .map(a -> bookingMapper.toEmployeeInfo(a.getEmployee()))
-                .toList())
-            .createdAt(booking.getCreatedAt())
-            .build();
+                .bookingId(booking.getBookingId())
+                .bookingCode(booking.getBookingCode())
+                .status(booking.getStatus().toString())
+                .totalAmount(booking.getTotalAmount())
+                .formattedTotalAmount(BookingDTOFormatter.formatPrice(booking.getTotalAmount()))
+                .bookingTime(booking.getBookingTime())
+                .title(booking.getTitle())
+                .imageUrl(booking.getImageUrl())
+                .isVerified(booking.getIsVerified())
+                .adminComment(booking.getAdminComment())
+                .customerInfo(addressInfo)
+                .serviceDetails(detailInfos)
+                .paymentInfo(paymentInfo)
+                .promotionApplied(promotionInfo)
+                .assignedEmployees(assignments.stream()
+                        .map(a -> bookingMapper.toEmployeeInfo(a.getEmployee()))
+                        .toList())
+                .createdAt(booking.getCreatedAt())
+                .build();
 
         try {
             summary.calculateSummaryFields();
         } catch (Exception e) {
             log.warn("Could not calculate summary fields: {}", e.getMessage());
         }
-        
+
         return summary;
     }
 
@@ -775,26 +792,219 @@ public class BookingServiceImpl implements BookingService {
             PromotionInfo promotionInfo = booking.getPromotion() != null ? bookingMapper.toPromotionInfo(booking.getPromotion()) : null;
 
             return new BookingHistoryResponse(
-                booking.getBookingId(),
-                booking.getBookingCode(),
-                booking.getCustomer().getCustomerId(),
-                booking.getCustomer().getFullName(),
-                addressInfo,
-                booking.getBookingTime().toString(),
-                booking.getNote(),
-                BookingDTOFormatter.formatPrice(booking.getTotalAmount()),
-                booking.getStatus().toString(),
-                promotionInfo,
-                paymentInfo
+                    booking.getBookingId(),
+                    booking.getBookingCode(),
+                    booking.getCustomer().getCustomerId(),
+                    booking.getCustomer().getFullName(),
+                    addressInfo,
+                    booking.getBookingTime().toString(),
+                    booking.getNote(),
+                    BookingDTOFormatter.formatPrice(booking.getTotalAmount()),
+                    booking.getStatus().toString(),
+                    promotionInfo,
+                    paymentInfo
             );
         });
 
         log.info("Found {} bookings for customer {} (page {} of {})",
-            bookingPage.getNumberOfElements(),
-            customerId,
-            bookingPage.getNumber() + 1,
-            bookingPage.getTotalPages());
+                bookingPage.getNumberOfElements(),
+                customerId,
+                bookingPage.getNumber() + 1,
+                bookingPage.getTotalPages());
 
         return bookingHistoryResponsePage;
+    }
+
+    @Override
+    @Transactional
+    public BookingResponse convertBookingToPost(String bookingId, ConvertBookingToPostRequest request) {
+        log.info("Updating booking {} with title: {}, imageUrl: {}", bookingId, request.title(), request.imageUrl());
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("KhĂ´ng tĂ¬m tháº¥y booking vá»›i ID: " + bookingId));
+
+        // Verify booking is unverified (meaning it has no assignments)
+        if (booking.getIsVerified()) {
+            throw new IllegalStateException("KhĂ´ng thá»ƒ cáº­p nháº­t booking Ä‘Ă£ Ä‘Æ°á»£c xĂ¡c minh (cĂ³ nhĂ¢n viĂªn)");
+        }
+
+        // Update title and image URL
+        booking.setTitle(request.title());
+        booking.setImageUrl(request.imageUrl());
+
+        Booking savedBooking = bookingRepository.save(booking);
+        log.info("Successfully updated booking {} title and image", bookingId);
+
+        return bookingMapper.toBookingResponse(savedBooking);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<BookingResponse> getUnverifiedBookings(Pageable pageable) {
+        log.info("Fetching unverified bookings for admin review");
+
+        Page<Booking> unverifiedBookings = bookingRepository.findUnverifiedBookingsOrderByCreatedAtDesc(pageable);
+
+        Page<BookingResponse> response = unverifiedBookings.map(bookingMapper::toBookingResponse);
+
+        log.info("Found {} unverified bookings (page {} of {})",
+                unverifiedBookings.getNumberOfElements(),
+                unverifiedBookings.getNumber() + 1,
+                unverifiedBookings.getTotalPages());
+
+        return response;
+    }
+
+    @Override
+    @Transactional
+    public BookingResponse verifyBooking(String bookingId, BookingVerificationRequest request) {
+        log.info("Admin verifying booking {}: approve={}", bookingId, request.approve());
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("KhĂ´ng tĂ¬m tháº¥y booking vá»›i ID: " + bookingId));
+
+        if (booking.getIsVerified()) {
+            throw new IllegalStateException("Booking nĂ y Ä‘Ă£ Ä‘Æ°á»£c xĂ¡c minh trÆ°á»›c Ä‘Ă³");
+        }
+
+        if (request.approve()) {
+            // Approve the booking post
+            booking.setIsVerified(true);
+
+            // Save admin comment if provided
+            if (request.adminComment() != null && !request.adminComment().trim().isEmpty()) {
+                booking.setAdminComment(request.adminComment());
+                log.info("Booking {} approved with admin comment", bookingId);
+            } else {
+                log.info("Booking {} has been approved by admin", bookingId);
+            }
+
+            // TODO: Send notification to customer about approval
+
+        } else {
+            // Reject the booking post
+            log.info("Booking {} has been rejected by admin. Reason: {}",
+                    bookingId, request.rejectionReason());
+
+            // Save rejection reason as admin comment
+            if (request.rejectionReason() != null && !request.rejectionReason().trim().isEmpty()) {
+                booking.setAdminComment(request.rejectionReason());
+            }
+
+            // TODO: Send notification to customer about rejection with reason
+            // For now, we'll just cancel the booking
+            booking.setStatus(BookingStatus.CANCELLED);
+        }
+
+        Booking savedBooking = bookingRepository.save(booking);
+
+        return bookingMapper.toBookingResponse(savedBooking);
+    }
+
+    @Override
+    @Transactional
+    public BookingResponse cancelBooking(String bookingId, String customerId, String reason) {
+        log.info("Customer {} cancelling booking {}", customerId, bookingId);
+
+        // 1. Find booking
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> {
+                    log.error("Booking {} not found", bookingId);
+                    return BookingNotFoundException.withId(bookingId);
+                });
+
+        // 2. Verify booking belongs to customer
+        if (!booking.getCustomer().getCustomerId().equals(customerId)) {
+            log.error("Customer {} tried to cancel booking {} which belongs to customer {}",
+                    customerId, bookingId, booking.getCustomer().getCustomerId());
+            throw BookingValidationException.singleError("Bạn không có quyền hủy booking này");
+        }
+
+        // 3. Check if booking can be cancelled
+        BookingStatus currentStatus = booking.getStatus();
+
+        if (currentStatus == BookingStatus.CANCELLED) {
+            log.warn("Booking {} is already cancelled", bookingId);
+            throw BookingValidationException.singleError("Booking đã bị hủy trước đó");
+        }
+
+        if (currentStatus == BookingStatus.COMPLETED) {
+            log.warn("Cannot cancel completed booking {}", bookingId);
+            throw BookingValidationException.singleError("Không thể hủy booking đã hoàn thành");
+        }
+
+        if (currentStatus == BookingStatus.IN_PROGRESS) {
+            log.warn("Cannot cancel in-progress booking {}", bookingId);
+            throw BookingValidationException.singleError("Không thể hủy booking đang thực hiện");
+        }
+
+        // 4. Cancel the booking
+        booking.setStatus(BookingStatus.CANCELLED);
+
+        // 5. Save cancellation reason
+        if (reason != null && !reason.trim().isEmpty()) {
+            String cancelNote = "Khách hàng hủy: " + reason.trim();
+            if (booking.getAdminComment() != null && !booking.getAdminComment().isEmpty()) {
+                booking.setAdminComment(booking.getAdminComment() + " | " + cancelNote);
+            } else {
+                booking.setAdminComment(cancelNote);
+            }
+        } else {
+            String cancelNote = "Khách hàng hủy booking";
+            if (booking.getAdminComment() != null && !booking.getAdminComment().isEmpty()) {
+                booking.setAdminComment(booking.getAdminComment() + " | " + cancelNote);
+            } else {
+                booking.setAdminComment(cancelNote);
+            }
+        }
+
+        // 6. Cancel all assignments related to this booking
+        List<BookingDetail> bookingDetails = booking.getBookingDetails();
+        if (bookingDetails != null && !bookingDetails.isEmpty()) {
+            for (BookingDetail detail : bookingDetails) {
+                List<Assignment> assignments = assignmentRepository.findByBookingDetailId(detail.getId());
+                if (assignments != null && !assignments.isEmpty()) {
+                    for (Assignment assignment : assignments) {
+                        if (assignment.getStatus() != AssignmentStatus.CANCELLED &&
+                                assignment.getStatus() != AssignmentStatus.COMPLETED) {
+                            assignment.setStatus(AssignmentStatus.CANCELLED);
+                            assignmentRepository.save(assignment);
+                            log.info("Cancelled assignment {} for employee {}",
+                                    assignment.getAssignmentId(),
+                                    assignment.getEmployee().getEmployeeId());
+                        }
+                    }
+                }
+            }
+        }
+
+        // 7. Handle payment refund/cancellation
+        List<Payment> payments = paymentRepository.findByBookingIdOrderByCreatedAtDesc(bookingId);
+        if (payments != null && !payments.isEmpty()) {
+            for (Payment payment : payments) {
+                if (payment.getPaymentStatus() == PaymentStatus.PAID) {
+                    // Mark for refund
+                    payment.setPaymentStatus(PaymentStatus.REFUNDED);
+                    paymentRepository.save(payment);
+                    log.info("Marked payment {} for refund", payment.getId());
+                } else if (payment.getPaymentStatus() == PaymentStatus.PENDING) {
+                    // Cancel pending payment
+                    payment.setPaymentStatus(PaymentStatus.CANCELLED);
+                    paymentRepository.save(payment);
+                    log.info("Cancelled pending payment {}", payment.getId());
+                }
+            }
+        }
+
+        // 8. Save booking
+        Booking savedBooking = bookingRepository.save(booking);
+
+        log.info("Booking {} cancelled successfully by customer {}", bookingId, customerId);
+
+        // TODO: Send notification to assigned employees about cancellation
+        // TODO: Send notification to customer about cancellation confirmation
+        // TODO: Process actual refund through payment gateway
+
+        return bookingMapper.toBookingResponse(savedBooking);
     }
 }
