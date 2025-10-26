@@ -21,7 +21,7 @@ public interface AccountRepository extends JpaRepository<Account, String> {
 
     List<Account> findAccountsByUsername(String username);
 
-    @Query("SELECT a FROM Account a JOIN a.roles r WHERE a.username = :username AND r.roleName = :roleName ORDER BY a.createdAt DESC")
+    @Query("SELECT a FROM Account a JOIN a.roles r WHERE a.username = :username AND r.roleName = :roleName")
     List<Account> findAccountsByUsernameAndRole(@Param("username") String username, @Param("roleName") RoleName roleName);
 
     boolean existsByUsername(String username);

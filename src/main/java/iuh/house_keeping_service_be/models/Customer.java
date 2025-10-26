@@ -8,7 +8,6 @@ package iuh.house_keeping_service_be.models;
     import org.hibernate.annotations.GenericGenerator;
 
     import java.time.LocalDate;
-    import java.time.LocalDateTime;
 
     @Entity
     @Table(name = "customer")
@@ -47,21 +46,4 @@ package iuh.house_keeping_service_be.models;
 
         @Column(name = "vip_level")
         private Integer vipLevel;
-
-        @Column(name = "created_at")
-        private LocalDateTime createdAt;
-
-        @Column(name = "updated_at")
-        private LocalDateTime updatedAt;
-
-        @PrePersist
-        protected void onCreate() {
-            createdAt = LocalDateTime.now();
-            updatedAt = LocalDateTime.now();
-        }
-
-        @PreUpdate
-        protected void onUpdate() {
-            updatedAt = LocalDateTime.now();
-        }
     }

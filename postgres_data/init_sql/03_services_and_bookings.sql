@@ -52,18 +52,3 @@ CREATE TABLE booking_details (
 
 ALTER TABLE booking_details
 ADD COLUMN selected_choice_ids TEXT;
-
-CREATE TABLE recurring_bookings (
-    recurring_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4(),
-    customer_id VARCHAR(36) NOT NULL REFERENCES customer(customer_id),
-    address_id VARCHAR(36) NOT NULL REFERENCES address(address_id),
-    service_id INT NOT NULL REFERENCES service(service_id),
-    frequency_type VARCHAR(20) NOT NULL CHECK (frequency_type IN ('WEEKLY', 'MONTHLY')),
-    interval INT DEFAULT 1,
-    day_of_week INT,
-    day_of_month INT,
-    start_time TIME NOT NULL,
-    start_date DATE NOT NULL,
-    end_date DATE,
-    is_active BOOLEAN DEFAULT TRUE
-);

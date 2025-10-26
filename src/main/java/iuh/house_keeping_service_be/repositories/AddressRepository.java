@@ -15,9 +15,6 @@ public interface AddressRepository extends JpaRepository<Address, String> {
     List<Address> findByCustomer_CustomerId(String customerId);
 
     Optional<Address> findByCustomer_CustomerIdAndIsDefaultTrue(String customerId);
-
-    // Find by customer ID
-    List<Address> findByCustomer_CustomerIdOrderByCreatedAtDesc(String customerId);
     
     // Find customer's default address
     @Query("SELECT a FROM Address a WHERE a.customer.customerId = :customerId AND a.isDefault = true")

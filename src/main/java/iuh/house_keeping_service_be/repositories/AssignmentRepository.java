@@ -57,8 +57,6 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
             @Param("endTime") LocalDateTime endTime
     );
 
-    List<Assignment> findByEmployeeEmployeeIdOrderByCreatedAtDesc(String employeeId);
-
     @Query("SELECT a FROM Assignment a WHERE a.employee.employeeId = :employeeId AND a.status IN :statuses AND " +
             "((a.checkInTime BETWEEN :startTime AND :endTime) OR (a.checkOutTime BETWEEN :startTime AND :endTime) OR " +
             "(a.checkInTime <= :startTime AND a.checkOutTime >= :endTime))")
@@ -71,16 +69,9 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
     @Query("SELECT COUNT(a) FROM Assignment a WHERE a.employee.employeeId = :employeeId AND a.status = 'COMPLETED'")
     Integer countCompletedJobsByEmployee(@Param("employeeId") String employeeId);
 
-    // Find by employee ID
-    @Query("SELECT a FROM Assignment a WHERE a.employee.employeeId = :employeeId ORDER BY a.createdAt DESC")
-    List<Assignment> findByEmployeeIdOrderByCreatedAtDesc(@Param("employeeId") String employeeId);
-
     // Find by booking detail ID
     @Query("SELECT a FROM Assignment a WHERE a.bookingDetail.id = :bookingDetailId")
     List<Assignment> findByBookingDetailId(@Param("bookingDetailId") String bookingDetailId);
-
-    // Find by status
-    List<Assignment> findByStatusOrderByCreatedAtDesc(AssignmentStatus status);
 
     boolean existsByBookingDetailIdAndEmployeeEmployeeId(String bookingDetailId, String employeeId);
 
@@ -136,7 +127,7 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
             "LEFT JOIN FETCH c.account " +
             "WHERE a.employee.employeeId = :employeeId " +
             "AND a.status = :status " +
-            "ORDER BY a.createdAt DESC")
+            "ORDER BY b.bookingTime DESC")
     List<Assignment> findByEmployeeIdAndStatusWithDetails(
             @Param("employeeId") String employeeId,
             @Param("status") AssignmentStatus status,
@@ -150,7 +141,7 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
             "LEFT JOIN FETCH b.address " +
             "LEFT JOIN FETCH c.account " +
             "WHERE a.employee.employeeId = :employeeId " +
-            "ORDER BY a.createdAt DESC")
+            "ORDER BY b.bookingTime DESC")
     List<Assignment> findByEmployeeIdWithDetails(
             @Param("employeeId") String employeeId,
             Pageable pageable);

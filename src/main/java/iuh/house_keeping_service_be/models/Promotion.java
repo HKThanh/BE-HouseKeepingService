@@ -52,12 +52,4 @@ public class Promotion {
 
     @Column(name = "is_active")
     private Boolean isActive = true;
-
-    @CreationTimestamp
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-
-    @UpdateTimestamp
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
 }

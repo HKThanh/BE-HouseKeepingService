@@ -45,23 +45,6 @@ public class Assignment {
     @Column(name = "check_out_time")
     private LocalDateTime checkOutTime;
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
-
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt = LocalDateTime.now();
-
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
-    }
-
     // Helper method to get booking time from booking detail
     public LocalDateTime getBookingTime() {
         return bookingDetail != null && bookingDetail.getBooking() != null
