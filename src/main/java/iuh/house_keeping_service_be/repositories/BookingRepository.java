@@ -146,4 +146,16 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
            "WHERE b.customer.customerId = :customerId " +
            "ORDER BY b.createdAt DESC")
     Page<Booking> findByCustomerIdWithPagination(@Param("customerId") String customerId, Pageable pageable);
+
+    // Find unverified bookings (posts) ordered by created date descending
+    @Query("SELECT b FROM Booking b " +
+           "LEFT JOIN FETCH b.customer c " +
+           "LEFT JOIN FETCH b.address a " +
+           "WHERE b.isVerified = false " +
+           "ORDER BY b.createdAt DESC")
+    Page<Booking> findUnverifiedBookingsOrderByCreatedAtDesc(Pageable pageable);
+
+    // Find unverified bookings without pagination
+    @Query("SELECT b FROM Booking b WHERE b.isVerified = false ORDER BY b.createdAt DESC")
+    List<Booking> findUnverifiedBookings();
 }

@@ -18,6 +18,12 @@ public record BookingCreateRequest(
         @Size(max = 1000, message = "Note cannot exceed 1000 characters")
         String note,
 
+        @Size(max = 255, message = "Title cannot exceed 255 characters")
+        String title,
+
+        @Size(max = 500, message = "Image URL cannot exceed 500 characters")
+        String imageUrl,
+
         @Size(max = 20, message = "Promo code cannot exceed 20 characters")
         String promoCode,
 
