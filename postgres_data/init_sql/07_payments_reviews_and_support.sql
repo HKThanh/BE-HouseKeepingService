@@ -43,17 +43,6 @@ CREATE TABLE review_details (
     PRIMARY KEY (review_id, criteria_id)
 );
 
-CREATE TABLE support_ticket (
-    ticket_id VARCHAR(36) PRIMARY KEY DEFAULT uuid_generate_v4(),
-    customer_id VARCHAR(36) REFERENCES customer(customer_id),
-    booking_id VARCHAR(36) REFERENCES bookings(booking_id),
-    subject VARCHAR(100) NOT NULL,
-    description TEXT NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED')),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
 CREATE TABLE promotions (
     promotion_id INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     promo_code VARCHAR(50) UNIQUE NOT NULL,

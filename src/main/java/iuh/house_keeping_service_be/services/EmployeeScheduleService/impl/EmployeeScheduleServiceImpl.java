@@ -108,7 +108,6 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
                     .endTime(request.endTime())
                     .reason(request.reason())
                     .isApproved(true)
-                    .createdAt(LocalDateTime.now())
                     .build();
 
             unavailabilityRepository.save(unavailability);
@@ -124,16 +123,21 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
     }
 
     private List<Employee> getEmployeesInWorkingZone(String ward, String city) {
-        if (ward == null && city == null) {
+        // Chuẩn hóa tên phường và thành phố
+        String normalizedWard = normalizeLocationName(ward);
+        String normalizedCity = normalizeLocationName(city);
+        
+        if (normalizedWard == null && normalizedCity == null) {
             return employeeRepository.findAll().stream()
                     .filter(emp -> emp.getEmployeeStatus() == EmployeeStatus.AVAILABLE)
                     .collect(Collectors.toList());
         }
 
-        List<EmployeeWorkingZone> workingZones = workingZoneRepository.findByLocation(ward, city);
+        List<EmployeeWorkingZone> workingZones = workingZoneRepository.findByLocationContaining(normalizedWard, normalizedCity);
         return workingZones.stream()
                 .map(EmployeeWorkingZone::getEmployee)
                 .filter(emp -> emp.getEmployeeStatus() == EmployeeStatus.AVAILABLE)
+                .distinct()
                 .collect(Collectors.toList());
     }
 
@@ -327,10 +331,15 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
      * Lọc nhân viên theo khu vực làm việc
      */
     private List<Employee> filterEmployeesByWorkingZone(String ward, String city) {
-        if (ward != null && city != null) {
-            // Sử dụng method hiện có để lọc theo location
-            List<EmployeeWorkingZone> workingZones = workingZoneRepository.findByLocation(ward, city);
-            log.info("Filtering by ward: {} and city: {}", ward, city);
+        // Chuẩn hóa tên phường và thành phố
+        String normalizedWard = normalizeLocationName(ward);
+        String normalizedCity = normalizeLocationName(city);
+        
+        if (normalizedWard != null && normalizedCity != null) {
+            // Sử dụng method LIKE để tìm kiếm theo chuỗi con
+            List<EmployeeWorkingZone> workingZones = workingZoneRepository.findByLocationContaining(normalizedWard, normalizedCity);
+            log.info("Filtering by ward: {} (normalized from: {}) and city: {} (normalized from: {})", 
+                    normalizedWard, ward, normalizedCity, city);
 
             return workingZones.stream()
                     .map(EmployeeWorkingZone::getEmployee)
@@ -338,10 +347,10 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
                     .distinct()
                     .collect(Collectors.toList());
 
-        } else if (city != null) {
+        } else if (normalizedCity != null) {
             // Lọc chỉ theo city
-            List<EmployeeWorkingZone> workingZones = workingZoneRepository.findByLocation(null, city);
-            log.info("Filtering by city: {}", city);
+            List<EmployeeWorkingZone> workingZones = workingZoneRepository.findByLocationContaining(null, normalizedCity);
+            log.info("Filtering by city: {} (normalized from: {})", normalizedCity, city);
 
             return workingZones.stream()
                     .map(EmployeeWorkingZone::getEmployee)
@@ -355,6 +364,34 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
                     .filter(emp -> emp.getEmployeeStatus() == EmployeeStatus.AVAILABLE)
                     .collect(Collectors.toList());
         }
+    }
+
+    /**
+     * Chuẩn hóa tên địa điểm bằng cách loại bỏ các tiền tố
+     * VD: "P. Tây Thạnh" -> "Tây Thạnh"
+     *     "Phường Tây Thạnh" -> "Tây Thạnh"
+     *     "TP. Hồ Chí Minh" -> "Hồ Chí Minh"
+     *     "Thành phố Hồ Chí Minh" -> "Hồ Chí Minh"
+     */
+    private String normalizeLocationName(String location) {
+        if (location == null || location.trim().isEmpty()) {
+            return null;
+        }
+        
+        String normalized = location.trim();
+        
+        // Loại bỏ các tiền tố phường
+        normalized = normalized.replaceFirst("(?i)^P\\.\\s*", "");
+        normalized = normalized.replaceFirst("(?i)^Phường\\s+", "");
+        normalized = normalized.replaceFirst("(?i)^phường\\s+", "");
+        
+        // Loại bỏ các tiền tố thành phố
+        normalized = normalized.replaceFirst("(?i)^TP\\.\\s*", "");
+        normalized = normalized.replaceFirst("(?i)^Tp\\.\\s*", "");
+        normalized = normalized.replaceFirst("(?i)^Thành phố\\s+", "");
+        normalized = normalized.replaceFirst("(?i)^thành phố\\s+", "");
+        
+        return normalized.trim();
     }
 
     /**

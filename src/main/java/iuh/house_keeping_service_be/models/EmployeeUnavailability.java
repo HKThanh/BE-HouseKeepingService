@@ -42,8 +42,4 @@ public class EmployeeUnavailability {
 
     @Column(name = "is_approved", nullable = false)
     private Boolean isApproved;
-
-    @CreationTimestamp
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
 }

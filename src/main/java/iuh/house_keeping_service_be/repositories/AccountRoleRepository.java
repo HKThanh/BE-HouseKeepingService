@@ -15,6 +15,4 @@ public interface AccountRoleRepository extends JpaRepository<AccountRole, Accoun
     @Query("SELECT ar FROM AccountRole ar WHERE ar.account.accountId = :accountId")
     List<AccountRole> findByAccountId(@Param("accountId") String accountId);
 
-    @Query("SELECT ar FROM AccountRole ar WHERE ar.role.roleId = :roleId")
-    List<AccountRole> findByRoleId(@Param("roleId") Integer roleId);
 }

@@ -162,8 +162,6 @@ public class AuthServiceImpl implements AuthService {
        account.setPhoneNumber(phoneNumber.trim());
        account.setStatus(AccountStatus.ACTIVE);
        account.setIsPhoneVerified(false);
-       account.setCreatedAt(LocalDateTime.now());
-       account.setUpdatedAt(LocalDateTime.now());
 
        // Get role entity
        Role roleEntity = roleRepository.findByRoleName(roleName)
@@ -190,8 +188,6 @@ public class AuthServiceImpl implements AuthService {
                customer.setAccount(account);
                customer.setFullName(fullName);
                customer.setEmail(email.trim());
-               customer.setCreatedAt(LocalDateTime.now());
-               customer.setUpdatedAt(LocalDateTime.now());
                customerRepository.save(customer);
                break;
 
@@ -201,8 +197,6 @@ public class AuthServiceImpl implements AuthService {
                employee.setFullName(fullName);
                employee.setEmail(email.trim());
                employee.setHiredDate(LocalDate.now());
-               employee.setCreatedAt(LocalDateTime.now());
-               employee.setUpdatedAt(LocalDateTime.now());
                employeeRepository.save(employee);
                break;
 
@@ -212,8 +206,6 @@ public class AuthServiceImpl implements AuthService {
                adminProfile.setFullName(fullName);
                adminProfile.setContactInfo(email.trim());
                adminProfile.setHireDate(LocalDate.now());
-               adminProfile.setCreatedAt(LocalDateTime.now());
-               adminProfile.setUpdatedAt(LocalDateTime.now());
                adminProfileRepository.save(adminProfile);
                break;
        }

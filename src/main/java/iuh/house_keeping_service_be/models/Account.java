@@ -38,12 +38,6 @@ public class Account {
     @Column(name = "is_phone_verified")
     private Boolean isPhoneVerified = false;
 
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
     @Column(name = "last_login")
     private LocalDateTime lastLogin;
 
@@ -57,15 +51,8 @@ public class Account {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
         if (accountId == null) {
             accountId = java.util.UUID.randomUUID().toString();
         }
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
     }
 }

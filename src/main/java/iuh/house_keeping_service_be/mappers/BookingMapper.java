@@ -161,8 +161,8 @@ public class BookingMapper {
             assignment.getStatus(),
             assignment.getCheckInTime(), // Use calculated start time
             assignment.getCheckOutTime(),   // Use calculated end time
-            assignment.getCreatedAt(),
-            assignment.getUpdatedAt()
+            null, // createdAt - timestamp field removed from Assignment
+            null  // updatedAt - timestamp field removed from Assignment
         );
     }
 

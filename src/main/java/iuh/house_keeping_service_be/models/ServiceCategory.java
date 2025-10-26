@@ -36,14 +36,6 @@ public class ServiceCategory {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
-    @CreationTimestamp
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-
-    @UpdateTimestamp
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
     @OneToMany(mappedBy = "category", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Service> services;
 }

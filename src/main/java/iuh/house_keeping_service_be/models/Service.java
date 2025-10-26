@@ -53,14 +53,6 @@ public class Service {
     @JoinColumn(name = "category_id")
     private ServiceCategory category;
 
-    @CreationTimestamp
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-
-    @UpdateTimestamp
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
     @OneToMany(mappedBy = "service", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<ServiceOption> serviceOptions;
 }

@@ -38,7 +38,7 @@ public interface ServiceRepository extends JpaRepository<Service, Integer> {
     @Query("SELECT DISTINCT s FROM Service s " +
            "LEFT JOIN FETCH s.serviceOptions so " +
            "LEFT JOIN FETCH so.choices soc " +
-           "WHERE s.id = :serviceId AND s.isActive = true " +
+           "WHERE s.serviceId = :serviceId AND s.isActive = true " +
            "ORDER BY so.displayOrder, soc.displayOrder")
     Optional<Service> findServiceWithOptions(@Param("serviceId") Integer serviceId);
     

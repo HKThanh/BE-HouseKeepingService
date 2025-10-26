@@ -6,7 +6,29 @@ INSERT INTO account (account_id, username, password, phone_number, status, is_ph
 ('a1000001-0000-0000-0000-000000000002', 'jane_smith', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0912345678', 'ACTIVE', true),
 ('a1000001-0000-0000-0000-000000000003', 'admin_1', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0900000001', 'ACTIVE', true),
 ('a1000001-0000-0000-0000-000000000004', 'mary_jones', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0909876543', 'INACTIVE', false),
-('a1000001-0000-0000-0000-000000000005', 'bob_wilson', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0923456789', 'ACTIVE', true);
+('a1000001-0000-0000-0000-000000000005', 'bob_wilson', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0923456789', 'ACTIVE', true),
+-- 10 tài khoản khách hàng mới
+('a1000001-0000-0000-0000-000000000006', 'nguyenvana', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0987654321', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000007', 'tranthib', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0976543210', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000008', 'levanc', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0965432109', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000009', 'phamthid', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0954321098', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000010', 'hoangvane', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0943210987', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000011', 'vothif', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0932109876', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000012', 'dangvang', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0921098765', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000013', 'ngothih', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0910987654', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000014', 'buivani', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0919876543', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000015', 'dothik', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0898765432', 'ACTIVE', true),
+-- 10 tài khoản nhân viên mới
+('a1000001-0000-0000-0000-000000000016', 'tranvanl', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0887224321', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000017', 'nguyenthim', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0876223210', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000018', 'levann', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0865222109', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000019', 'phamvano', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0854221098', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000020', 'hoangthip', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0843220987', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000021', 'vovanq', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0832229876', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000022', 'dangthir', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0821228765', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000023', 'ngovans', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0810227654', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000024', 'buithit', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0809226543', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000025', 'dovanu', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0798225432', 'ACTIVE', true);
 
 -- Gán vai trò cho các tài khoản
 INSERT INTO account_roles (account_id, role_id) VALUES
@@ -15,34 +37,131 @@ INSERT INTO account_roles (account_id, role_id) VALUES
 ('a1000001-0000-0000-0000-000000000002', 1), -- jane_smith cũng là CUSTOMER
 ('a1000001-0000-0000-0000-000000000003', 3), -- admin_1 là ADMIN
 ('a1000001-0000-0000-0000-000000000004', 1), -- mary_jones là CUSTOMER
-('a1000001-0000-0000-0000-000000000005', 2); -- bob_wilson là EMPLOYEE
+('a1000001-0000-0000-0000-000000000005', 2), -- bob_wilson là EMPLOYEE
+-- 10 khách hàng mới
+('a1000001-0000-0000-0000-000000000006', 1),
+('a1000001-0000-0000-0000-000000000007', 1),
+('a1000001-0000-0000-0000-000000000008', 1),
+('a1000001-0000-0000-0000-000000000009', 1),
+('a1000001-0000-0000-0000-000000000010', 1),
+('a1000001-0000-0000-0000-000000000011', 1),
+('a1000001-0000-0000-0000-000000000012', 1),
+('a1000001-0000-0000-0000-000000000013', 1),
+('a1000001-0000-0000-0000-000000000014', 1),
+('a1000001-0000-0000-0000-000000000015', 1),
+-- 10 nhân viên mới
+('a1000001-0000-0000-0000-000000000016', 2),
+('a1000001-0000-0000-0000-000000000017', 2),
+('a1000001-0000-0000-0000-000000000018', 2),
+('a1000001-0000-0000-0000-000000000019', 2),
+('a1000001-0000-0000-0000-000000000020', 2),
+('a1000001-0000-0000-0000-000000000021', 2),
+('a1000001-0000-0000-0000-000000000022', 2),
+('a1000001-0000-0000-0000-000000000023', 2),
+('a1000001-0000-0000-0000-000000000024', 2),
+('a1000001-0000-0000-0000-000000000025', 2);
 
 -- Thêm hồ sơ khách hàng (customer)
 INSERT INTO customer (customer_id, account_id, avatar, full_name, is_male, email, birthdate) VALUES
 ('c1000001-0000-0000-0000-000000000001', 'a1000001-0000-0000-0000-000000000001', 'https://picsum.photos/200', 'John Doe', TRUE, 'john.doe@example.com', '2003-09-10'),
 ('c1000001-0000-0000-0000-000000000002', 'a1000001-0000-0000-0000-000000000004', 'https://picsum.photos/200', 'Mary Jones', FALSE, 'mary.jones@example.com', '2003-01-19'),
-('c1000001-0000-0000-0000-000000000003', 'a1000001-0000-0000-0000-000000000002', 'https://picsum.photos/200', 'Jane Smith Customer', FALSE, 'jane.smith.customer@example.com', '2003-04-14');
+('c1000001-0000-0000-0000-000000000003', 'a1000001-0000-0000-0000-000000000002', 'https://picsum.photos/200', 'Jane Smith Customer', FALSE, 'jane.smith.customer@example.com', '2003-04-14'),
+-- 10 khách hàng Việt Nam
+('c1000001-0000-0000-0000-000000000004', 'a1000001-0000-0000-0000-000000000006', 'https://i.pravatar.cc/150?img=11', 'Nguyễn Văn An', TRUE, 'nguyenvanan@gmail.com', '1995-03-15'),
+('c1000001-0000-0000-0000-000000000005', 'a1000001-0000-0000-0000-000000000007', 'https://i.pravatar.cc/150?img=5', 'Trần Thị Bích', FALSE, 'tranthibich@gmail.com', '1998-07-22'),
+('c1000001-0000-0000-0000-000000000006', 'a1000001-0000-0000-0000-000000000008', 'https://i.pravatar.cc/150?img=12', 'Lê Văn Cường', TRUE, 'levancuong@gmail.com', '1992-11-08'),
+('c1000001-0000-0000-0000-000000000007', 'a1000001-0000-0000-0000-000000000009', 'https://i.pravatar.cc/150?img=9', 'Phạm Thị Dung', FALSE, 'phamthidung@gmail.com', '1996-05-30'),
+('c1000001-0000-0000-0000-000000000008', 'a1000001-0000-0000-0000-000000000010', 'https://i.pravatar.cc/150?img=13', 'Hoàng Văn Em', TRUE, 'hoangvanem@gmail.com', '1994-09-12'),
+('c1000001-0000-0000-0000-000000000009', 'a1000001-0000-0000-0000-000000000011', 'https://i.pravatar.cc/150?img=20', 'Võ Thị Phương', FALSE, 'vothiphuong@gmail.com', '1997-02-18'),
+('c1000001-0000-0000-0000-000000000010', 'a1000001-0000-0000-0000-000000000012', 'https://i.pravatar.cc/150?img=14', 'Đặng Văn Giang', TRUE, 'dangvangiang@gmail.com', '1993-06-25'),
+('c1000001-0000-0000-0000-000000000011', 'a1000001-0000-0000-0000-000000000013', 'https://i.pravatar.cc/150?img=23', 'Ngô Thị Hà', FALSE, 'ngothiha@gmail.com', '1999-10-14'),
+('c1000001-0000-0000-0000-000000000012', 'a1000001-0000-0000-0000-000000000014', 'https://i.pravatar.cc/150?img=15', 'Bùi Văn Ích', TRUE, 'buivanich@gmail.com', '1991-04-07'),
+('c1000001-0000-0000-0000-000000000013', 'a1000001-0000-0000-0000-000000000015', 'https://i.pravatar.cc/150?img=24', 'Đỗ Thị Kim', FALSE, 'dothikim@gmail.com', '2000-12-20');
 
 -- Thêm hồ sơ nhân viên (employee)
 INSERT INTO employee (employee_id, account_id, avatar, full_name, is_male, email, birthdate, hired_date, skills, bio) VALUES
 ('e1000001-0000-0000-0000-000000000001', 'a1000001-0000-0000-0000-000000000002', 'https://picsum.photos/200', 'Jane Smith', FALSE, 'jane.smith@example.com', '2003-04-14', '2024-01-15', ARRAY['Cleaning', 'Organizing'], 'Có kinh nghiệm dọn dẹp nhà cửa và sắp xếp đồ đạc.'),
-('e1000001-0000-0000-0000-000000000002', 'a1000001-0000-0000-0000-000000000005', 'https://picsum.photos/200', 'Bob Wilson', TRUE, 'bob.wilson@examplefieldset.com', '2003-08-10', '2023-06-20', ARRAY['Deep Cleaning', 'Laundry'], 'Chuyên gia giặt ủi và làm sạch sâu.');
+('e1000001-0000-0000-0000-000000000002', 'a1000001-0000-0000-0000-000000000005', 'https://picsum.photos/200', 'Bob Wilson', TRUE, 'bob.wilson@examplefieldset.com', '2003-08-10', '2023-06-20', ARRAY['Deep Cleaning', 'Laundry'], 'Chuyên gia giặt ủi và làm sạch sâu.'),
+-- 10 nhân viên Việt Nam
+('e1000001-0000-0000-0000-000000000003', 'a1000001-0000-0000-0000-000000000016', 'https://i.pravatar.cc/150?img=33', 'Trần Văn Long', TRUE, 'tranvanlong@gmail.com', '1994-08-12', '2023-03-10', ARRAY['Vệ sinh tổng quát', 'Lau dọn'], 'Nhiều năm kinh nghiệm vệ sinh nhà cửa, tỉ mỉ và cẩn thận.'),
+('e1000001-0000-0000-0000-000000000004', 'a1000001-0000-0000-0000-000000000017', 'https://i.pravatar.cc/150?img=27', 'Nguyễn Thị Mai', FALSE, 'nguyenthimai@gmail.com', '1996-04-25', '2023-05-15', ARRAY['Giặt ủi', 'Nấu ăn'], 'Chuyên về công việc gia đình, giặt ủi và nấu ăn ngon.'),
+('e1000001-0000-0000-0000-000000000005', 'a1000001-0000-0000-0000-000000000018', 'https://i.pravatar.cc/150?img=34', 'Lê Văn Nam', TRUE, 'levannam@gmail.com', '1992-11-18', '2022-08-20', ARRAY['Vệ sinh máy lạnh', 'Sửa chữa nhỏ'], 'Có kỹ năng kỹ thuật, chuyên vệ sinh và bảo trì máy lạnh.'),
+('e1000001-0000-0000-0000-000000000006', 'a1000001-0000-0000-0000-000000000019', 'https://i.pravatar.cc/150?img=35', 'Phạm Văn Ơn', TRUE, 'phamvanon@gmail.com', '1995-06-30', '2023-07-12', ARRAY['Dọn dẹp', 'Sắp xếp'], 'Nhiệt tình, trách nhiệm, làm việc nhanh nhẹn.'),
+('e1000001-0000-0000-0000-000000000007', 'a1000001-0000-0000-0000-000000000020', 'https://i.pravatar.cc/150?img=28', 'Hoàng Thị Phương', FALSE, 'hoangthiphuong@gmail.com', '1997-02-14', '2023-09-08', ARRAY['Vệ sinh sofa', 'Giặt thảm'], 'Chuyên vệ sinh sofa, thảm, rèm cửa bằng máy móc chuyên dụng.'),
+('e1000001-0000-0000-0000-000000000008', 'a1000001-0000-0000-0000-000000000021', 'https://i.pravatar.cc/150?img=36', 'Võ Văn Quang', TRUE, 'vovanquang@gmail.com', '1993-09-22', '2022-11-25', ARRAY['Tổng vệ sinh', 'Làm vườn'], 'Kinh nghiệm dọn dẹp nhà phố, biệt thự và chăm sóc vườn.'),
+('e1000001-0000-0000-0000-000000000009', 'a1000001-0000-0000-0000-000000000022', 'https://i.pravatar.cc/150?img=29', 'Đặng Thị Rượu', FALSE, 'dangthiruou@gmail.com', '1998-05-16', '2024-01-05', ARRAY['Nấu ăn', 'Đi chợ'], 'Nấu ăn ngon, đa dạng món Việt và món Á, mua sắm khéo léo.'),
+('e1000001-0000-0000-0000-000000000010', 'a1000001-0000-0000-0000-000000000023', 'https://i.pravatar.cc/150?img=37', 'Ngô Văn Sơn', TRUE, 'ngovanson@gmail.com', '1991-12-03', '2022-04-18', ARRAY['Vệ sinh công nghiệp', 'Làm sạch kính'], 'Chuyên vệ sinh các tòa nhà cao tầng, lau kính chuyên nghiệp.'),
+('e1000001-0000-0000-0000-000000000011', 'a1000001-0000-0000-0000-000000000024', 'https://i.pravatar.cc/150?img=30', 'Bùi Thị Tâm', FALSE, 'buithitam@gmail.com', '1999-07-28', '2024-02-20', ARRAY['Giặt ủi', 'Chăm sóc quần áo'], 'Giặt ủi cẩn thận, chuyên chăm sóc quần áo cao cấp.'),
+('e1000001-0000-0000-0000-000000000012', 'a1000001-0000-0000-0000-000000000025', 'https://i.pravatar.cc/150?img=38', 'Đỗ Văn Út', TRUE, 'dovanut@gmail.com', '1990-10-10', '2021-12-15', ARRAY['Tổng vệ sinh', 'Khử khuẩn'], 'Lâu năm trong nghề, chuyên khử khuẩn và vệ sinh sâu.');
 
 -- Thêm hồ sơ quản trị viên (admin_profile)
 INSERT INTO admin_profile (admin_profile_id, account_id, full_name, is_male, department, contact_info, birthdate, hire_date) VALUES
 ('ad100001-0000-0000-0000-000000000001', 'a1000001-0000-0000-0000-000000000003', 'Admin One', TRUE, 'Management', 'admin1@example.com', '1988-09-10', '2023-03-01');
 
--- Thêm địa chỉ cho khách hàng
+-- Thêm địa chỉ cho khách hàng (default = true)
 INSERT INTO address (address_id, customer_id, full_address, ward, city, latitude, longitude, is_default) VALUES
-('adrs0001-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', '123 Lê Trọng Tấn, Phường Tây Thạnh, TP. Hồ Chí Minh', 'Phường Tây Thạnh', 'TP. Hồ Chí Minh', 10.7943, 106.6256, true),
-('adrs0001-0000-0000-0000-000000000002', 'c1000001-0000-0000-0000-000000000002', '456 Lê Lợi, Phường Sài Gòn, TP. Hồ Chí Minh', 'Phường Sài Gòn', 'TP. Hồ Chí Minh', 10.7769, 106.7009, true),
-('adrs0001-0000-0000-0000-000000000003', 'c1000001-0000-0000-0000-000000000003', '104 Lê Lợi, Phường Hạnh Thông, TP. Hồ Chí Minh', 'Phường Hạnh Thông', 'TP. Hồ Chí Minh', 10.8142, 106.6938, true);
+('adrs0001-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', '123 Lê Trọng Tấn, Phường Tây Thạnh, Thành phố Hồ Chí Minh', 'Phường Tây Thạnh', 'Thành phố Hồ Chí Minh', 10.7943, 106.6256, true),
+('adrs0001-0000-0000-0000-000000000002', 'c1000001-0000-0000-0000-000000000002', '456 Lê Lợi, Phường Bến Thành, Thành phố Hồ Chí Minh', 'Phường Bến Thành', 'Thành phố Hồ Chí Minh', 10.7769, 106.7009, true),
+('adrs0001-0000-0000-0000-000000000003', 'c1000001-0000-0000-0000-000000000003', '104 Lê Lợi, Phường Bến Nghé, Thành phố Hồ Chí Minh', 'Phường Bến Nghé', 'Thành phố Hồ Chí Minh', 10.8142, 106.6938, true),
+-- 10 khách hàng Việt Nam với địa chỉ mặc định
+('adrs0001-0000-0000-0000-000000000009', 'c1000001-0000-0000-0000-000000000004', '45 Nguyễn Huệ, Phường Bến Nghé, Thành phố Hồ Chí Minh', 'Phường Bến Nghé', 'Thành phố Hồ Chí Minh', 10.7743, 106.7043, true),
+('adrs0001-0000-0000-0000-000000000010', 'c1000001-0000-0000-0000-000000000005', '128 Trần Hưng Đạo, Phường Cầu Kho, Thành phố Hồ Chí Minh', 'Phường Cầu Kho', 'Thành phố Hồ Chí Minh', 10.7657, 106.6921, true),
+('adrs0001-0000-0000-0000-000000000011', 'c1000001-0000-0000-0000-000000000006', '234 Võ Văn Tần, Phường Võ Thị Sáu, Thành phố Hồ Chí Minh', 'Phường Võ Thị Sáu', 'Thành phố Hồ Chí Minh', 10.7788, 106.6897, true),
+('adrs0001-0000-0000-0000-000000000012', 'c1000001-0000-0000-0000-000000000007', '567 Cách Mạng Tháng 8, Phường Phạm Ngũ Lão, Thành phố Hồ Chí Minh', 'Phường Phạm Ngũ Lão', 'Thành phố Hồ Chí Minh', 10.7843, 106.6801, true),
+('adrs0001-0000-0000-0000-000000000013', 'c1000001-0000-0000-0000-000000000008', '89 Lý Thường Kiệt, Phường Nguyễn Cư Trinh, Thành phố Hồ Chí Minh', 'Phường Nguyễn Cư Trinh', 'Thành phố Hồ Chí Minh', 10.7993, 106.6554, true),
+('adrs0001-0000-0000-0000-000000000014', 'c1000001-0000-0000-0000-000000000009', '321 Hoàng Văn Thụ, Phường Đakao, Thành phố Hồ Chí Minh', 'Phường Đakao', 'Thành phố Hồ Chí Minh', 10.7978, 106.6801, true),
+('adrs0001-0000-0000-0000-000000000015', 'c1000001-0000-0000-0000-000000000010', '156 Xô Viết Nghệ Tĩnh, Phường 22, Thành phố Hồ Chí Minh', 'Phường 22', 'Thành phố Hồ Chí Minh', 10.8011, 106.7067, true),
+('adrs0001-0000-0000-0000-000000000016', 'c1000001-0000-0000-0000-000000000011', '78 Phan Văn Trị, Phường 10, Thành phố Hồ Chí Minh', 'Phường 10', 'Thành phố Hồ Chí Minh', 10.8387, 106.6666, true),
+('adrs0001-0000-0000-0000-000000000017', 'c1000001-0000-0000-0000-000000000012', '245 Quang Trung, Phường 11, Thành phố Hồ Chí Minh', 'Phường 11', 'Thành phố Hồ Chí Minh', 10.8320, 106.6543, true),
+('adrs0001-0000-0000-0000-000000000018', 'c1000001-0000-0000-0000-000000000013', '432 Nguyễn Thái Sơn, Phường 4, Thành phố Hồ Chí Minh', 'Phường 4', 'Thành phố Hồ Chí Minh', 10.8258, 106.6721, true);
 
 -- Thêm khu vực làm việc cho nhân viên
 INSERT INTO employee_working_zones (employee_id, ward, city) VALUES
-('e1000001-0000-0000-0000-000000000001', 'Phường Tây Thạnh', 'TP. Hồ Chí Minh'),
-('e1000001-0000-0000-0000-000000000001', 'Phường Bảy Hiền', 'TP. Hồ Chí Minh'),
-('e1000001-0000-0000-0000-000000000002', 'Phường Hạnh Thông', 'TP. Hồ Chí Minh');
+-- 2 nhân viên cũ
+('e1000001-0000-0000-0000-000000000001', 'Phường Tây Thạnh', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000001', 'Phường 11', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000002', 'Phường Bến Nghé', 'Thành phố Hồ Chí Minh'),
+-- 10 nhân viên Việt Nam - mỗi nhân viên 3 phường
+-- Trần Văn Long
+('e1000001-0000-0000-0000-000000000003', 'Phường Bến Nghé', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000003', 'Phường Bến Thành', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000003', 'Phường Nguyễn Thái Bình', 'Thành phố Hồ Chí Minh'),
+-- Nguyễn Thị Mai
+('e1000001-0000-0000-0000-000000000004', 'Phường Cầu Kho', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000004', 'Phường Phạm Ngũ Lão', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000004', 'Phường Nguyễn Cư Trinh', 'Thành phố Hồ Chí Minh'),
+-- Lê Văn Nam
+('e1000001-0000-0000-0000-000000000005', 'Phường Võ Thị Sáu', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000005', 'Phường Đakao', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000005', 'Phường 1', 'Thành phố Hồ Chí Minh'),
+-- Phạm Văn Ơn
+('e1000001-0000-0000-0000-000000000006', 'Phường 11', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000006', 'Phường 12', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000006', 'Phường 13', 'Thành phố Hồ Chí Minh'),
+-- Hoàng Thị Phương
+('e1000001-0000-0000-0000-000000000007', 'Phường 17', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000007', 'Phường 4', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000007', 'Phường 5', 'Thành phố Hồ Chí Minh'),
+-- Võ Văn Quang
+('e1000001-0000-0000-0000-000000000008', 'Phường 8', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000008', 'Phường 9', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000008', 'Phường 15', 'Thành phố Hồ Chí Minh'),
+-- Đặng Thị Rượu
+('e1000001-0000-0000-0000-000000000009', 'Phường 21', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000009', 'Phường 22', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000009', 'Phường 24', 'Thành phố Hồ Chí Minh'),
+-- Ngô Văn Sơn
+('e1000001-0000-0000-0000-000000000010', 'Phường 10', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000010', 'Phường 14', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000010', 'Phường 18', 'Thành phố Hồ Chí Minh'),
+-- Bùi Thị Tâm
+('e1000001-0000-0000-0000-000000000011', 'Phường 11', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000011', 'Phường 16', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000011', 'Phường 17', 'Thành phố Hồ Chí Minh'),
+-- Đỗ Văn Út
+('e1000001-0000-0000-0000-000000000012', 'Phường 4', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000012', 'Phường 5', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000012', 'Phường 6', 'Thành phố Hồ Chí Minh');
 
 -- Thêm các chức năng mẫu vào bảng `features`
 INSERT INTO features (feature_name, description, module) VALUES
@@ -176,28 +295,8 @@ INSERT INTO review_details (review_id, criteria_id, rating) VALUES
 (1, (SELECT criteria_id FROM review_criteria WHERE criteria_name = 'Chất lượng công việc'), 4.5);
 
 
--- Khối III: Thêm dữ liệu cho Checklist và Media
+-- Khối III: Thêm dữ liệu cho Media
 -- =================================================================================
-
--- Thêm một mẫu checklist cho dịch vụ 'Tổng vệ sinh'
-INSERT INTO checklist_templates (service_id, name, description) VALUES
-((SELECT service_id FROM service WHERE name = 'Tổng vệ sinh'), 'Checklist Tổng Vệ Sinh Cơ Bản', 'Các đầu việc cần làm cho gói tổng vệ sinh');
-
--- Thêm các mục con cho mẫu checklist
-INSERT INTO checklist_template_items (template_id, item_description, item_order) VALUES
-(1, 'Quét và lau sàn tất cả các phòng', 1),
-(1, 'Hút bụi thảm, sofa', 2),
-(1, 'Lau bụi bề mặt tủ, bàn, ghế', 3),
-(1, 'Vệ sinh toàn bộ khu vực nhà vệ sinh', 4),
-(1, 'Lau cửa kính mặt trong', 5),
-(1, 'Thu gom và đổ rác', 6);
-
--- Thêm các mục checklist vào lịch đặt đã hoàn thành (giả sử được copy từ template)
-INSERT INTO booking_checklist_items (booking_id, item_description, is_completed, completed_at, employee_id) VALUES
-('b0000001-0000-0000-0000-000000000001', 'Quét và lau sàn tất cả các phòng', true, '2025-08-20 10:00:00+07', 'e1000001-0000-0000-0000-000000000002'),
-('b0000001-0000-0000-0000-000000000001', 'Hút bụi thảm, sofa', true, '2025-08-20 10:30:00+07', 'e1000001-0000-0000-0000-000000000002'),
-('b0000001-0000-0000-0000-000000000001', 'Lau bụi bề mặt tủ, bàn, ghế', true, '2025-08-20 11:00:00+07', 'e1000001-0000-0000-0000-000000000002');
-
 
 -- Thêm media (ảnh Trước & Sau) cho lịch đặt đã hoàn thành
 INSERT INTO booking_media (booking_id, assignment_id, media_url, media_type) VALUES
@@ -220,44 +319,48 @@ INSERT INTO employee_unavailability (employee_id, start_time, end_time, reason, 
 
 -- Tổng vệ sinh có các câu hỏi tùy chọn
 -- Câu hỏi 1: Loại nhà
-INSERT INTO service_options (service_id, label, option_type, display_order) VALUES (2, 'Loại hình nhà ở?', 'SINGLE_CHOICE_RADIO', 1);
-INSERT INTO service_option_choices (option_id, label) VALUES (1, 'Căn hộ'), (1, 'Nhà phố');
+INSERT INTO service_options (service_id, label, option_type, display_order)
+VALUES (2, 'Loại hình nhà ở?', 'SINGLE_CHOICE_RADIO', 1);
+INSERT INTO service_option_choices (option_id, label)
+VALUES 
+((SELECT option_id FROM service_options WHERE service_id = 2 AND label = 'Loại hình nhà ở?' LIMIT 1), 'Căn hộ'), 
+((SELECT option_id FROM service_options WHERE service_id = 2 AND label = 'Loại hình nhà ở?' LIMIT 1), 'Nhà phố');
 
 -- Câu hỏi 2 (PHỤ THUỘC): Số tầng (chỉ hiện khi chọn 'Nhà phố' - choice_id=2)
-INSERT INTO service_options (service_id, label, option_type, display_order, parent_choice_id) VALUES (2, 'Nhà bạn có mấy tầng (bao gồm trệt)?', 'QUANTITY_INPUT', 2, 2);
+INSERT INTO service_options (service_id, label, option_type, display_order, parent_choice_id)
+VALUES (2, 'Nhà bạn có mấy tầng (bao gồm trệt)?', 'QUANTITY_INPUT', 2, (SELECT choice_id FROM service_option_choices WHERE label = 'Nhà phố' LIMIT 1));
 
 -- Câu hỏi 3: Diện tích
-INSERT INTO service_options (service_id, label, option_type, display_order) VALUES (2, 'Diện tích dọn dẹp?', 'SINGLE_CHOICE_DROPDOWN', 3);
-INSERT INTO service_option_choices (option_id, label) VALUES (3, 'Dưới 80m²'), (3, 'Trên 80m²');
-
--- Câu hỏi cho dịch vụ 'Dọn dẹp theo giờ'
--- Câu hỏi 1: Số phòng ngủ
 INSERT INTO service_options (service_id, label, option_type, display_order)
-VALUES (1, 'Số phòng ngủ cần dọn?', 'QUANTITY_INPUT', 1);
+VALUES (2, 'Diện tích dọn dẹp?', 'SINGLE_CHOICE_DROPDOWN', 3);
+INSERT INTO service_option_choices (option_id, label)
+VALUES 
+((SELECT option_id FROM service_options WHERE service_id = 2 AND label = 'Diện tích dọn dẹp?' LIMIT 1), 'Dưới 80m²'), 
+((SELECT option_id FROM service_options WHERE service_id = 2 AND label = 'Diện tích dọn dẹp?' LIMIT 1), 'Trên 80m²');
 
 -- Câu hỏi 2: Công việc thêm
 INSERT INTO service_options (service_id, label, option_type, display_order)
 VALUES (1, 'Bạn có yêu cầu thêm công việc nào?', 'MULTIPLE_CHOICE_CHECKBOX', 2);
 INSERT INTO service_option_choices (option_id, label, display_order) VALUES
-(5, 'Giặt chăn ga', 1),
-(5, 'Rửa chén', 2),
-(5, 'Lau cửa kính', 3);
+((SELECT option_id FROM service_options WHERE service_id = 1 AND label = 'Bạn có yêu cầu thêm công việc nào?' LIMIT 1), 'Giặt chăn ga', 1),
+((SELECT option_id FROM service_options WHERE service_id = 1 AND label = 'Bạn có yêu cầu thêm công việc nào?' LIMIT 1), 'Rửa chén', 2),
+((SELECT option_id FROM service_options WHERE service_id = 1 AND label = 'Bạn có yêu cầu thêm công việc nào?' LIMIT 1), 'Lau cửa kính', 3);
 
 -- Câu hỏi cho dịch vụ 'Vệ sinh Sofa - Nệm - Rèm'
 INSERT INTO service_options (service_id, label, option_type, display_order)
 VALUES (3, 'Hạng mục cần vệ sinh?', 'SINGLE_CHOICE_RADIO', 1);
 INSERT INTO service_option_choices (option_id, label, display_order) VALUES
-(6, 'Sofa', 1),
-(6, 'Nệm', 2),
-(6, 'Rèm', 3);
+((SELECT option_id FROM service_options WHERE service_id = 3 AND label = 'Hạng mục cần vệ sinh?' LIMIT 1), 'Sofa', 1),
+((SELECT option_id FROM service_options WHERE service_id = 3 AND label = 'Hạng mục cần vệ sinh?' LIMIT 1), 'Nệm', 2),
+((SELECT option_id FROM service_options WHERE service_id = 3 AND label = 'Hạng mục cần vệ sinh?' LIMIT 1), 'Rèm', 3);
 
 -- Câu hỏi cho dịch vụ 'Vệ sinh máy lạnh'
 INSERT INTO service_options (service_id, label, option_type, display_order)
 VALUES (4, 'Loại máy lạnh?', 'SINGLE_CHOICE_DROPDOWN', 1);
 INSERT INTO service_option_choices (option_id, label, display_order) VALUES
-(7, 'Treo tường', 1),
-(7, 'Âm trần/Cassette', 2),
-(7, 'Tủ đứng', 3);
+((SELECT option_id FROM service_options WHERE service_id = 4 AND label = 'Loại máy lạnh?' LIMIT 1), 'Treo tường', 1),
+((SELECT option_id FROM service_options WHERE service_id = 4 AND label = 'Loại máy lạnh?' LIMIT 1), 'Âm trần/Cassette', 2),
+((SELECT option_id FROM service_options WHERE service_id = 4 AND label = 'Loại máy lạnh?' LIMIT 1), 'Tủ đứng', 3);
 INSERT INTO service_options (service_id, label, option_type, display_order)
 VALUES (4, 'Số lượng máy?', 'QUANTITY_INPUT', 2);
 
@@ -265,34 +368,20 @@ VALUES (4, 'Số lượng máy?', 'QUANTITY_INPUT', 2);
 INSERT INTO service_options (service_id, label, option_type, display_order)
 VALUES (5, 'Có cần gấp quần áo sau khi giặt?', 'SINGLE_CHOICE_RADIO', 1);
 INSERT INTO service_option_choices (option_id, label, display_order) VALUES
-(9, 'Có', 1),
-(9, 'Không', 2);
+((SELECT option_id FROM service_options WHERE service_id = 5 AND label = 'Có cần gấp quần áo sau khi giặt?' LIMIT 1), 'Có', 1),
+((SELECT option_id FROM service_options WHERE service_id = 5 AND label = 'Có cần gấp quần áo sau khi giặt?' LIMIT 1), 'Không', 2);
 
 -- Câu hỏi cho dịch vụ 'Giặt hấp cao cấp'
 INSERT INTO service_options (service_id, label, option_type, display_order)
 VALUES (6, 'Loại trang phục giặt hấp?', 'SINGLE_CHOICE_DROPDOWN', 1);
 INSERT INTO service_option_choices (option_id, label, display_order) VALUES
-(10, 'Vest', 1),
-(10, 'Áo dài', 2),
-(10, 'Đầm', 3);
+((SELECT option_id FROM service_options WHERE service_id = 6 AND label = 'Loại trang phục giặt hấp?' LIMIT 1), 'Vest', 1),
+((SELECT option_id FROM service_options WHERE service_id = 6 AND label = 'Loại trang phục giặt hấp?' LIMIT 1), 'Áo dài', 2),
+((SELECT option_id FROM service_options WHERE service_id = 6 AND label = 'Loại trang phục giặt hấp?' LIMIT 1), 'Đầm', 3);
 
 -- Câu hỏi cho dịch vụ 'Nấu ăn gia đình'
 INSERT INTO service_options (service_id, label, option_type, display_order)
 VALUES (7, 'Số người ăn?', 'QUANTITY_INPUT', 1);
-INSERT INTO service_options (service_id, label, option_type, display_order)
-VALUES (7, 'Bạn có cần chúng tôi mua nguyên liệu?', 'SINGLE_CHOICE_RADIO', 2);
-INSERT INTO service_option_choices (option_id, label, display_order) VALUES
-(12, 'Có', 1),
-(12, 'Không', 2);
-INSERT INTO service_options (service_id, label, option_type, display_order, parent_choice_id)
-VALUES (7, 'Ngân sách thực phẩm (VNĐ)?', 'QUANTITY_INPUT', 3, 19);
-
--- Câu hỏi cho dịch vụ 'Đi chợ hộ'
-INSERT INTO service_options (service_id, label, option_type, display_order)
-VALUES (8, 'Thời gian giao hàng mong muốn?', 'SINGLE_CHOICE_DROPDOWN', 1);
-INSERT INTO service_option_choices (option_id, label, display_order) VALUES
-(14, 'Trong ngày', 1),
-(14, 'Ngày hôm sau', 2);
 
 INSERT INTO pricing_rules (service_id, rule_name, condition_logic, priority, price_adjustment, staff_adjustment, duration_adjustment_hours) VALUES
 (2, 'Phụ thu nhà phố lớn', 'ALL', 10, 250000, 1, 2.0),
@@ -302,77 +391,87 @@ INSERT INTO pricing_rules (service_id, rule_name, condition_logic, priority, pri
 (3, 'Vệ sinh nệm', 'ALL', 5, 150000, 0, 1.0),
 (3, 'Vệ sinh rèm', 'ALL', 5, 100000, 0, 1.0),
 (4, 'Máy lạnh âm trần', 'ALL', 5, 50000, 0, 0.5),
-(5, 'Gấp quần áo', 'ALL', 5, 10000, 0, 1.0),
-(7, 'Mua nguyên liệu nấu ăn', 'ALL', 5, 30000, 0, 1.0);
+(5, 'Gấp quần áo', 'ALL', 5, 10000, 0, 1.0);
 
 -- Gán điều kiện cho các quy tắc trên
 -- Phụ thu nhà phố lớn: yêu cầu nhà phố và diện tích trên 80m²
 INSERT INTO rule_conditions (rule_id, choice_id)
 VALUES (
 (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu nhà phố lớn'),
-(SELECT choice_id FROM service_option_choices WHERE option_id = 1 AND label = 'Nhà phố')
+(SELECT choice_id FROM service_option_choices 
+ WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 2 AND label = 'Loại hình nhà ở?' LIMIT 1) 
+ AND label = 'Nhà phố' LIMIT 1)
 );
 
 INSERT INTO rule_conditions (rule_id, choice_id)
 VALUES (
 (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu nhà phố lớn'),
-(SELECT choice_id FROM service_option_choices WHERE option_id = 3 AND label = 'Trên 80m²')
+(SELECT choice_id FROM service_option_choices 
+ WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 2 AND label = 'Diện tích dọn dẹp?' LIMIT 1) 
+ AND label = 'Trên 80m²' LIMIT 1)
 );
 
 -- Giặt chăn ga
 INSERT INTO rule_conditions (rule_id, choice_id)
 VALUES (
 (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Giặt chăn ga'),
-(SELECT choice_id FROM service_option_choices WHERE option_id = 5 AND label = 'Giặt chăn ga')
+(SELECT choice_id FROM service_option_choices 
+ WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 1 AND label = 'Bạn có yêu cầu thêm công việc nào?' LIMIT 1) 
+ AND label = 'Giặt chăn ga' LIMIT 1)
 );
 
 -- Rửa chén
 INSERT INTO rule_conditions (rule_id, choice_id)
 VALUES (
 (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Rửa chén'),
-(SELECT choice_id FROM service_option_choices WHERE option_id = 5 AND label = 'Rửa chén')
+(SELECT choice_id FROM service_option_choices 
+ WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 1 AND label = 'Bạn có yêu cầu thêm công việc nào?' LIMIT 1) 
+ AND label = 'Rửa chén' LIMIT 1)
 );
 
 -- Lau cửa kính
 INSERT INTO rule_conditions (rule_id, choice_id)
 VALUES (
 (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Lau cửa kính'),
-(SELECT choice_id FROM service_option_choices WHERE option_id = 5 AND label = 'Lau cửa kính')
+(SELECT choice_id FROM service_option_choices 
+ WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 1 AND label = 'Bạn có yêu cầu thêm công việc nào?' LIMIT 1) 
+ AND label = 'Lau cửa kính' LIMIT 1)
 );
 
 -- Vệ sinh nệm
 INSERT INTO rule_conditions (rule_id, choice_id)
 VALUES (
 (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Vệ sinh nệm'),
-(SELECT choice_id FROM service_option_choices WHERE option_id = 6 AND label = 'Nệm')
+(SELECT choice_id FROM service_option_choices 
+ WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 3 AND label = 'Hạng mục cần vệ sinh?' LIMIT 1) 
+ AND label = 'Nệm' LIMIT 1)
 );
 
 -- Vệ sinh rèm
 INSERT INTO rule_conditions (rule_id, choice_id)
 VALUES (
 (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Vệ sinh rèm'),
-(SELECT choice_id FROM service_option_choices WHERE option_id = 6 AND label = 'Rèm')
+(SELECT choice_id FROM service_option_choices 
+ WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 3 AND label = 'Hạng mục cần vệ sinh?' LIMIT 1) 
+ AND label = 'Rèm' LIMIT 1)
 );
 
 -- Máy lạnh âm trần
 INSERT INTO rule_conditions (rule_id, choice_id)
 VALUES (
 (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Máy lạnh âm trần'),
-(SELECT choice_id FROM service_option_choices WHERE option_id = 7 AND label = 'Âm trần/Cassette')
+(SELECT choice_id FROM service_option_choices 
+ WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 4 AND label = 'Loại máy lạnh?' LIMIT 1) 
+ AND label = 'Âm trần/Cassette' LIMIT 1)
 );
 
 -- Gấp quần áo
 INSERT INTO rule_conditions (rule_id, choice_id)
 VALUES (
 (SELECT rule_id FROM pricing_rules WHERE rule_name = 'Gấp quần áo'),
-(SELECT choice_id FROM service_option_choices WHERE option_id = 9 AND label = 'Có')
-);
-
--- Mua nguyên liệu nấu ăn
-INSERT INTO rule_conditions (rule_id, choice_id)
-VALUES (
-(SELECT rule_id FROM pricing_rules WHERE rule_name = 'Mua nguyên liệu nấu ăn'),
-(SELECT choice_id FROM service_option_choices WHERE option_id = 12 AND label = 'Có')
+(SELECT choice_id FROM service_option_choices 
+ WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 5 AND label = 'Có cần gấp quần áo sau khi giặt?' LIMIT 1) 
+ AND label = 'Có' LIMIT 1)
 );
 
 INSERT INTO payment_methods (method_code, method_name, is_active) VALUES
@@ -571,15 +670,21 @@ INSERT INTO pricing_rules (service_id, rule_name, condition_logic, priority, pri
 -- Add rule conditions for new pricing rules
 INSERT INTO rule_conditions (rule_id, choice_id) VALUES
 ((SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu máy tủ đứng'),
-(SELECT choice_id FROM service_option_choices WHERE option_id = 7 AND label = 'Tủ đứng'));
+(SELECT choice_id FROM service_option_choices 
+ WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 4 AND label = 'Loại máy lạnh?' LIMIT 1) 
+ AND label = 'Tủ đứng' LIMIT 1));
 
 INSERT INTO rule_conditions (rule_id, choice_id) VALUES
 ((SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu áo dài'),
-(SELECT choice_id FROM service_option_choices WHERE option_id = 10 AND label = 'Áo dài'));
+(SELECT choice_id FROM service_option_choices 
+ WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 6 AND label = 'Loại trang phục giặt hấp?' LIMIT 1) 
+ AND label = 'Áo dài' LIMIT 1));
 
 INSERT INTO rule_conditions (rule_id, choice_id) VALUES
 ((SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu đầm dạ hội'),
-(SELECT choice_id FROM service_option_choices WHERE option_id = 10 AND label = 'Đầm'));
+(SELECT choice_id FROM service_option_choices 
+ WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 6 AND label = 'Loại trang phục giặt hấp?' LIMIT 1) 
+ AND label = 'Đầm' LIMIT 1));
 
 -- Insert additional addresses for more booking locations
 INSERT INTO address (address_id, customer_id, full_address, ward, city, latitude, longitude, is_default) VALUES
