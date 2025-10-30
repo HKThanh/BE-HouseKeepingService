@@ -7,4 +7,6 @@ public interface CloudinaryService {
     CloudinaryUploadResult uploadCustomerAvatar(MultipartFile file);
 
     CloudinaryUploadResult uploadEmployeeAvatar(MultipartFile file);
+
+    CloudinaryUploadResult uploadBookingImage(MultipartFile file);
 }
