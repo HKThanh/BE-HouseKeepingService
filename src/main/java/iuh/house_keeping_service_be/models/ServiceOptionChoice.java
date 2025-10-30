@@ -32,6 +32,10 @@ public class ServiceOptionChoice {
     @Column(name = "is_default")
     private Boolean isDefault;
 
+    @ColumnDefault("true")
+    @Column(name = "is_active")
+    private Boolean isActive;
+
     @Column(name = "display_order")
     private Integer displayOrder;
 }

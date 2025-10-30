@@ -14,6 +14,7 @@ CREATE TABLE service_options (
      ),
     display_order INT,
     is_required BOOLEAN DEFAULT TRUE,
+    is_active BOOLEAN DEFAULT TRUE,
     parent_option_id INT REFERENCES service_options(option_id),
     parent_choice_id INT,
     validation_rules JSONB
@@ -24,6 +25,7 @@ CREATE TABLE service_option_choices (
     option_id INT NOT NULL REFERENCES service_options(option_id) ON DELETE CASCADE,
     label TEXT NOT NULL,
     is_default BOOLEAN DEFAULT FALSE,
+    is_active BOOLEAN DEFAULT TRUE,
     display_order INT
 );
 
@@ -38,6 +40,7 @@ CREATE TABLE pricing_rules (
     rule_name VARCHAR(255) UNIQUE NOT NULL,
     condition_logic VARCHAR(10) DEFAULT 'ALL' CHECK (condition_logic IN ('ALL', 'ANY')),
     priority INT DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
     price_adjustment DECIMAL(10, 2) DEFAULT 0,
     staff_adjustment INT DEFAULT 0,
     duration_adjustment_hours DECIMAL(5, 2) DEFAULT 0
