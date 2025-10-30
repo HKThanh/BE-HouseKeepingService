@@ -28,7 +28,12 @@ INSERT INTO account (account_id, username, password, phone_number, status, is_ph
 ('a1000001-0000-0000-0000-000000000022', 'dangthir', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0821228765', 'ACTIVE', true),
 ('a1000001-0000-0000-0000-000000000023', 'ngovans', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0810227654', 'ACTIVE', true),
 ('a1000001-0000-0000-0000-000000000024', 'buithit', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0809226543', 'ACTIVE', true),
-('a1000001-0000-0000-0000-000000000025', 'dovanu', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0798225432', 'ACTIVE', true);
+('a1000001-0000-0000-0000-000000000025', 'dovanu', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0798225432', 'ACTIVE', true),
+-- 4 tài khoản Việt Nam có 2 vai trò (EMPLOYEE và CUSTOMER)
+('a1000001-0000-0000-0000-000000000026', 'nguyenthanhviet', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0988777666', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000027', 'lethihuong', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0977888999', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000028', 'phamvantuan', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0966555444', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000029', 'tranthilan', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0955222333', 'ACTIVE', true);
 
 -- Gán vai trò cho các tài khoản
 INSERT INTO account_roles (account_id, role_id) VALUES
@@ -59,7 +64,16 @@ INSERT INTO account_roles (account_id, role_id) VALUES
 ('a1000001-0000-0000-0000-000000000022', 2),
 ('a1000001-0000-0000-0000-000000000023', 2),
 ('a1000001-0000-0000-0000-000000000024', 2),
-('a1000001-0000-0000-0000-000000000025', 2);
+('a1000001-0000-0000-0000-000000000025', 2),
+-- 4 tài khoản có 2 vai trò (CUSTOMER và EMPLOYEE)
+('a1000001-0000-0000-0000-000000000026', 1), -- nguyenthanhviet CUSTOMER
+('a1000001-0000-0000-0000-000000000026', 2), -- nguyenthanhviet EMPLOYEE
+('a1000001-0000-0000-0000-000000000027', 1), -- lethihuong CUSTOMER
+('a1000001-0000-0000-0000-000000000027', 2), -- lethihuong EMPLOYEE
+('a1000001-0000-0000-0000-000000000028', 1), -- phamvantuan CUSTOMER
+('a1000001-0000-0000-0000-000000000028', 2), -- phamvantuan EMPLOYEE
+('a1000001-0000-0000-0000-000000000029', 1), -- tranthilan CUSTOMER
+('a1000001-0000-0000-0000-000000000029', 2); -- tranthilan EMPLOYEE
 
 -- Thêm hồ sơ khách hàng (customer)
 INSERT INTO customer (customer_id, account_id, avatar, full_name, is_male, email, birthdate) VALUES
@@ -76,7 +90,12 @@ INSERT INTO customer (customer_id, account_id, avatar, full_name, is_male, email
 ('c1000001-0000-0000-0000-000000000010', 'a1000001-0000-0000-0000-000000000012', 'https://i.pravatar.cc/150?img=14', 'Đặng Văn Giang', TRUE, 'dangvangiang@gmail.com', '1993-06-25'),
 ('c1000001-0000-0000-0000-000000000011', 'a1000001-0000-0000-0000-000000000013', 'https://i.pravatar.cc/150?img=23', 'Ngô Thị Hà', FALSE, 'ngothiha@gmail.com', '1999-10-14'),
 ('c1000001-0000-0000-0000-000000000012', 'a1000001-0000-0000-0000-000000000014', 'https://i.pravatar.cc/150?img=15', 'Bùi Văn Ích', TRUE, 'buivanich@gmail.com', '1991-04-07'),
-('c1000001-0000-0000-0000-000000000013', 'a1000001-0000-0000-0000-000000000015', 'https://i.pravatar.cc/150?img=24', 'Đỗ Thị Kim', FALSE, 'dothikim@gmail.com', '2000-12-20');
+('c1000001-0000-0000-0000-000000000013', 'a1000001-0000-0000-0000-000000000015', 'https://i.pravatar.cc/150?img=24', 'Đỗ Thị Kim', FALSE, 'dothikim@gmail.com', '2000-12-20'),
+-- Customer profile cho 4 tài khoản có 2 vai trò
+('c1000001-0000-0000-0000-000000000014', 'a1000001-0000-0000-0000-000000000026', 'https://i.pravatar.cc/150?img=16', 'Nguyễn Thành Việt', TRUE, 'nguyenthanhviet@gmail.com', '1995-08-20'),
+('c1000001-0000-0000-0000-000000000015', 'a1000001-0000-0000-0000-000000000027', 'https://i.pravatar.cc/150?img=47', 'Lê Thị Hương', FALSE, 'lethihuong@gmail.com', '1996-12-05'),
+('c1000001-0000-0000-0000-000000000016', 'a1000001-0000-0000-0000-000000000028', 'https://i.pravatar.cc/150?img=17', 'Phạm Văn Tuấn', TRUE, 'phamvantuan@gmail.com', '1994-06-18'),
+('c1000001-0000-0000-0000-000000000017', 'a1000001-0000-0000-0000-000000000029', 'https://i.pravatar.cc/150?img=48', 'Trần Thị Lan', FALSE, 'tranthilan@gmail.com', '1997-09-25');
 
 -- Thêm hồ sơ nhân viên (employee)
 INSERT INTO employee (employee_id, account_id, avatar, full_name, is_male, email, birthdate, hired_date, skills, bio) VALUES
@@ -92,7 +111,12 @@ INSERT INTO employee (employee_id, account_id, avatar, full_name, is_male, email
 ('e1000001-0000-0000-0000-000000000009', 'a1000001-0000-0000-0000-000000000022', 'https://i.pravatar.cc/150?img=29', 'Đặng Thị Rượu', FALSE, 'dangthiruou@gmail.com', '1998-05-16', '2024-01-05', ARRAY['Nấu ăn', 'Đi chợ'], 'Nấu ăn ngon, đa dạng món Việt và món Á, mua sắm khéo léo.'),
 ('e1000001-0000-0000-0000-000000000010', 'a1000001-0000-0000-0000-000000000023', 'https://i.pravatar.cc/150?img=37', 'Ngô Văn Sơn', TRUE, 'ngovanson@gmail.com', '1991-12-03', '2022-04-18', ARRAY['Vệ sinh công nghiệp', 'Làm sạch kính'], 'Chuyên vệ sinh các tòa nhà cao tầng, lau kính chuyên nghiệp.'),
 ('e1000001-0000-0000-0000-000000000011', 'a1000001-0000-0000-0000-000000000024', 'https://i.pravatar.cc/150?img=30', 'Bùi Thị Tâm', FALSE, 'buithitam@gmail.com', '1999-07-28', '2024-02-20', ARRAY['Giặt ủi', 'Chăm sóc quần áo'], 'Giặt ủi cẩn thận, chuyên chăm sóc quần áo cao cấp.'),
-('e1000001-0000-0000-0000-000000000012', 'a1000001-0000-0000-0000-000000000025', 'https://i.pravatar.cc/150?img=38', 'Đỗ Văn Út', TRUE, 'dovanut@gmail.com', '1990-10-10', '2021-12-15', ARRAY['Tổng vệ sinh', 'Khử khuẩn'], 'Lâu năm trong nghề, chuyên khử khuẩn và vệ sinh sâu.');
+('e1000001-0000-0000-0000-000000000012', 'a1000001-0000-0000-0000-000000000025', 'https://i.pravatar.cc/150?img=38', 'Đỗ Văn Út', TRUE, 'dovanut@gmail.com', '1990-10-10', '2021-12-15', ARRAY['Tổng vệ sinh', 'Khử khuẩn'], 'Lâu năm trong nghề, chuyên khử khuẩn và vệ sinh sâu.'),
+-- Employee profile cho 4 tài khoản có 2 vai trò
+('e1000001-0000-0000-0000-000000000013', 'a1000001-0000-0000-0000-000000000026', 'https://i.pravatar.cc/150?img=16', 'Nguyễn Thành Việt', TRUE, 'nguyenthanhviet.employee@gmail.com', '1995-08-20', '2023-10-15', ARRAY['Vệ sinh tổng hợp', 'Bảo trì nhà cửa'], 'Vừa là khách hàng vừa là nhân viên, có kinh nghiệm đa dạng trong lĩnh vực dịch vụ nhà.'),
+('e1000001-0000-0000-0000-000000000014', 'a1000001-0000-0000-0000-000000000027', 'https://i.pravatar.cc/150?img=47', 'Lê Thị Hương', FALSE, 'lethihuong.employee@gmail.com', '1996-12-05', '2023-08-20', ARRAY['Chăm sóc trẻ em', 'Nấu ăn gia đình'], 'Kinh nghiệm chăm sóc trẻ nhỏ và nấu ăn dinh dưỡng cho gia đình.'),
+('e1000001-0000-0000-0000-000000000015', 'a1000001-0000-0000-0000-000000000028', 'https://i.pravatar.cc/150?img=17', 'Phạm Văn Tuấn', TRUE, 'phamvantuan.employee@gmail.com', '1994-06-18', '2023-05-10', ARRAY['Sửa chữa điện nước', 'Vệ sinh máy lạnh'], 'Thợ điện nước lành nghề, chuyên sửa chữa và bảo trì thiết bị gia đình.'),
+('e1000001-0000-0000-0000-000000000016', 'a1000001-0000-0000-0000-000000000029', 'https://i.pravatar.cc/150?img=48', 'Trần Thị Lan', FALSE, 'tranthilan.employee@gmail.com', '1997-09-25', '2024-03-01', ARRAY['Trang trí nhà cửa', 'Sắp xếp đồ đạc'], 'Có khiếu thẩm mỹ, chuyên tư vấn trang trí và sắp xếp nội thất.');
 
 -- Thêm hồ sơ quản trị viên (admin_profile)
 INSERT INTO admin_profile (admin_profile_id, account_id, full_name, is_male, department, contact_info, birthdate, hire_date) VALUES
@@ -258,17 +282,30 @@ INSERT INTO promotions (promo_code, description, discount_type, discount_value, 
 ('GIAM20K', 'Giảm giá 20,000đ cho mọi đơn hàng', 'FIXED_AMOUNT', 20000, NULL, '2025-08-01 00:00:00+07', '2025-09-30 23:59:59+07', TRUE),
 ('KHAITRUONG10', 'Giảm 10% mừng khai trương', 'PERCENTAGE', 10, 50000, '2025-08-01 00:00:00+07', '2025-08-31 23:59:59+07', TRUE);
 
--- Thêm 2 lịch đặt (bookings) mẫu
+-- Thêm các lịch đặt (bookings) mẫu
 -- Một lịch đã HOÀN THÀNH của khách hàng 'John Doe'
 -- Một lịch đã XÁC NHẬN của khách hàng 'Jane Smith Customer'
-INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status, promotion_id) VALUES
-('b0000001-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000001', 'BK000001', '2025-08-20 09:00:00+07', 'Nhà có trẻ nhỏ, vui lòng lau dọn kỹ khu vực phòng khách.', 80000.00, 'COMPLETED', (SELECT promotion_id FROM promotions WHERE promo_code = 'GIAM20K')),
-('b0000001-0000-0000-0000-000000000002', 'c1000001-0000-0000-0000-000000000003', 'adrs0001-0000-0000-0000-000000000003', 'BK000002', '2025-08-28 14:00:00+07', 'Vui lòng đến đúng giờ.', 90000.00, 'CONFIRMED', (SELECT promotion_id FROM promotions WHERE promo_code = 'KHAITRUONG10'));
+-- Thêm 5 booking PENDING chưa verify để test chức năng verify booking
+INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status, promotion_id, is_verified) VALUES
+('b0000001-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000001', 'BK000001', '2025-08-20 09:00:00+07', 'Nhà có trẻ nhỏ, vui lòng lau dọn kỹ khu vực phòng khách.', 80000.00, 'COMPLETED', (SELECT promotion_id FROM promotions WHERE promo_code = 'GIAM20K'), true),
+('b0000001-0000-0000-0000-000000000002', 'c1000001-0000-0000-0000-000000000003', 'adrs0001-0000-0000-0000-000000000003', 'BK000002', '2025-08-28 14:00:00+07', 'Vui lòng đến đúng giờ.', 90000.00, 'CONFIRMED', (SELECT promotion_id FROM promotions WHERE promo_code = 'KHAITRUONG10'), true),
+-- 5 booking PENDING chưa verify (isVerified = false) để test
+('b0000001-0000-0000-0000-000000000003', 'c1000001-0000-0000-0000-000000000004', 'adrs0001-0000-0000-0000-000000000009', 'BK000003', '2025-11-01 08:00:00+07', 'Cần vệ sinh tổng quát căn hộ 2 phòng ngủ.', 500000.00, 'PENDING', NULL, false),
+('b0000001-0000-0000-0000-000000000004', 'c1000001-0000-0000-0000-000000000005', 'adrs0001-0000-0000-0000-000000000010', 'BK000004', '2025-11-02 10:00:00+07', 'Giặt ủi 10kg quần áo gia đình.', 300000.00, 'PENDING', NULL, false),
+('b0000001-0000-0000-0000-000000000005', 'c1000001-0000-0000-0000-000000000006', 'adrs0001-0000-0000-0000-000000000011', 'BK000005', '2025-11-03 14:00:00+07', 'Vệ sinh sofa 3 chỗ và 2 ghế đơn.', 350000.00, 'PENDING', NULL, false),
+('b0000001-0000-0000-0000-000000000006', 'c1000001-0000-0000-0000-000000000007', 'adrs0001-0000-0000-0000-000000000012', 'BK000006', '2025-11-04 09:30:00+07', 'Vệ sinh 2 máy lạnh trong phòng.', 400000.00, 'PENDING', NULL, false),
+('b0000001-0000-0000-0000-000000000007', 'c1000001-0000-0000-0000-000000000008', 'adrs0001-0000-0000-0000-000000000013', 'BK000007', '2025-11-05 11:00:00+07', 'Nấu ăn cho gia đình 6 người, 2 bữa.', 320000.00, 'PENDING', NULL, false);
 
 -- Thêm chi tiết dịch vụ cho các lịch đặt
 INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
 ('bd000001-0000-0000-0000-000000000001', 'b0000001-0000-0000-0000-000000000001', (SELECT service_id FROM service WHERE name = 'Tổng vệ sinh'), 1, 100000.00, 100000.00),
-('bd000001-0000-0000-0000-000000000002', 'b0000001-0000-0000-0000-000000000002', (SELECT service_id FROM service WHERE name = 'Dọn dẹp theo giờ'), 2, 50000.00, 100000.00);
+('bd000001-0000-0000-0000-000000000002', 'b0000001-0000-0000-0000-000000000002', (SELECT service_id FROM service WHERE name = 'Dọn dẹp theo giờ'), 2, 50000.00, 100000.00),
+-- Chi tiết cho 5 booking PENDING chưa verify
+('bd000001-0000-0000-0000-000000000003', 'b0000001-0000-0000-0000-000000000003', (SELECT service_id FROM service WHERE name = 'Tổng vệ sinh'), 1, 500000.00, 500000.00),
+('bd000001-0000-0000-0000-000000000004', 'b0000001-0000-0000-0000-000000000004', (SELECT service_id FROM service WHERE name = 'Giặt sấy theo kg'), 10, 30000.00, 300000.00),
+('bd000001-0000-0000-0000-000000000005', 'b0000001-0000-0000-0000-000000000005', (SELECT service_id FROM service WHERE name = 'Vệ sinh Sofa - Nệm - Rèm'), 1, 350000.00, 350000.00),
+('bd000001-0000-0000-0000-000000000006', 'b0000001-0000-0000-0000-000000000006', (SELECT service_id FROM service WHERE name = 'Vệ sinh máy lạnh'), 2, 200000.00, 400000.00),
+('bd000001-0000-0000-0000-000000000007', 'b0000001-0000-0000-0000-000000000007', (SELECT service_id FROM service WHERE name = 'Nấu ăn gia đình'), 4, 80000.00, 320000.00);
 
 -- Phân công nhân viên cho các lịch đặt
 INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status, check_in_time, check_out_time) VALUES
@@ -480,104 +517,10 @@ INSERT INTO payment_methods (method_code, method_name, is_active) VALUES
 ('VNPAY', 'Cổng thanh toán VNPAY', TRUE),
 ('BANK_TRANSFER', 'Chuyển khoản ngân hàng', TRUE);
 
--- Add more bookings with their corresponding booking details and assignments
--- Each booking will have exactly 1 booking detail
-
--- Booking 3: Mary Jones - Pending status
-INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status) VALUES
-('b0000001-0000-0000-0000-000000000003', 'c1000001-0000-0000-0000-000000000002', 'adrs0001-0000-0000-0000-000000000002', 'BK000003', '2025-08-30 10:00:00+07', 'Cần vệ sinh máy lạnh trong phòng ngủ.', 150000.00, 'PENDING');
-
-INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
-('bd000001-0000-0000-0000-000000000003', 'b0000001-0000-0000-0000-000000000003', (SELECT service_id FROM service WHERE name = 'Vệ sinh máy lạnh'), 1, 150000.00, 150000.00);
-
--- Booking 4: John Doe - Confirmed status with assignment
-INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status) VALUES
-('b0000001-0000-0000-0000-000000000004', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000001', 'BK000004', '2025-09-01 08:00:00+07', 'Giặt vest cho buổi họp quan trọng.', 120000.00, 'CONFIRMED');
-
-INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
-('bd000001-0000-0000-0000-000000000004', 'b0000001-0000-0000-0000-000000000004', (SELECT service_id FROM service WHERE name = 'Giặt hấp cao cấp'), 1, 120000.00, 120000.00);
-
-INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status) VALUES
-('as000001-0000-0000-0000-000000000003', 'bd000001-0000-0000-0000-000000000004', 'e1000001-0000-0000-0000-000000000002', 'ASSIGNED');
-
--- Booking 5: Jane Smith Customer - In Progress
-INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status) VALUES
-('b0000001-0000-0000-0000-000000000005', 'c1000001-0000-0000-0000-000000000003', 'adrs0001-0000-0000-0000-000000000003', 'BK000005', '2025-08-25 15:00:00+07', 'Nấu cơm tối cho gia đình 4 người.', 150000.00, 'IN_PROGRESS');
-
-INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
-('bd000001-0000-0000-0000-000000000005', 'b0000001-0000-0000-0000-000000000005', (SELECT service_id FROM service WHERE name = 'Nấu ăn gia đình'), 2, 60000.00, 120000.00);
-
-INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status, check_in_time) VALUES
-('as000001-0000-0000-0000-000000000004', 'bd000001-0000-0000-0000-000000000005', 'e1000001-0000-0000-0000-000000000001', 'IN_PROGRESS', '2025-08-25 15:00:00+07');
-
--- Booking 6: Mary Jones - Cancelled
-INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status) VALUES
-('b0000001-0000-0000-0000-000000000006', 'c1000001-0000-0000-0000-000000000002', 'adrs0001-0000-0000-0000-000000000002', 'BK000006', '2025-08-22 14:00:00+07', 'Hủy do thay đổi lịch trình.', 60000.00, 'CANCELLED');
-
-INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
-('bd000001-0000-0000-0000-000000000006', 'b0000001-0000-0000-0000-000000000006', (SELECT service_id FROM service WHERE name = 'Giặt sấy theo kg'), 2, 30000.00, 60000.00);
-
--- Booking 7: John Doe - Awaiting Employee (no assignment yet)
-INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status, promotion_id) VALUES
-('b0000001-0000-0000-0000-000000000007', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000001', 'BK000007', '2025-09-05 09:00:00+07', 'Vệ sinh sofa phòng khách.', 270000.00, 'AWAITING_EMPLOYEE', (SELECT promotion_id FROM promotions WHERE promo_code = 'GIAM20K'));
-
-INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
-('bd000001-0000-0000-0000-000000000007', 'b0000001-0000-0000-0000-000000000007', (SELECT service_id FROM service WHERE name = 'Vệ sinh Sofa - Nệm - Rèm'), 1, 300000.00, 300000.00);
-
--- Booking 8: Jane Smith Customer - Completed with assignment
-INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status) VALUES
-('b0000001-0000-0000-0000-000000000008', 'c1000001-0000-0000-0000-000000000003', 'adrs0001-0000-0000-0000-000000000003', 'BK000008', '2025-08-18 11:00:00+07', 'Đi chợ mua thực phẩm cho tuần.', 40000.00, 'COMPLETED');
-
-INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
-('bd000001-0000-0000-0000-000000000008', 'b0000001-0000-0000-0000-000000000008', (SELECT service_id FROM service WHERE name = 'Đi chợ hộ'), 1, 40000.00, 40000.00);
-
-INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status, check_in_time, check_out_time) VALUES
-('as000001-0000-0000-0000-000000000005', 'bd000001-0000-0000-0000-000000000008', 'e1000001-0000-0000-0000-000000000001', 'COMPLETED', '2025-08-18 11:00:00+07', '2025-08-18 12:30:00+07');
-
--- Booking 9: Mary Jones - Awaiting Employee
-INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status) VALUES
-('b0000001-0000-0000-0000-000000000009', 'c1000001-0000-0000-0000-000000000002', 'adrs0001-0000-0000-0000-000000000002', 'BK000009', '2025-09-03 16:00:00+07', 'Dọn dẹp nhà cửa 3 giờ.', 150000.00, 'AWAITING_EMPLOYEE');
-
-INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
-('bd000001-0000-0000-0000-000000000009', 'b0000001-0000-0000-0000-000000000009', (SELECT service_id FROM service WHERE name = 'Dọn dẹp theo giờ'), 3, 50000.00, 150000.00);
-
--- Booking 10: John Doe - Confirmed
-INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status, promotion_id) VALUES
-('b0000001-0000-0000-0000-000000000010', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000001', 'BK000010', '2025-09-02 13:00:00+07', 'Tổng vệ sinh nhà phố 2 tầng.', 630000.00, 'CONFIRMED', (SELECT promotion_id FROM promotions WHERE promo_code = 'KHAITRUONG10'));
-
-INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total, selected_choice_ids) VALUES
-('bd000001-0000-0000-0000-000000000010', 'b0000001-0000-0000-0000-000000000010', (SELECT service_id FROM service WHERE name = 'Tổng vệ sinh'), 1, 700000.00, 700000.00, '2,4'); -- Nhà phố, Trên 80m²
-
-INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status) VALUES
-('as000001-0000-0000-0000-000000000006', 'bd000001-0000-0000-0000-000000000010', 'e1000001-0000-0000-0000-000000000002', 'ASSIGNED'),
-('as000001-0000-0000-0000-000000000007', 'bd000001-0000-0000-0000-000000000010', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED');
-
--- Add corresponding payments for the new bookings
+-- Add corresponding payments for the bookings
 INSERT INTO payments (payment_id, booking_id, amount, method_id, payment_status, transaction_code, paid_at) VALUES
-('pay00001-0000-0000-0000-000000000003', 'b0000001-0000-0000-0000-000000000004', 120000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'CASH'), 'PAID', NULL, '2025-09-01 08:30:00+07'),
-('pay00001-0000-0000-0000-000000000004', 'b0000001-0000-0000-0000-000000000005', 150000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'MOMO'), 'PENDING', NULL, NULL),
-('pay00001-0000-0000-0000-000000000005', 'b0000001-0000-0000-0000-000000000008', 40000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'CASH'), 'PAID', NULL, '2025-08-18 12:30:00+07'),
 ('pay00001-0000-0000-0000-000000000001', 'b0000001-0000-0000-0000-000000000001', 80000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'VNPAY'), 'PAID', 'VNP123456789', '2025-08-20 13:05:00+07'),
-('pay00001-0000-0000-0000-000000000002', 'b0000001-0000-0000-0000-000000000002', 90000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'MOMO'), 'PENDING', NULL, NULL),
-('pay00001-0000-0000-0000-000000000006', 'b0000001-0000-0000-0000-000000000010', 630000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'VNPAY'), 'PENDING', NULL, NULL);
-
--- Add reviews for completed bookings
-INSERT INTO review (booking_id, customer_id, employee_id, comment) VALUES
-('b0000001-0000-0000-0000-000000000008', 'c1000001-0000-0000-0000-000000000003', 'e1000001-0000-0000-0000-000000000001', 'Nhân viên mua đúng yêu cầu và giao hàng nhanh chóng.');
-
-INSERT INTO review_details (review_id, criteria_id, rating) VALUES
-(2, (SELECT criteria_id FROM review_criteria WHERE criteria_name = 'Thái độ'), 4.5),
-(2, (SELECT criteria_id FROM review_criteria WHERE criteria_name = 'Đúng giờ'), 5.0),
-(2, (SELECT criteria_id FROM review_criteria WHERE criteria_name = 'Chất lượng công việc'), 4.0);
-
-UPDATE service SET base_price = 60000 WHERE name = 'Dọn dẹp theo giờ';
-UPDATE service SET base_price = 500000 WHERE name = 'Tổng vệ sinh';
-UPDATE service SET base_price = 350000 WHERE name = 'Vệ sinh Sofa - Nệm - Rèm';
-UPDATE service SET base_price = 200000 WHERE name = 'Vệ sinh máy lạnh';
-UPDATE service SET base_price = 25000 WHERE name = 'Giặt sấy theo kg';
-UPDATE service SET base_price = 150000 WHERE name = 'Giặt hấp cao cấp';
-UPDATE service SET base_price = 80000 WHERE name = 'Nấu ăn gia đình';
-UPDATE service SET base_price = 50000 WHERE name = 'Đi chợ hộ';
+('pay00001-0000-0000-0000-000000000002', 'b0000001-0000-0000-0000-000000000002', 90000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'MOMO'), 'PENDING', NULL, NULL);
 
 -- Update pricing rules to reflect realistic market adjustments
 UPDATE pricing_rules SET price_adjustment = 200000 WHERE rule_name = 'Phụ thu nhà phố lớn';

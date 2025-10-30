@@ -861,10 +861,10 @@ public class BookingServiceImpl implements BookingService {
         log.info("Admin verifying booking {}: approve={}", bookingId, request.approve());
 
         Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new IllegalArgumentException("KhĂ´ng tĂ¬m tháº¥y booking vá»›i ID: " + bookingId));
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking với ID: " + bookingId));
 
         if (booking.getIsVerified()) {
-            throw new IllegalStateException("Booking nĂ y Ä‘Ă£ Ä‘Æ°á»£c xĂ¡c minh trÆ°á»›c Ä‘Ă³");
+            throw new IllegalStateException("Booking này đã được xác minh trước đó");
         }
 
         if (request.approve()) {
