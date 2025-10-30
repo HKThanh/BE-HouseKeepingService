@@ -86,7 +86,6 @@ class AssignmentServiceImplTest {
         assignment.setEmployee(employee);
         assignment.setBookingDetail(bookingDetail);
         assignment.setStatus(status);
-        assignment.setCreatedAt(LocalDateTime.now().minusDays(1));
 
         booking.setBookingDetails(List.of(bookingDetail));
         bookingDetail.setAssignments(List.of(assignment));

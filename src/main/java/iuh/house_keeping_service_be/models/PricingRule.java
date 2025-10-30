@@ -34,15 +34,17 @@ package iuh.house_keeping_service_be.models;
         @Column(name = "condition_logic", length = 10)
         private ConditionLogic conditionLogic;
 
-        @ColumnDefault("0")
-        @Column(name = "priority")
-        private Integer priority;
+    @ColumnDefault("0")
+    @Column(name = "priority")
+    private Integer priority;
 
-        @ColumnDefault("0")
-        @Column(name = "price_adjustment", precision = 10, scale = 2)
-        private BigDecimal priceAdjustment;
+    @ColumnDefault("true")
+    @Column(name = "is_active")
+    private Boolean isActive;
 
-        @ColumnDefault("0")
+    @ColumnDefault("0")
+    @Column(name = "price_adjustment", precision = 10, scale = 2)
+    private BigDecimal priceAdjustment;        @ColumnDefault("0")
         @Column(name = "staff_adjustment")
         private Integer staffAdjustment;
 

@@ -46,6 +46,10 @@ public class ServiceOption {
     @Column(name = "is_required")
     private Boolean isRequired;
 
+    @ColumnDefault("true")
+    @Column(name = "is_active")
+    private Boolean isActive;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_option_id")
     private ServiceOption parentOption;
