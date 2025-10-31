@@ -9,6 +9,7 @@ import iuh.house_keeping_service_be.dtos.Booking.request.BookingVerificationRequ
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingHistoryResponse;
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingResponse;
 import iuh.house_keeping_service_be.dtos.Booking.summary.BookingCreationSummary;
+import iuh.house_keeping_service_be.dtos.Cloudinary.CloudinaryUploadResult;
 import iuh.house_keeping_service_be.dtos.Service.ServiceDetailResponse;
 import iuh.house_keeping_service_be.models.Address;
 import iuh.house_keeping_service_be.models.Customer;
@@ -16,6 +17,7 @@ import iuh.house_keeping_service_be.repositories.CustomerRepository;
 import iuh.house_keeping_service_be.services.AddressService.AddressService;
 import iuh.house_keeping_service_be.services.AdminService.PermissionService;
 import iuh.house_keeping_service_be.services.BookingService.BookingService;
+import iuh.house_keeping_service_be.services.CloudinaryService.CloudinaryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +29,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 
@@ -38,6 +41,7 @@ public class BookingController {
     private final AddressService addressService;
     private final PermissionService permissionService;
     private final BookingService bookingService;
+    private final CloudinaryService cloudinaryService;
     private final JwtUtil jwtUtil;
     private final CustomerRepository customerRepository;
 
@@ -290,6 +294,69 @@ public class BookingController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                 "success", false,
                 "message", "Đã xảy ra lỗi khi xác minh booking"
+            ));
+        }
+    }
+
+    @PostMapping("/{bookingId}/upload-image")
+    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_ADMIN')")
+    public ResponseEntity<?> uploadBookingImage(
+            @PathVariable String bookingId,
+            @RequestParam("file") MultipartFile file) {
+        
+        log.info("Uploading image for booking {}", bookingId);
+        
+        try {
+            // Validate file
+            if (file == null || file.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "File không được để trống"
+                ));
+            }
+
+            // Validate file type
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "File phải là định dạng ảnh"
+                ));
+            }
+
+            // Validate file size (max 5MB)
+            if (file.getSize() > 5 * 1024 * 1024) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Kích thước file không được vượt quá 5MB"
+                ));
+            }
+
+            // Upload to Cloudinary
+            CloudinaryUploadResult result = cloudinaryService.uploadBookingImage(file);
+            
+            log.info("Successfully uploaded image for booking {}: {}", bookingId, result.secureUrl());
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Tải ảnh lên thành công",
+                "data", Map.of(
+                    "bookingId", bookingId,
+                    "imageUrl", result.secureUrl(),
+                    "publicId", result.publicId()
+                )
+            ));
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid file for booking {}: {}", bookingId, e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            log.error("Error uploading image for booking {}: {}", bookingId, e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "success", false,
+                "message", "Đã xảy ra lỗi khi tải ảnh lên"
             ));
         }
     }

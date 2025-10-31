@@ -1007,4 +1007,21 @@ public class BookingServiceImpl implements BookingService {
 
         return bookingMapper.toBookingResponse(savedBooking);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<BookingResponse> getVerifiedAwaitingEmployeeBookings(Pageable pageable) {
+        log.info("Fetching verified bookings that are awaiting employee assignment");
+
+        Page<Booking> verifiedAwaitingBookings = bookingRepository.findVerifiedAwaitingEmployeeBookings(pageable);
+
+        Page<BookingResponse> response = verifiedAwaitingBookings.map(bookingMapper::toBookingResponse);
+
+        log.info("Found {} verified bookings awaiting employee (page {} of {})",
+                verifiedAwaitingBookings.getNumberOfElements(),
+                verifiedAwaitingBookings.getNumber() + 1,
+                verifiedAwaitingBookings.getTotalPages());
+
+        return response;
+    }
 }

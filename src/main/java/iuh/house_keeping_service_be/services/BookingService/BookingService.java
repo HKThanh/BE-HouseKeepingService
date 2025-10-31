@@ -27,4 +27,7 @@ public interface BookingService {
     
     // Customer cancel booking
     BookingResponse cancelBooking(String bookingId, String customerId, String reason);
+    
+    // Get verified bookings that are still awaiting employee (for Employee and Admin)
+    Page<BookingResponse> getVerifiedAwaitingEmployeeBookings(Pageable pageable);
 }

@@ -158,4 +158,14 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
     // Find unverified bookings without pagination
     @Query("SELECT b FROM Booking b WHERE b.isVerified = false ORDER BY b.createdAt DESC")
     List<Booking> findUnverifiedBookings();
+
+    // Find verified bookings that are still awaiting employee assignment
+    @Query("SELECT b FROM Booking b " +
+           "LEFT JOIN FETCH b.customer c " +
+           "LEFT JOIN FETCH b.address a " +
+           "LEFT JOIN FETCH b.promotion p " +
+           "WHERE b.isVerified = true " +
+           "AND b.status = iuh.house_keeping_service_be.enums.BookingStatus.AWAITING_EMPLOYEE " +
+           "ORDER BY b.createdAt DESC")
+    Page<Booking> findVerifiedAwaitingEmployeeBookings(Pageable pageable);
 }
