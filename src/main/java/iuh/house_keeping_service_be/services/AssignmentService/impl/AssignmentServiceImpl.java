@@ -42,7 +42,7 @@ public class AssignmentServiceImpl implements AssignmentService {
 
     @Override
     public List<AssignmentDetailResponse> getEmployeeAssignments(String employeeId, String status, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "bookingDetail.booking.bookingTime"));
 
         List<Assignment> assignments;
 
