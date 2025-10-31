@@ -37,3 +37,4 @@ cloudinary:
   folders:
     customer: ${CLOUDINARY_CUSTOMER_FOLDER:customer_avatars}
     employee: ${CLOUDINARY_EMPLOYEE_FOLDER:employee_avatars}
+    chat: ${CLOUDINARY_CHAT_FOLDER:chat_images}

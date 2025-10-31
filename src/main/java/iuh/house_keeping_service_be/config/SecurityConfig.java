@@ -49,7 +49,8 @@ public class SecurityConfig {
                                 "/api/v1/auth/change-password",
                                 "/api/v1/auth/get-role",
                                 "/api/v1/media/**",
-                                "/api/v1/reviews/**").permitAll()
+                                "/api/v1/reviews/**",
+                                "/ws/**").permitAll()
                         .requestMatchers("/api/v1/auth/register").hasAnyRole("EMPLOYEE", "CUSTOMER")
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/employee/**").hasAnyRole("EMPLOYEE", "ADMIN")

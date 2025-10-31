@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Chat Real-Time Test</title>
+    
+    <!-- SockJS and STOMP libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 30px;
+        }
+        
+        .section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 20px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .control-group input,
+        .control-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        .control-group input:focus,
+        .control-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .control-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-connect {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-connect:hover {
+            background: #218838;
+        }
+        
+        .btn-disconnect {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .btn-disconnect:hover {
+            background: #c82333;
+        }
+        
+        .btn-send {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-send:hover {
+            background: #5568d3;
+        }
+        
+        .btn-clear {
+            background: #ffc107;
+            color: #333;
+        }
+        
+        .btn-clear:hover {
+            background: #e0a800;
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-weight: 600;
+            text-align: center;
+        }
+        
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .messages-container {
+            height: 400px;
+            overflow-y: auto;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            padding: 15px;
+            background: white;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            padding: 12px;
+            border-radius: 8px;
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .message.text-message {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+        }
+        
+        .message.image-message {
+            background: #f3e5f5;
+            border-left: 4px solid #9c27b0;
+        }
+        
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .message-sender {
+            font-weight: 700;
+            color: #667eea;
+        }
+        
+        .message-time {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .message-content {
+            color: #333;
+            word-wrap: break-word;
+        }
+        
+        .message-image {
+            max-width: 100%;
+            max-height: 300px;
+            border-radius: 5px;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+        
+        .message-type-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        
+        .badge-text {
+            background: #2196f3;
+            color: white;
+        }
+        
+        .badge-image {
+            background: #9c27b0;
+            color: white;
+        }
+        
+        .info-box {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-size: 13px;
+            color: #856404;
+        }
+        
+        .info-box strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        /* Custom scrollbar */
+        .messages-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .messages-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        
+        .messages-container::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 10px;
+        }
+        
+        .messages-container::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #5568d3 0%, #6a4190 100%);
+        }
+        
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+            
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔌 WebSocket Chat Real-Time Test</h1>
+            <p>Test nhận tin nhắn real-time khi có người gửi qua REST API - Dựa trên Backend Spring Boot</p>
+        </div>
+        
+        <div style="background: #fff3cd; border-left: 5px solid #ffc107; padding: 15px; margin: 20px 30px;">
+            <strong style="color: #856404;">📋 Thông tin Backend & Test Data:</strong>
+            <ul style="margin: 10px 0 0 20px; color: #856404;">
+                <li><strong>WebSocket Endpoint:</strong> /ws/chat (SockJS enabled)</li>
+                <li><strong>STOMP Topic:</strong> /topic/conversation/{conversationId}</li>
+                <li><strong>Message Broker:</strong> In-memory Simple Broker</li>
+                <li><strong>Authentication:</strong> JWT Bearer Token (required cho REST API)</li>
+                <li><strong>Message Types:</strong> TEXT, IMAGE</li>
+                <li><strong>Image Storage:</strong> Cloudinary (max 5MB)</li>
+                <li><strong>Database:</strong> PostgreSQL với table: conversations, chat_messages</li>
+            </ul>
+            <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #ffc107;">
+                <strong style="color: #856404;">👥 Test Accounts (Password: 123456):</strong>
+                <ul style="margin: 5px 0 0 20px; color: #856404; font-size: 13px;">
+                    <li><strong>john_doe</strong> (CUSTOMER) - ID: a1000001-0000-0000-0000-000000000001</li>
+                    <li><strong>jane_smith</strong> (EMPLOYEE + CUSTOMER) - ID: a1000001-0000-0000-0000-000000000002</li>
+                    <li><strong>admin_1</strong> (ADMIN) - ID: a1000001-0000-0000-0000-000000000003</li>
+                    <li><strong>nguyenvana</strong> (CUSTOMER) - ID: a1000001-0000-0000-0000-000000000006</li>
+                    <li><strong>tranvanl</strong> (EMPLOYEE) - ID: a1000001-0000-0000-0000-000000000016</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="content">
+            <!-- LEFT SECTION: WebSocket Connection -->
+            <div class="section">
+                <h2>📡 WebSocket Receiver</h2>
+                
+                <div class="info-box">
+                    <strong>💡 Hướng dẫn:</strong>
+                    1. Nhập Conversation ID<br>
+                    2. Nhấn "Connect WebSocket"<br>
+                    3. Gửi tin nhắn từ Postman hoặc phần bên phải<br>
+                    4. Xem tin nhắn hiển thị real-time bên dưới<br>
+                    <br>
+                    <strong>📌 Lưu ý:</strong> WebSocket không cần JWT token để nhận tin nhắn
+                </div>
+                
+                <div id="connectionStatus" class="status disconnected">
+                    ⭕ Chưa kết nối
+                </div>
+                
+                <div class="control-group">
+                    <label>🆔 Conversation ID:</label>
+                    <input type="text" id="conversationId" value="" placeholder="Nhập UUID conversation (vd: conv001-...)">
+                    <small style="color: #666; font-size: 12px;">💡 Tạo conversation trước hoặc dùng ID có sẵn trong database</small>
+                </div>
+                
+                <div class="button-group">
+                    <button id="btnConnect" class="btn-connect" onclick="connectWebSocket()">
+                        ✅ Connect WebSocket
+                    </button>
+                    <button id="btnDisconnect" class="btn-disconnect" onclick="disconnectWebSocket()" disabled>
+                        ❌ Disconnect
+                    </button>
+                    <button class="btn-send" onclick="copyPostmanExample()" style="background: #fd7e14;">
+                        📋 Copy Postman Example
+                    </button>
+                </div>
+                
+                <div class="control-group">
+                    <label>📨 Tin nhắn nhận được:</label>
+                    <button class="btn-clear" onclick="clearMessages()" style="width: 100%; margin-bottom: 10px;">
+                        🗑️ Xóa tất cả tin nhắn
+                    </button>
+                    <div id="messagesContainer" class="messages-container">
+                        <p style="text-align: center; color: #999;">Chưa có tin nhắn nào</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- RIGHT SECTION: Send Message via API -->
+            <div class="section">
+                <h2>📤 Gửi Tin Nhắn qua API</h2>
+                
+                <div class="info-box">
+                    <strong>💡 Cách test:</strong>
+                    1. Kết nối WebSocket bên trái<br>
+                    2. Điền thông tin tin nhắn<br>
+                    3. Nhập JWT Token (bắt buộc!)<br>
+                    4. Nhấn "Gửi Text" hoặc "Gửi Image"<br>
+                    5. Tin nhắn sẽ hiện ngay bên trái (real-time!)<br>
+                    <br>
+                    <strong>🔑 Lấy JWT Token:</strong><br>
+                    POST /api/v1/auth/login → copy "token" từ response
+                </div>
+                
+                <div class="control-group">
+                    <label>🆔 Conversation ID:</label>
+                    <input type="text" id="apiConversationId" value="" placeholder="UUID conversation">
+                </div>
+                
+                <div class="control-group">
+                    <label>👤 Sender ID (Account ID):</label>
+                    <input type="text" id="apiSenderId" value="a1000001-0000-0000-0000-000000000001" placeholder="UUID account">
+                    <small style="color: #666; font-size: 12px;">
+                        💡 Ví dụ:<br>
+                        - john_doe (Customer): a1000001-0000-0000-0000-000000000001<br>
+                        - jane_smith (Employee): a1000001-0000-0000-0000-000000000002<br>
+                        - nguyenvana (Customer): a1000001-0000-0000-0000-000000000006
+                    </small>
+                </div>
+                
+                <div class="control-group">
+                    <label>📝 Nội dung tin nhắn:</label>
+                    <textarea id="apiContent" placeholder="Nhập nội dung tin nhắn..."></textarea>
+                </div>
+                
+                <div class="control-group">
+                    <label>🔑 JWT Token (required):</label>
+                    <input type="text" id="jwtToken" placeholder="Dán JWT token vào đây (bắt buộc cho API)">
+                    <small style="color: #666; font-size: 12px;">💡 Lấy từ response khi login: eyJhbGciOiJIUzI1...</small>
+                </div>
+                
+                <div class="button-group">
+                    <button class="btn-send" onclick="sendTextMessage()">
+                        📝 Gửi Text Message
+                    </button>
+                    <button class="btn-send" onclick="loadConversationMessages()" style="background: #17a2b8;">
+                        📥 Load lịch sử chat
+                    </button>
+                </div>
+                
+                <div class="control-group">
+                    <label>🖼️ Chọn ảnh để gửi:</label>
+                    <input type="file" id="imageFile" accept="image/*">
+                    <small style="color: #666; font-size: 12px;">💡 Chỉ hỗ trợ file ảnh (JPG, PNG, GIF, etc.), tối đa 5MB</small>
+                </div>
+                
+                <div class="control-group">
+                    <label>📝 Caption (optional):</label>
+                    <input type="text" id="imageCaption" placeholder="Mô tả cho ảnh (không bắt buộc)">
+                </div>
+                
+                <div class="button-group">
+                    <button class="btn-send" onclick="sendImageMessage()">
+                        🖼️ Gửi Image Message
+                    </button>
+                </div>
+                
+                <div class="control-group">
+                    <label>📊 Response Log:</label>
+                    <div id="responseLog" class="messages-container" style="height: 200px; font-family: monospace; font-size: 12px;">
+                        <p style="color: #999;">Chưa có response nào</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let stompClient = null;
+        let messageCount = 0;
+        
+        // ========== WebSocket Functions ==========
+        
+        function connectWebSocket() {
+            const conversationId = document.getElementById('conversationId').value;
+            
+            if (!conversationId) {
+                alert('⚠️ Vui lòng nhập Conversation ID');
+                return;
+            }
+            
+            const socket = new SockJS('http://localhost:8080/ws/chat');
+            stompClient = Stomp.over(socket);
+            
+            // Tắt debug log
+            stompClient.debug = null;
+            
+            // Update UI
+            updateConnectionStatus('connecting');
+            
+            stompClient.connect({}, 
+                function(frame) {
+                    console.log('✅ WebSocket Connected:', frame);
+                    
+                    // Subscribe to conversation topic
+                    stompClient.subscribe(`/topic/conversation/${conversationId}`, function(message) {
+                        const chatMessage = JSON.parse(message.body);
+                        console.log('📨 Received real-time message:', chatMessage);
+                        
+                        displayReceivedMessage(chatMessage);
+                    });
+                    
+                    updateConnectionStatus('connected', conversationId);
+                    
+                    document.getElementById('btnConnect').disabled = true;
+                    document.getElementById('btnDisconnect').disabled = false;
+                },
+                function(error) {
+                    console.error('❌ WebSocket Connection Error:', error);
+                    updateConnectionStatus('error');
+                    alert('❌ Không thể kết nối WebSocket. Kiểm tra xem server có đang chạy không?');
+                }
+            );
+        }
+        
+        function disconnectWebSocket() {
+            if (stompClient !== null && stompClient.connected) {
+                stompClient.disconnect(function() {
+                    console.log('Disconnected from WebSocket');
+                    updateConnectionStatus('disconnected');
+                    
+                    document.getElementById('btnConnect').disabled = false;
+                    document.getElementById('btnDisconnect').disabled = true;
+                });
+            }
+        }
+        
+        function updateConnectionStatus(status, conversationId = null) {
+            const statusDiv = document.getElementById('connectionStatus');
+            
+            switch(status) {
+                case 'connecting':
+                    statusDiv.className = 'status';
+                    statusDiv.style.background = '#fff3cd';
+                    statusDiv.style.color = '#856404';
+                    statusDiv.innerHTML = '⏳ Đang kết nối...';
+                    break;
+                case 'connected':
+                    statusDiv.className = 'status connected';
+                    statusDiv.innerHTML = `✅ Đã kết nối - Subscribe: /topic/conversation/${conversationId}`;
+                    break;
+                case 'disconnected':
+                    statusDiv.className = 'status disconnected';
+                    statusDiv.innerHTML = '⭕ Chưa kết nối';
+                    break;
+                case 'error':
+                    statusDiv.className = 'status';
+                    statusDiv.style.background = '#f8d7da';
+                    statusDiv.style.color = '#721c24';
+                    statusDiv.innerHTML = '❌ Lỗi kết nối';
+                    break;
+            }
+        }
+        
+        function displayReceivedMessage(message) {
+            const container = document.getElementById('messagesContainer');
+            
+            // Remove "no messages" placeholder
+            if (messageCount === 0) {
+                container.innerHTML = '';
+            }
+            
+            messageCount++;
+            
+            const messageDiv = document.createElement('div');
+            const isTextMessage = message.messageType === 'TEXT';
+            messageDiv.className = `message ${isTextMessage ? 'text-message' : 'image-message'}`;
+            
+            // Backend trả về timestamp as LocalDateTime
+            const timestamp = new Date(message.timestamp || message.createdAt).toLocaleString('vi-VN');
+            const senderName = message.senderName || `User #${message.senderId}`;
+            
+            let contentHTML = '';
+            
+            if (isTextMessage) {
+                contentHTML = `
+                    <div class="message-header">
+                        <span class="message-sender">${senderName}<span class="message-type-badge badge-text">TEXT</span></span>
+                        <span class="message-time">${timestamp}</span>
+                    </div>
+                    <div class="message-content">${escapeHtml(message.content)}</div>
+                    <div style="font-size: 11px; color: #999; margin-top: 5px;">
+                        ID: ${message.messageId}
+                    </div>
+                `;
+            } else {
+                contentHTML = `
+                    <div class="message-header">
+                        <span class="message-sender">${senderName}<span class="message-type-badge badge-image">IMAGE</span></span>
+                        <span class="message-time">${timestamp}</span>
+                    </div>
+                    ${message.content ? `<div class="message-content">${escapeHtml(message.content)}</div>` : ''}
+                    <img src="${message.imageUrl}" class="message-image" alt="Image" onclick="window.open('${message.imageUrl}', '_blank')" title="Click để xem ảnh full size">
+                    <div style="font-size: 11px; color: #999; margin-top: 5px;">
+                        ID: ${message.messageId} | Cloudinary URL
+                    </div>
+                `;
+            }
+            
+            messageDiv.innerHTML = contentHTML;
+            container.appendChild(messageDiv);
+            
+            // Auto scroll to bottom với animation
+            container.scrollTo({
+                top: container.scrollHeight,
+                behavior: 'smooth'
+            });
+            
+            // Play sound notification (optional)
+            playNotificationSound();
+        }
+        
+        function playNotificationSound() {
+            // Tạo âm thanh thông báo đơn giản
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = 800;
+            oscillator.type = 'sine';
+            
+            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.1);
+        }
+        
+        function clearMessages() {
+            const container = document.getElementById('messagesContainer');
+            container.innerHTML = '<p style="text-align: center; color: #999;">Chưa có tin nhắn nào</p>';
+            messageCount = 0;
+        }
+        
+        // ========== API Functions ==========
+        
+        async function loadConversationMessages() {
+            const conversationId = document.getElementById('apiConversationId').value;
+            const jwtToken = document.getElementById('jwtToken').value;
+            
+            if (!conversationId) {
+                alert('⚠️ Vui lòng nhập Conversation ID');
+                return;
+            }
+            
+            if (!jwtToken) {
+                alert('⚠️ Vui lòng nhập JWT Token');
+                return;
+            }
+            
+            try {
+                logResponse(`📥 Đang load lịch sử chat của conversation ${conversationId}...`);
+                
+                const headers = {
+                    'Authorization': jwtToken.startsWith('Bearer ') ? jwtToken : `Bearer ${jwtToken}`
+                };
+                
+                const response = await fetch(`http://localhost:8080/api/v1/messages/conversation/${conversationId}/all`, {
+                    method: 'GET',
+                    headers: headers
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    const messages = result.data;
+                    logResponse(`✅ Load thành công ${messages.length} tin nhắn`);
+                    
+                    // Clear existing messages first
+                    const container = document.getElementById('messagesContainer');
+                    container.innerHTML = '';
+                    messageCount = 0;
+                    
+                    // Display all messages
+                    messages.forEach(msg => {
+                        // Convert ChatMessageResponse to WebSocket format
+                        const wsMessage = {
+                            messageId: msg.messageId,
+                            conversationId: msg.conversationId,
+                            senderId: msg.senderId,
+                            senderName: msg.senderName,
+                            messageType: msg.messageType,
+                            content: msg.content,
+                            imageUrl: msg.imageUrl,
+                            timestamp: msg.createdAt
+                        };
+                        displayReceivedMessage(wsMessage);
+                    });
+                    
+                    alert(`✅ Đã load ${messages.length} tin nhắn từ lịch sử`);
+                } else {
+                    logResponse(`❌ Lỗi: ${response.status}\n${JSON.stringify(result, null, 2)}`);
+                    alert(`❌ Không thể load lịch sử: ${result.message || 'Unknown error'}`);
+                }
+            } catch (error) {
+                logResponse(`❌ Exception: ${error.message}`);
+                alert('❌ Không thể kết nối đến server');
+                console.error('Error:', error);
+            }
+        }
+        
+        async function sendTextMessage() {
+            const conversationId = document.getElementById('apiConversationId').value;
+            const senderId = document.getElementById('apiSenderId').value;
+            const content = document.getElementById('apiContent').value;
+            const jwtToken = document.getElementById('jwtToken').value;
+            
+            if (!conversationId || !senderId || !content) {
+                alert('⚠️ Vui lòng điền đầy đủ: Conversation ID, Sender ID và Nội dung');
+                return;
+            }
+            
+            if (!jwtToken) {
+                alert('⚠️ Vui lòng nhập JWT Token. API yêu cầu authentication!');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('conversationId', conversationId);
+            formData.append('senderId', senderId);
+            formData.append('content', content);
+            
+            try {
+                logResponse('📤 Đang gửi text message...');
+                
+                const headers = {
+                    'Authorization': jwtToken.startsWith('Bearer ') ? jwtToken : `Bearer ${jwtToken}`
+                };
+                
+                const response = await fetch('http://localhost:8080/api/v1/messages/send/text', {
+                    method: 'POST',
+                    headers: headers,
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    logResponse(`✅ Gửi thành công!\n${JSON.stringify(result, null, 2)}`);
+                    document.getElementById('apiContent').value = '';
+                    alert('✅ Tin nhắn đã được gửi! Kiểm tra bên trái để xem real-time.');
+                } else {
+                    logResponse(`❌ Lỗi: ${response.status}\n${JSON.stringify(result, null, 2)}`);
+                    
+                    if (response.status === 401 || response.status === 403) {
+                        alert(`❌ Lỗi xác thực! Token không hợp lệ hoặc đã hết hạn.\n\nVui lòng:\n1. Login lại để lấy token mới\n2. Kiểm tra token có đúng format không`);
+                    } else {
+                        alert(`❌ Lỗi gửi tin nhắn: ${result.message || 'Unknown error'}`);
+                    }
+                }
+            } catch (error) {
+                logResponse(`❌ Exception: ${error.message}`);
+                alert('❌ Không thể kết nối đến server. Kiểm tra:\n1. Server có đang chạy không?\n2. URL có đúng không?\n3. CORS có được cấu hình không?');
+                console.error('Error:', error);
+            }
+        }
+        
+        async function sendImageMessage() {
+            const conversationId = document.getElementById('apiConversationId').value;
+            const senderId = document.getElementById('apiSenderId').value;
+            const caption = document.getElementById('imageCaption').value;
+            const jwtToken = document.getElementById('jwtToken').value;
+            const imageFile = document.getElementById('imageFile').files[0];
+            
+            if (!conversationId || !senderId) {
+                alert('⚠️ Vui lòng điền Conversation ID và Sender ID');
+                return;
+            }
+            
+            if (!imageFile) {
+                alert('⚠️ Vui lòng chọn file ảnh');
+                return;
+            }
+            
+            if (!jwtToken) {
+                alert('⚠️ Vui lòng nhập JWT Token. API yêu cầu authentication!');
+                return;
+            }
+            
+            // Kiểm tra kích thước file (5MB)
+            const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+            if (imageFile.size > maxSize) {
+                alert(`⚠️ File quá lớn! Kích thước: ${(imageFile.size / 1024 / 1024).toFixed(2)}MB\nTối đa cho phép: 5MB`);
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('conversationId', conversationId);
+            formData.append('senderId', senderId);
+            formData.append('imageFile', imageFile);
+            if (caption) {
+                formData.append('caption', caption);
+            }
+            
+            try {
+                logResponse(`📤 Đang upload ảnh: ${imageFile.name} (${(imageFile.size / 1024).toFixed(2)}KB)...`);
+                
+                const headers = {
+                    'Authorization': jwtToken.startsWith('Bearer ') ? jwtToken : `Bearer ${jwtToken}`
+                };
+                
+                const response = await fetch('http://localhost:8080/api/v1/messages/send/image', {
+                    method: 'POST',
+                    headers: headers,
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    logResponse(`✅ Upload thành công!\nCloudinary URL: ${result.data.imageUrl}\n${JSON.stringify(result, null, 2)}`);
+                    document.getElementById('imageCaption').value = '';
+                    document.getElementById('imageFile').value = '';
+                    alert('✅ Ảnh đã được upload và gửi! Kiểm tra bên trái để xem real-time.');
+                } else {
+                    logResponse(`❌ Lỗi: ${response.status}\n${JSON.stringify(result, null, 2)}`);
+                    
+                    if (response.status === 401 || response.status === 403) {
+                        alert(`❌ Lỗi xác thực! Token không hợp lệ hoặc đã hết hạn.`);
+                    } else if (response.status === 400) {
+                        alert(`❌ Lỗi validation: ${result.message || 'File không hợp lệ'}\n\nKiểm tra:\n1. File có phải là ảnh không?\n2. Kích thước < 5MB?`);
+                    } else {
+                        alert(`❌ Lỗi gửi ảnh: ${result.message || 'Unknown error'}`);
+                    }
+                }
+            } catch (error) {
+                logResponse(`❌ Exception: ${error.message}`);
+                alert('❌ Không thể kết nối đến server hoặc Cloudinary.\n\nKiểm tra:\n1. Server có đang chạy?\n2. Cloudinary credentials có đúng?');
+                console.error('Error:', error);
+            }
+        }
+        
+        function logResponse(message) {
+            const logDiv = document.getElementById('responseLog');
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.style.marginBottom = '10px';
+            logEntry.style.paddingBottom = '10px';
+            logEntry.style.borderBottom = '1px solid #e0e0e0';
+            logEntry.innerHTML = `<strong>[${timestamp}]</strong><br><pre style="white-space: pre-wrap; margin-top: 5px;">${escapeHtml(message)}</pre>`;
+            
+            if (logDiv.querySelector('p')) {
+                logDiv.innerHTML = '';
+            }
+            
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        // ========== Utility Functions ==========
+        
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+        
+        function copyPostmanExample() {
+            const conversationId = document.getElementById('conversationId').value || '1';
+            const jwtToken = document.getElementById('jwtToken').value || 'YOUR_JWT_TOKEN';
+            
+            const postmanExample = `
+📮 POSTMAN Example - Send Text Message:
+
+Method: POST
+URL: http://localhost:8080/api/v1/messages/send/text
+
+Headers:
+- Authorization: Bearer ${jwtToken}
+
+Body (form-data):
+- conversationId: ${conversationId}
+- senderId: a1000001-0000-0000-0000-000000000001
+- content: Xin chào từ Postman
+
+---
+
+📮 POSTMAN Example - Send Image:
+
+Method: POST  
+URL: http://localhost:8080/api/v1/messages/send/image
+
+Headers:
+- Authorization: Bearer ${jwtToken}
+
+Body (form-data):
+- conversationId: ${conversationId}
+- senderId: a1000001-0000-0000-0000-000000000001
+- imageFile: [Select image file]
+- caption: Mô tả ảnh (optional)
+
+---
+
+📮 CREATE CONVERSATION Example:
+
+Method: POST
+URL: http://localhost:8080/api/v1/conversations
+
+Headers:
+- Authorization: Bearer ${jwtToken}
+- Content-Type: application/json
+
+Body (JSON):
+{
+  "customerId": "c1000001-0000-0000-0000-000000000001",
+  "employeeId": "e1000001-0000-0000-0000-000000000001"
+}
+
+Response sẽ trả về conversationId để dùng cho chat.
+            `.trim();
+            
+            navigator.clipboard.writeText(postmanExample).then(() => {
+                alert('✅ Đã copy Postman example vào clipboard!');
+            }).catch(err => {
+                console.error('Error copying:', err);
+                alert('❌ Không thể copy. Xem console để lấy thông tin.');
+                console.log(postmanExample);
+            });
+        }
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            if (stompClient !== null && stompClient.connected) {
+                stompClient.disconnect();
+            }
+        });
+    </script>
+</body>
+</html>
