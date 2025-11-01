@@ -168,4 +168,12 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
            "AND b.status = iuh.house_keeping_service_be.enums.BookingStatus.AWAITING_EMPLOYEE " +
            "ORDER BY b.createdAt DESC")
     Page<Booking> findVerifiedAwaitingEmployeeBookings(Pageable pageable);
+
+    // Find all bookings ordered by booking time descending (for admin)
+    @Query("SELECT b FROM Booking b " +
+           "LEFT JOIN FETCH b.customer c " +
+           "LEFT JOIN FETCH b.address a " +
+           "LEFT JOIN FETCH b.promotion p " +
+           "ORDER BY b.bookingTime DESC")
+    Page<Booking> findAllBookingsOrderByBookingTimeDesc(Pageable pageable);
 }

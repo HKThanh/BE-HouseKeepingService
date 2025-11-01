@@ -30,4 +30,7 @@ public interface BookingService {
     
     // Get verified bookings that are still awaiting employee (for Employee and Admin)
     Page<BookingResponse> getVerifiedAwaitingEmployeeBookings(Pageable pageable);
+    
+    // Get all bookings sorted by booking time descending (for Admin only)
+    Page<BookingResponse> getAllBookingsSortedByBookingTime(Pageable pageable);
 }

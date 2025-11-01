@@ -317,16 +317,20 @@ public class BookingServiceImpl implements BookingService {
         ServicePricingResult pricingResult = calculateServicePricing(detail, service, validChoiceIds);
         BigDecimal calculatedPrice = pricingResult.totalPrice();
 
-        // Compare with expected price (tolerance of 1000 VND)
-        BigDecimal priceDifference = calculatedPrice.subtract(detail.expectedPrice()).abs();
-        boolean priceMatches = priceDifference.compareTo(new BigDecimal("1000")) <= 0;
+        // Compare with expected price (tolerance of 1000 VND) - only if expectedPrice is provided
+        boolean priceMatches = true; // Default to true if no expectedPrice provided
+        if (detail.expectedPrice() != null) {
+            BigDecimal priceDifference = calculatedPrice.subtract(detail.expectedPrice()).abs();
+            priceMatches = priceDifference.compareTo(new BigDecimal("1000")) <= 0;
 
-        if (!priceMatches) {
-            errors.add(String.format("Price mismatch for service %d. Expected: %s, Calculated: %s",
-                    detail.serviceId(),
-                    BookingDTOFormatter.formatPrice(detail.expectedPrice()),
-                    BookingDTOFormatter.formatPrice(calculatedPrice)));
+            if (!priceMatches) {
+                errors.add(String.format("Price mismatch for service %d. Expected: %s, Calculated: %s",
+                        detail.serviceId(),
+                        BookingDTOFormatter.formatPrice(detail.expectedPrice()),
+                        BookingDTOFormatter.formatPrice(calculatedPrice)));
+            }
         }
+        // If expectedPrice is null, we skip price validation (will use calculated price)
 
         return ServiceValidationInfo.builder()
                 .serviceId(detail.serviceId())
@@ -719,10 +723,20 @@ public class BookingServiceImpl implements BookingService {
                                                                 List<BookingDetail> details,
                                                                 List<Assignment> assignments,
                                                                 Payment payment) {
-        // Map to DTOs
+        // Group assignments by BookingDetail ID
+        Map<String, List<Assignment>> assignmentsByDetailId = assignments.stream()
+                .collect(Collectors.groupingBy(a -> a.getBookingDetail().getId()));
+        
+        // Map to DTOs - manually set assignments for each detail
         CustomerAddressInfo addressInfo = bookingMapper.toCustomerAddressInfo(booking.getAddress());
         List<BookingDetailInfo> detailInfos = details.stream()
-                .map(bookingMapper::toBookingDetailInfo)
+                .map(detail -> {
+                    // Get assignments for this detail
+                    List<Assignment> detailAssignments = assignmentsByDetailId.getOrDefault(detail.getId(), List.of());
+                    // Set assignments to detail so mapper can use them
+                    detail.setAssignments(detailAssignments);
+                    return bookingMapper.toBookingDetailInfo(detail);
+                })
                 .toList();
         PaymentInfo paymentInfo = bookingMapper.toPaymentInfo(payment);
         PromotionInfo promotionInfo = booking.getPromotion() != null ?
@@ -791,6 +805,13 @@ public class BookingServiceImpl implements BookingService {
             PaymentInfo paymentInfo = booking.getPayments().isEmpty() ? null : bookingMapper.toPaymentInfo(booking.getPayments().get(0));
             PromotionInfo promotionInfo = booking.getPromotion() != null ? bookingMapper.toPromotionInfo(booking.getPromotion()) : null;
 
+            // Get all assignments for this booking
+            List<EmployeeInfo> assignedEmployees = booking.getBookingDetails().stream()
+                    .flatMap(detail -> detail.getAssignments().stream())
+                    .map(assignment -> bookingMapper.toEmployeeInfo(assignment.getEmployee()))
+                    .distinct()
+                    .toList();
+
             return new BookingHistoryResponse(
                     booking.getBookingId(),
                     booking.getBookingCode(),
@@ -802,7 +823,11 @@ public class BookingServiceImpl implements BookingService {
                     BookingDTOFormatter.formatPrice(booking.getTotalAmount()),
                     booking.getStatus().toString(),
                     promotionInfo,
-                    paymentInfo
+                    paymentInfo,
+                    booking.getTitle(),
+                    booking.getImageUrl(),
+                    booking.getIsVerified(),
+                    assignedEmployees
             );
         });
 
@@ -1021,6 +1046,23 @@ public class BookingServiceImpl implements BookingService {
                 verifiedAwaitingBookings.getNumberOfElements(),
                 verifiedAwaitingBookings.getNumber() + 1,
                 verifiedAwaitingBookings.getTotalPages());
+
+        return response;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<BookingResponse> getAllBookingsSortedByBookingTime(Pageable pageable) {
+        log.info("Admin fetching all bookings sorted by booking time descending");
+
+        Page<Booking> allBookings = bookingRepository.findAllBookingsOrderByBookingTimeDesc(pageable);
+
+        Page<BookingResponse> response = allBookings.map(bookingMapper::toBookingResponse);
+
+        log.info("Found {} bookings (page {} of {})",
+                allBookings.getNumberOfElements(),
+                allBookings.getNumber() + 1,
+                allBookings.getTotalPages());
 
         return response;
     }
