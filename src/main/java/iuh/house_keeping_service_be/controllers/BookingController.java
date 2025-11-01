@@ -1,11 +1,11 @@
 package iuh.house_keeping_service_be.controllers;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import iuh.house_keeping_service_be.config.JwtUtil;
 import iuh.house_keeping_service_be.dtos.Booking.internal.BookingValidationResult;
 import iuh.house_keeping_service_be.dtos.Booking.request.BookingCreateRequest;
 import iuh.house_keeping_service_be.dtos.Booking.request.BookingCancelRequest;
 import iuh.house_keeping_service_be.dtos.Booking.request.ConvertBookingToPostRequest;
-import iuh.house_keeping_service_be.dtos.Booking.request.BookingVerificationRequest;
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingHistoryResponse;
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingResponse;
 import iuh.house_keeping_service_be.dtos.Booking.summary.BookingCreationSummary;
@@ -44,6 +44,7 @@ public class BookingController {
     private final CloudinaryService cloudinaryService;
     private final JwtUtil jwtUtil;
     private final CustomerRepository customerRepository;
+    private final ObjectMapper objectMapper;
 
     @GetMapping("/{customerId}/default-address")
     public ResponseEntity<?> getDefaultAddress(@PathVariable String customerId
@@ -94,15 +95,93 @@ public class BookingController {
         }
     }
 
-    @PostMapping
+    @PostMapping(consumes = {"multipart/form-data"})
     @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_ADMIN')")
-    public ResponseEntity<BookingCreationSummary> createBooking(@Valid @RequestBody BookingCreateRequest request) {
-        log.info("Creating new booking with {} services", request.bookingDetails().size());
+    public ResponseEntity<?> createBooking(
+            @RequestPart(value = "booking", required = true) String bookingJson,
+            @RequestPart(value = "image", required = false) MultipartFile image) {
         
-        BookingCreationSummary summary = bookingService.createBooking(request);
-
-        log.info("Booking created successfully: {}", summary.getBookingId());
-        return ResponseEntity.status(HttpStatus.CREATED).body(summary);
+        log.info("Received booking creation request");
+        
+        try {
+            // Parse JSON string to BookingCreateRequest object
+            BookingCreateRequest request;
+            try {
+                request = objectMapper.readValue(bookingJson, BookingCreateRequest.class);
+                log.info("Creating new booking with {} services", request.bookingDetails().size());
+            } catch (Exception e) {
+                log.error("Failed to parse booking JSON: {}", e.getMessage());
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Invalid booking data format: " + e.getMessage()
+                ));
+            }
+            
+            String imageUrl = null;
+            
+            // Upload image to Cloudinary if provided
+            if (image != null && !image.isEmpty()) {
+                log.info("Uploading booking image to Cloudinary");
+                
+                // Validate file type
+                String contentType = image.getContentType();
+                if (contentType == null || !contentType.startsWith("image/")) {
+                    return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "File phải là định dạng ảnh"
+                    ));
+                }
+                
+                // Validate file size (max 5MB)
+                if (image.getSize() > 5 * 1024 * 1024) {
+                    return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "Kích thước file không được vượt quá 5MB"
+                    ));
+                }
+                
+                CloudinaryUploadResult uploadResult = cloudinaryService.uploadBookingImage(image);
+                imageUrl = uploadResult.secureUrl();
+                log.info("Image uploaded successfully: {}", imageUrl);
+            }
+            
+            // Create new request with image URL if uploaded
+            BookingCreateRequest bookingRequest = request;
+            if (imageUrl != null) {
+                bookingRequest = new BookingCreateRequest(
+                    request.addressId(),
+                    request.newAddress(),
+                    request.bookingTime(),
+                    request.note(),
+                    request.title(),
+                    imageUrl,
+                    request.promoCode(),
+                    request.bookingDetails(),
+                    request.assignments(),
+                    request.paymentMethodId()
+                );
+            }
+            
+            BookingCreationSummary summary = bookingService.createBooking(bookingRequest);
+            
+            log.info("Booking created successfully: {}", summary.getBookingId());
+            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                "success", true,
+                "data", summary
+            ));
+        } catch (IllegalArgumentException e) {
+            log.error("Validation error creating booking: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            log.error("Error creating booking: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "success", false,
+                "message", "Đã xảy ra lỗi khi tạo booking"
+            ));
+        }
     }
 
     @GetMapping("/{bookingId}")
@@ -230,72 +309,6 @@ public class BookingController {
             "message", "Huỷ booking thành công",
             "data", response
         ));
-    }
-
-    @GetMapping("/admin/unverified")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
-    public ResponseEntity<?> getUnverifiedBookings(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        
-        log.info("Admin fetching unverified bookings (page: {}, size: {})", page, size);
-        
-        try {
-            if (page < 0) page = 0;
-            if (size <= 0 || size > 100) size = 10;
-            
-            Pageable pageable = PageRequest.of(page, size);
-            Page<BookingResponse> unverifiedBookings = bookingService.getUnverifiedBookings(pageable);
-            
-            return ResponseEntity.ok(Map.of(
-                "success", true,
-                "data", unverifiedBookings.getContent(),
-                "currentPage", unverifiedBookings.getNumber(),
-                "totalItems", unverifiedBookings.getTotalElements(),
-                "totalPages", unverifiedBookings.getTotalPages()
-            ));
-        } catch (Exception e) {
-            log.error("Error fetching unverified bookings: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
-                "success", false,
-                "message", "Đã xảy ra lỗi khi lấy danh sách booking chưa xác minh"
-            ));
-        }
-    }
-
-    @PutMapping("/admin/{bookingId}/verify")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
-    public ResponseEntity<?> verifyBooking(
-            @PathVariable String bookingId,
-            @Valid @RequestBody BookingVerificationRequest request) {
-        
-        log.info("Admin verifying booking {}: approve={}", bookingId, request.approve());
-        
-        try {
-            BookingResponse response = bookingService.verifyBooking(bookingId, request);
-            
-            String message = request.approve() 
-                ? "Chấp nhận bài post thành công" 
-                : "Từ chối bài post thành công";
-            
-            return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", message,
-                "data", response
-            ));
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            log.error("Error verifying booking: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of(
-                "success", false,
-                "message", e.getMessage()
-            ));
-        } catch (Exception e) {
-            log.error("Unexpected error verifying booking: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
-                "success", false,
-                "message", "Đã xảy ra lỗi khi xác minh booking"
-            ));
-        }
     }
 
     @PostMapping("/{bookingId}/upload-image")
