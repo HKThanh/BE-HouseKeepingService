@@ -16,25 +16,31 @@ public class CorsConfig {
         CorsConfiguration configuration = new CorsConfiguration();
 
         // Use allowedOriginPatterns instead of allowedOrigins when credentials are true
-        configuration.setAllowedOriginPatterns(Arrays.asList(
-            "http://localhost:*",    // All localhost ports
-            "http://127.0.0.1:*"     // All 127.0.0.1 ports
-        ));
+        // configuration.setAllowedOriginPatterns(Arrays.asList(
+        //     "http://localhost:*",    // All localhost ports
+        //     "http://127.0.0.1:*"     // All 127.0.0.1 ports
+        // ));
 
-        configuration.setAllowedOrigins(Arrays.asList(
-            "http://localhost:3000",  // React dev server
-            "http://localhost:5173",  // Vite dev server
-            "http://localhost:8080",  // Local development
-            "http://127.0.0.1:5500",  // Live Server
-            "http://127.0.0.1:3000",
-            "http://127.0.0.1:5173"
-        ));
+        // configuration.setAllowedOrigins(Arrays.asList(
+        //     "http://localhost:3000",  // React dev server
+        //     "http://localhost:5173",  // Vite dev server
+        //     "http://localhost:8080",  // Local development
+        //     "http://127.0.0.1:5500",  // Live Server
+        //     "http://127.0.0.1:3000",
+        //     "http://127.0.0.1:5173"
+        // ));
+
+        // Use allowedOriginPatterns when credentials are needed
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
 
         // Allow all HTTP methods
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
 
         // Allow all headers
         configuration.setAllowedHeaders(Arrays.asList("*"));
+
+        // Expose headers that client can read
+        configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type"));
 
         // Allow credentials (cookies, authorization headers)
         configuration.setAllowCredentials(true);

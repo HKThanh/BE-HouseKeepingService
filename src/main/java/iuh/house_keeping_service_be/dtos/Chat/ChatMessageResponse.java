@@ -17,6 +17,7 @@ public class ChatMessageResponse {
     private String conversationId;
     private String senderId;
     private String senderName;
+    private String senderAvatar;
     private MessageType messageType;
     private String content;
     private String imageUrl;

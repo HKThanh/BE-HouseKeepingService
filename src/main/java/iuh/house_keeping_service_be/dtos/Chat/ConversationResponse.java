@@ -15,8 +15,10 @@ public class ConversationResponse {
     private String conversationId;
     private String customerId;
     private String customerName;
+    private String customerAvatar;
     private String employeeId;
     private String employeeName;
+    private String employeeAvatar;
     private String bookingId;
     private String lastMessage;
     private LocalDateTime lastMessageTime;

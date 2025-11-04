@@ -7,9 +7,13 @@ import iuh.house_keeping_service_be.enums.MessageType;
 import iuh.house_keeping_service_be.models.Account;
 import iuh.house_keeping_service_be.models.ChatMessage;
 import iuh.house_keeping_service_be.models.Conversation;
+import iuh.house_keeping_service_be.models.Customer;
+import iuh.house_keeping_service_be.models.Employee;
 import iuh.house_keeping_service_be.repositories.AccountRepository;
 import iuh.house_keeping_service_be.repositories.ChatMessageRepository;
 import iuh.house_keeping_service_be.repositories.ConversationRepository;
+import iuh.house_keeping_service_be.repositories.CustomerRepository;
+import iuh.house_keeping_service_be.repositories.EmployeeRepository;
 import iuh.house_keeping_service_be.services.ChatService.ChatMessageService;
 import iuh.house_keeping_service_be.services.ChatService.ConversationService;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +37,8 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     private final ChatMessageRepository chatMessageRepository;
     private final ConversationRepository conversationRepository;
     private final AccountRepository accountRepository;
+    private final CustomerRepository customerRepository;
+    private final EmployeeRepository employeeRepository;
     private final ConversationService conversationService;
     private final Cloudinary cloudinary;
 
@@ -149,12 +155,14 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
     private ChatMessageResponse mapToResponse(ChatMessage message) {
         String senderName = getSenderName(message.getSender());
+        String senderAvatar = getSenderAvatar(message.getSender());
         
         return ChatMessageResponse.builder()
                 .messageId(message.getMessageId())
                 .conversationId(message.getConversation().getConversationId())
                 .senderId(message.getSender().getAccountId())
                 .senderName(senderName)
+                .senderAvatar(senderAvatar)
                 .messageType(message.getMessageType())
                 .content(message.getContent())
                 .imageUrl(message.getImageUrl())
@@ -168,5 +176,21 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         return accountRepository.findById(sender.getAccountId())
                 .map(account -> account.getUsername())
                 .orElse("Unknown");
+    }
+
+    private String getSenderAvatar(Account sender) {
+        // Try to get avatar from Customer first
+        Customer customer = customerRepository.findByAccount_AccountId(sender.getAccountId()).orElse(null);
+        if (customer != null) {
+            return customer.getAvatar();
+        }
+        
+        // If not customer, try Employee
+        Employee employee = employeeRepository.findByAccount_AccountId(sender.getAccountId()).orElse(null);
+        if (employee != null) {
+            return employee.getAvatar();
+        }
+        
+        return null;
     }
 }
