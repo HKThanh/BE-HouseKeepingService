@@ -17,6 +17,7 @@ public record BookingHistoryResponse(
         String title,
         String imageUrl,
         Boolean isVerified,
-        List<EmployeeInfo> assignedEmployees
+        List<EmployeeInfo> assignedEmployees,
+        List<ServiceInfo> services
 ) {
 }

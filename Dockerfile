@@ -16,7 +16,7 @@ COPY src ./src
 RUN ./gradlew build --no-daemon -x test
 
 # Runtime stage
-FROM openjdk:17-slim
+FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
 # Copy the JAR file from build stage

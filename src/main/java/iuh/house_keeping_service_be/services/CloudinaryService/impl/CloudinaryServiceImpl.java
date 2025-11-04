@@ -92,4 +92,16 @@ public class CloudinaryServiceImpl implements CloudinaryService {
             throw new RuntimeException("Không thể tải ảnh lên Cloudinary", e);
         }
     }
+
+    @Override
+    public void deleteImage(String publicId) {
+        if (publicId == null || publicId.isBlank()) {
+            throw new IllegalArgumentException("Public ID không hợp lệ");
+        }
+        try {
+            cloudinary.uploader().destroy(publicId, Map.of());
+        } catch (IOException e) {
+            throw new RuntimeException("Không thể xóa ảnh từ Cloudinary", e);
+        }
+    }
 }

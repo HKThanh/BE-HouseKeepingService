@@ -1,7 +1,10 @@
 package iuh.house_keeping_service_be.controllers;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import iuh.house_keeping_service_be.dtos.Assignment.request.AssignmentActionRequest;
 import iuh.house_keeping_service_be.dtos.Assignment.request.AssignmentCancelRequest;
+import iuh.house_keeping_service_be.dtos.Assignment.request.AssignmentCheckInRequest;
+import iuh.house_keeping_service_be.dtos.Assignment.request.AssignmentCheckOutRequest;
 import iuh.house_keeping_service_be.dtos.Assignment.response.AssignmentActionResponse;
 import iuh.house_keeping_service_be.dtos.Assignment.response.AssignmentDetailResponse;
 import iuh.house_keeping_service_be.dtos.Assignment.response.BookingSummary;
@@ -12,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -23,6 +27,7 @@ import java.util.Map;
 public class EmployeeAssignmentController {
 
     private final AssignmentService assignmentService;
+    private final ObjectMapper objectMapper;
 
     @GetMapping("/{employeeId}/assignments")
     @PreAuthorize("hasAnyAuthority('ROLE_EMPLOYEE', 'ROLE_ADMIN')")
@@ -154,10 +159,50 @@ public class EmployeeAssignmentController {
     @PreAuthorize("hasAuthority('ROLE_EMPLOYEE')")
     public ResponseEntity<?> checkInAssignment(
             @PathVariable String assignmentId,
-            @Valid @RequestBody AssignmentActionRequest request) {
+            @RequestPart(value = "request", required = true) String requestJson,
+            @RequestPart(value = "image", required = false) MultipartFile image) {
 
         try {
-            AssignmentDetailResponse response = assignmentService.checkIn(assignmentId, request);
+            // Parse JSON string to AssignmentCheckInRequest object
+            AssignmentCheckInRequest request;
+            try {
+                request = objectMapper.readValue(requestJson, AssignmentCheckInRequest.class);
+            } catch (Exception e) {
+                log.error("Failed to parse check-in request JSON: {}", e.getMessage());
+                return ResponseEntity.badRequest().body(new AssignmentActionResponse(
+                        false,
+                        "Dữ liệu yêu cầu không hợp lệ: " + e.getMessage(),
+                        null
+                ));
+            }
+
+            // Validate image if provided
+            if (image != null && !image.isEmpty()) {
+                String contentType = image.getContentType();
+                if (contentType == null || !contentType.startsWith("image/")) {
+                    return ResponseEntity.badRequest().body(new AssignmentActionResponse(
+                            false,
+                            "File phải là định dạng ảnh",
+                            null
+                    ));
+                }
+
+                if (image.getSize() > 5 * 1024 * 1024) {
+                    return ResponseEntity.badRequest().body(new AssignmentActionResponse(
+                            false,
+                            "Kích thước file không được vượt quá 5MB",
+                            null
+                    ));
+                }
+            }
+
+            AssignmentDetailResponse response = assignmentService.checkIn(
+                    assignmentId, 
+                    request.employeeId(), 
+                    image, 
+                    request.imageDescription()
+            );
+
             return ResponseEntity.ok(new AssignmentActionResponse(
                     true,
                     "Điểm danh bắt đầu công việc thành công",
@@ -191,10 +236,50 @@ public class EmployeeAssignmentController {
     @PreAuthorize("hasAuthority('ROLE_EMPLOYEE')")
     public ResponseEntity<?> checkOutAssignment(
             @PathVariable String assignmentId,
-            @Valid @RequestBody AssignmentActionRequest request) {
+            @RequestPart(value = "request", required = true) String requestJson,
+            @RequestPart(value = "image", required = false) MultipartFile image) {
 
         try {
-            AssignmentDetailResponse response = assignmentService.checkOut(assignmentId, request);
+            // Parse JSON string to AssignmentCheckOutRequest object
+            AssignmentCheckOutRequest request;
+            try {
+                request = objectMapper.readValue(requestJson, AssignmentCheckOutRequest.class);
+            } catch (Exception e) {
+                log.error("Failed to parse check-out request JSON: {}", e.getMessage());
+                return ResponseEntity.badRequest().body(new AssignmentActionResponse(
+                        false,
+                        "Dữ liệu yêu cầu không hợp lệ: " + e.getMessage(),
+                        null
+                ));
+            }
+
+            // Validate image if provided
+            if (image != null && !image.isEmpty()) {
+                String contentType = image.getContentType();
+                if (contentType == null || !contentType.startsWith("image/")) {
+                    return ResponseEntity.badRequest().body(new AssignmentActionResponse(
+                            false,
+                            "File phải là định dạng ảnh",
+                            null
+                    ));
+                }
+
+                if (image.getSize() > 5 * 1024 * 1024) {
+                    return ResponseEntity.badRequest().body(new AssignmentActionResponse(
+                            false,
+                            "Kích thước file không được vượt quá 5MB",
+                            null
+                    ));
+                }
+            }
+
+            AssignmentDetailResponse response = assignmentService.checkOut(
+                    assignmentId, 
+                    request.employeeId(), 
+                    image, 
+                    request.imageDescription()
+            );
+
             return ResponseEntity.ok(new AssignmentActionResponse(
                     true,
                     "Chấm công kết thúc công việc thành công",

@@ -812,6 +812,12 @@ public class BookingServiceImpl implements BookingService {
                     .distinct()
                     .toList();
 
+            // Get all services for this booking
+            List<ServiceInfo> services = booking.getBookingDetails().stream()
+                    .map(detail -> bookingMapper.toServiceInfo(detail.getService()))
+                    .distinct()
+                    .toList();
+
             return new BookingHistoryResponse(
                     booking.getBookingId(),
                     booking.getBookingCode(),
@@ -827,7 +833,8 @@ public class BookingServiceImpl implements BookingService {
                     booking.getTitle(),
                     booking.getImageUrl(),
                     booking.getIsVerified(),
-                    assignedEmployees
+                    assignedEmployees,
+                    services
             );
         });
 

@@ -11,6 +11,8 @@ import org.hibernate.annotations.GenericGenerator;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "assignments")
@@ -44,6 +46,10 @@ public class Assignment {
 
     @Column(name = "check_out_time")
     private LocalDateTime checkOutTime;
+
+    @OneToMany(mappedBy = "assignment", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<BookingMedia> media = new ArrayList<>();
 
     // Helper method to get booking time from booking detail
     public LocalDateTime getBookingTime() {

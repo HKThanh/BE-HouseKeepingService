@@ -4,6 +4,7 @@ import iuh.house_keeping_service_be.dtos.Assignment.request.AssignmentActionRequ
 import iuh.house_keeping_service_be.dtos.Assignment.request.AssignmentCancelRequest;
 import iuh.house_keeping_service_be.dtos.Assignment.response.AssignmentDetailResponse;
 import iuh.house_keeping_service_be.dtos.Assignment.response.BookingSummary;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -15,6 +16,6 @@ public interface AssignmentService {
     List<BookingSummary> getAvailableBookings(String employeeId, int page, int size);
     AssignmentDetailResponse acceptBookingDetail(String detailId, String employeeId);
 
-    AssignmentDetailResponse checkIn(String assignmentId, AssignmentActionRequest request);
-    AssignmentDetailResponse checkOut(String assignmentId, AssignmentActionRequest request);
+    AssignmentDetailResponse checkIn(String assignmentId, String employeeId, MultipartFile image, String imageDescription);
+    AssignmentDetailResponse checkOut(String assignmentId, String employeeId, MultipartFile image, String imageDescription);
 }
