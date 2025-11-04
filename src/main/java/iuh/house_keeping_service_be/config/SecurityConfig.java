@@ -50,6 +50,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/get-role",
                                 "/api/v1/media/**",
                                 "/api/v1/reviews/**",
+                                "/api/v1/addresses/**",
                                 "/ws/**").permitAll()
                         .requestMatchers("/api/v1/auth/register").hasAnyRole("EMPLOYEE", "CUSTOMER")
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
