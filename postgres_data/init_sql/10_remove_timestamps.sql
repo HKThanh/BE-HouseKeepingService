@@ -40,8 +40,8 @@ ALTER TABLE assignments DROP COLUMN IF EXISTS updated_at;
 -- Employee unavailability
 ALTER TABLE employee_unavailability DROP COLUMN IF EXISTS created_at;
 
--- Booking media
-ALTER TABLE booking_media DROP COLUMN IF EXISTS uploaded_at;
+-- Booking media - KEEP uploaded_at (needed for new schema in 12_booking_media.sql)
+-- ALTER TABLE booking_media DROP COLUMN IF EXISTS uploaded_at; -- COMMENTED OUT
 
 -- NOTE: payments table - KEEP created_at (as requested)
 -- ALTER TABLE payments DROP COLUMN IF EXISTS created_at; -- COMMENTED OUT

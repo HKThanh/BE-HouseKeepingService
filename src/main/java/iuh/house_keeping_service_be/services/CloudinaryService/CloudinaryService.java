@@ -9,4 +9,6 @@ public interface CloudinaryService {
     CloudinaryUploadResult uploadEmployeeAvatar(MultipartFile file);
 
     CloudinaryUploadResult uploadBookingImage(MultipartFile file);
+
+    void deleteImage(String publicId);
 }

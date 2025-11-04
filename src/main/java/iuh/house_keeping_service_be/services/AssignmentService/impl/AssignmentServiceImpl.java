@@ -6,10 +6,12 @@ import iuh.house_keeping_service_be.dtos.Assignment.response.AssignmentDetailRes
 import iuh.house_keeping_service_be.dtos.Assignment.response.BookingSummary;
 import iuh.house_keeping_service_be.enums.AssignmentStatus;
 import iuh.house_keeping_service_be.enums.BookingStatus;
+import iuh.house_keeping_service_be.enums.MediaType;
 import iuh.house_keeping_service_be.models.*;
 import iuh.house_keeping_service_be.repositories.*;
 import iuh.house_keeping_service_be.repositories.projections.ZoneCoordinate;
 import iuh.house_keeping_service_be.services.AssignmentService.AssignmentService;
+import iuh.house_keeping_service_be.services.BookingMediaService.BookingMediaService;
 //import iuh.house_keeping_service_be.services.NotificationService.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +21,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -38,6 +41,7 @@ public class AssignmentServiceImpl implements AssignmentService {
     private final EmployeeRepository employeeRepository;
     private final EmployeeUnavailabilityRepository employeeUnavailabilityRepository;
     private final AddressRepository addressRepository;
+    private final BookingMediaService bookingMediaService;
 //    private final NotificationService notificationService;
 
     @Override
@@ -220,11 +224,11 @@ public class AssignmentServiceImpl implements AssignmentService {
 
     @Override
     @Transactional
-    public AssignmentDetailResponse checkIn(String assignmentId, AssignmentActionRequest request) {
+    public AssignmentDetailResponse checkIn(String assignmentId, String employeeId, MultipartFile image, String imageDescription) {
         Assignment assignment = assignmentRepository.findByIdWithDetails(assignmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy công việc"));
 
-        ensureAssignmentBelongsToEmployee(assignment, request.employeeId());
+        ensureAssignmentBelongsToEmployee(assignment, employeeId);
 
         if (assignment.getCheckInTime() != null) {
             throw new IllegalStateException("Công việc đã được điểm danh bắt đầu");
@@ -259,6 +263,17 @@ public class AssignmentServiceImpl implements AssignmentService {
         assignment.setStatus(AssignmentStatus.IN_PROGRESS);
         Assignment savedAssignment = assignmentRepository.save(assignment);
 
+        // Upload check-in image if provided
+        if (image != null && !image.isEmpty()) {
+            try {
+                bookingMediaService.uploadMedia(savedAssignment, image, MediaType.CHECK_IN_IMAGE, imageDescription);
+                log.info("Check-in image uploaded successfully for assignment {}", assignmentId);
+            } catch (Exception e) {
+                log.error("Failed to upload check-in image for assignment {}: {}", assignmentId, e.getMessage());
+                // Don't fail the check-in if image upload fails
+            }
+        }
+
         updateBookingStatusToInProgressIfNeeded(booking, now);
 
         return mapToAssignmentDetailResponse(savedAssignment);
@@ -266,11 +281,11 @@ public class AssignmentServiceImpl implements AssignmentService {
 
     @Override
     @Transactional
-    public AssignmentDetailResponse checkOut(String assignmentId, AssignmentActionRequest request) {
+    public AssignmentDetailResponse checkOut(String assignmentId, String employeeId, MultipartFile image, String imageDescription) {
         Assignment assignment = assignmentRepository.findByIdWithDetails(assignmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy công việc"));
 
-        ensureAssignmentBelongsToEmployee(assignment, request.employeeId());
+        ensureAssignmentBelongsToEmployee(assignment, employeeId);
 
         if (assignment.getStatus() != AssignmentStatus.IN_PROGRESS) {
             throw new IllegalStateException("Chỉ có thể chấm công kết thúc khi công việc đang được thực hiện");
@@ -285,6 +300,17 @@ public class AssignmentServiceImpl implements AssignmentService {
         assignment.setStatus(AssignmentStatus.COMPLETED);
 
         Assignment savedAssignment = assignmentRepository.save(assignment);
+
+        // Upload check-out image if provided
+        if (image != null && !image.isEmpty()) {
+            try {
+                bookingMediaService.uploadMedia(savedAssignment, image, MediaType.CHECK_OUT_IMAGE, imageDescription);
+                log.info("Check-out image uploaded successfully for assignment {}", assignmentId);
+            } catch (Exception e) {
+                log.error("Failed to upload check-out image for assignment {}: {}", assignmentId, e.getMessage());
+                // Don't fail the check-out if image upload fails
+            }
+        }
 
         Booking booking = assignment.getBookingDetail().getBooking();
         updateBookingStatusToCompletedIfNeeded(booking, now);
