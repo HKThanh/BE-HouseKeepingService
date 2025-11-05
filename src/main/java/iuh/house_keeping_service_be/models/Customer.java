@@ -7,7 +7,9 @@ package iuh.house_keeping_service_be.models;
     import lombok.NoArgsConstructor;
     import org.hibernate.annotations.GenericGenerator;
 
-    import java.time.LocalDate;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import java.time.LocalDate;
 
     @Entity
     @Table(name = "customer")
@@ -23,6 +25,7 @@ package iuh.house_keeping_service_be.models;
 
         @OneToOne
         @JoinColumn(name = "account_id", nullable = false, unique = true)
+        @JsonIgnore
         private Account account;
 
         @Column(name = "avatar")
