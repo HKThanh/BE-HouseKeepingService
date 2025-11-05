@@ -2,6 +2,7 @@ package iuh.house_keeping_service_be.dtos.Authentication;
 
 public record EmployeeLoginResponse(
         String employeeId,
+        String accountId,
         String username,
         String avatar,
         String fullName,

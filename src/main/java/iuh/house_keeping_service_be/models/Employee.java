@@ -31,6 +31,7 @@ public class Employee {
 
     @OneToOne
     @JoinColumn(name = "account_id", nullable = false, unique = true)
+    @JsonIgnore
     private Account account;
 
     @Column(name = "avatar")

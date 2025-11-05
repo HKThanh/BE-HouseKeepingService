@@ -6,6 +6,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.GenericGenerator;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -23,6 +25,7 @@ public class AdminProfile {
 
     @OneToOne
     @JoinColumn(name = "account_id", nullable = false, unique = true)
+    @JsonIgnore
     private Account account;
 
     @Column(name = "full_name", length = 100, nullable = false)

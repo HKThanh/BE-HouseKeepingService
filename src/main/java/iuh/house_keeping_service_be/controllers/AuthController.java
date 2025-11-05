@@ -240,6 +240,7 @@ public class AuthController {
                 AdminProfile adminProfile = adminService.findByAccountId(account.getAccountId());
                 return new AdminLoginResponse(
                         adminProfile.getAdminProfileId(),
+                        account.getAccountId(),
                         account.getUsername(),
                         adminProfile.getFullName(),
                         adminProfile.getIsMale(),
@@ -254,6 +255,7 @@ public class AuthController {
                 Address address = addressService.findByCustomerId(customer.getCustomerId());
                 return new CustomerLoginResponse(
                         customer.getCustomerId(),
+                        account.getAccountId(),
                         account.getUsername(),
                         customer.getAvatar(),
                         customer.getFullName(),
@@ -268,6 +270,7 @@ public class AuthController {
                 Employee employee = employeeService.findByAccountId(account.getAccountId());
                 return new EmployeeLoginResponse(
                         employee.getEmployeeId(),
+                        account.getAccountId(),
                         account.getUsername(),
                         employee.getAvatar(),
                         employee.getFullName(),
