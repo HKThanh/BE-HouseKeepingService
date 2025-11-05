@@ -62,19 +62,3 @@ CREATE INDEX IF NOT EXISTS idx_notifications_account_unread ON notifications(acc
 CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
 CREATE INDEX IF NOT EXISTS idx_notifications_priority ON notifications(priority);
 CREATE INDEX IF NOT EXISTS idx_notifications_related ON notifications(related_id, related_type);
-
--- Add comment to table
-COMMENT ON TABLE notifications IS 'Stores system notifications for users';
-COMMENT ON COLUMN notifications.notification_id IS 'Unique identifier for the notification';
-COMMENT ON COLUMN notifications.account_id IS 'Reference to the account receiving the notification';
-COMMENT ON COLUMN notifications.type IS 'Type of notification (BOOKING_CREATED, PAYMENT_SUCCESS, etc.)';
-COMMENT ON COLUMN notifications.title IS 'Short title/subject of the notification';
-COMMENT ON COLUMN notifications.message IS 'Detailed message content';
-COMMENT ON COLUMN notifications.related_id IS 'ID of related entity (booking ID, payment ID, etc.)';
-COMMENT ON COLUMN notifications.related_type IS 'Type of related entity (BOOKING, PAYMENT, etc.)';
-COMMENT ON COLUMN notifications.is_read IS 'Flag indicating if notification has been read';
-COMMENT ON COLUMN notifications.read_at IS 'Timestamp when notification was marked as read';
-COMMENT ON COLUMN notifications.priority IS 'Priority level (LOW, NORMAL, HIGH, URGENT)';
-COMMENT ON COLUMN notifications.action_url IS 'URL to navigate when notification is clicked';
-COMMENT ON COLUMN notifications.created_at IS 'Timestamp when notification was created';
-COMMENT ON COLUMN notifications.updated_at IS 'Timestamp when notification was last updated';

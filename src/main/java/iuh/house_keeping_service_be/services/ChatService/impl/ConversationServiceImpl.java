@@ -104,6 +104,23 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     private ConversationResponse mapToResponse(Conversation conversation) {
+        // Tính toán flag canChat
+        Boolean canChat = true;
+        
+        // Nếu conversation có isActive = false thì không cho phép chat
+        if (conversation.getIsActive() != null && !conversation.getIsActive()) {
+            canChat = false;
+        }
+        
+        // Kiểm tra booking của conversation
+        if (conversation.getBooking() != null) {
+            String bookingStatus = conversation.getBooking().getStatus().name();
+            // Nếu booking có status là COMPLETED hoặc CANCELLED thì không cho phép chat
+            if ("COMPLETED".equals(bookingStatus) || "CANCELLED".equals(bookingStatus)) {
+                canChat = false;
+            }
+        }
+        
         return ConversationResponse.builder()
                 .conversationId(conversation.getConversationId())
                 .customerId(conversation.getCustomer().getCustomerId())
@@ -116,6 +133,7 @@ public class ConversationServiceImpl implements ConversationService {
                 .lastMessage(conversation.getLastMessage())
                 .lastMessageTime(conversation.getLastMessageTime())
                 .isActive(conversation.getIsActive())
+                .canChat(canChat)
                 .createdAt(conversation.getCreatedAt())
                 .updatedAt(conversation.getUpdatedAt())
                 .build();

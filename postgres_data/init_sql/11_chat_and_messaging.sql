@@ -45,10 +45,3 @@ CREATE INDEX IF NOT EXISTS idx_chat_messages_sender ON chat_messages(sender_id);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON chat_messages(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_is_read ON chat_messages(is_read);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_conversation_created ON chat_messages(conversation_id, created_at DESC);
-
--- Add comments
-COMMENT ON TABLE conversations IS 'Stores conversation threads between customers and employees';
-COMMENT ON TABLE chat_messages IS 'Stores individual chat messages within conversations';
-COMMENT ON COLUMN conversations.is_active IS 'Indicates if the conversation is active or archived';
-COMMENT ON COLUMN chat_messages.message_type IS 'Type of message: TEXT or IMAGE';
-COMMENT ON COLUMN chat_messages.is_read IS 'Indicates if the message has been read by the recipient';
