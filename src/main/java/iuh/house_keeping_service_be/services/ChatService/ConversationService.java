@@ -18,6 +18,8 @@ public interface ConversationService {
     
     ConversationResponse getConversationByBooking(String bookingId);
     
+    Page<ConversationResponse> getConversationsBySenderId(String senderId, Pageable pageable);
+    
     void updateLastMessage(String conversationId, String lastMessage);
     
     void deleteConversation(String conversationId);

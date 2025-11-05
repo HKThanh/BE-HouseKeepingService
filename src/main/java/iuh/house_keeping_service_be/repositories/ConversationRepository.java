@@ -29,4 +29,10 @@ public interface ConversationRepository extends JpaRepository<Conversation, Stri
            "WHERE (c.customer.account.accountId = :accountId OR c.employee.account.accountId = :accountId) " +
            "ORDER BY c.lastMessageTime DESC")
     Page<Conversation> findActiveConversationsByAccount(@Param("accountId") String accountId, Pageable pageable);
+
+    // Find conversations by senderId (can be customerId or employeeId)
+    @Query("SELECT c FROM Conversation c " +
+           "WHERE (c.customer.customerId = :senderId OR c.employee.employeeId = :senderId) " +
+           "ORDER BY c.lastMessageTime DESC")
+    Page<Conversation> findBySenderId(@Param("senderId") String senderId, Pageable pageable);
 }

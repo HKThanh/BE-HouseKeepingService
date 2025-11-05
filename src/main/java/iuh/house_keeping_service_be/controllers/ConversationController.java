@@ -126,6 +126,33 @@ public class ConversationController {
         }
     }
 
+    @GetMapping("/sender/{senderId}")
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_ADMIN')")
+    public ResponseEntity<?> getConversationsBySenderId(
+            @PathVariable String senderId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        try {
+            Pageable pageable = PageRequest.of(page, size);
+            Page<ConversationResponse> conversations = conversationService.getConversationsBySenderId(senderId, pageable);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("data", conversations.getContent());
+            response.put("currentPage", conversations.getNumber());
+            response.put("totalItems", conversations.getTotalElements());
+            response.put("totalPages", conversations.getTotalPages());
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error getting conversations by senderId: ", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "success", false,
+                    "message", "Failed to get conversations: " + e.getMessage()
+            ));
+        }
+    }
+
     @DeleteMapping("/{conversationId}")
     @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_ADMIN')")
     public ResponseEntity<?> deleteConversation(@PathVariable String conversationId) {

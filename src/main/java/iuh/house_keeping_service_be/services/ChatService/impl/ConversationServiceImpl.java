@@ -85,6 +85,13 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Page<ConversationResponse> getConversationsBySenderId(String senderId, Pageable pageable) {
+        Page<Conversation> conversations = conversationRepository.findBySenderId(senderId, pageable);
+        return conversations.map(this::mapToResponse);
+    }
+
+    @Override
     @Transactional
     public void updateLastMessage(String conversationId, String lastMessage) {
         Conversation conversation = conversationRepository.findById(conversationId)
