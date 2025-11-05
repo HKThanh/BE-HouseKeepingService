@@ -155,12 +155,16 @@ public class ChatMessageController {
     @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_ADMIN')")
     public ResponseEntity<?> getUnreadMessageCount(
             @PathVariable String conversationId,
-            @RequestParam String accountId) {
+            @RequestParam String receiverId) {
         try {
-            Long count = chatMessageService.getUnreadMessageCount(conversationId, accountId);
+            Long count = chatMessageService.getUnreadMessageCount(conversationId, receiverId);
             return ResponseEntity.ok(Map.of(
                     "success", true,
-                    "unreadCount", count
+                    "data", Map.of(
+                            "receiverId", receiverId,
+                            "conversationId", conversationId,
+                            "unreadCount", count
+                    )
             ));
         } catch (Exception e) {
             log.error("Error getting unread count: ", e);
@@ -171,22 +175,71 @@ public class ChatMessageController {
         }
     }
 
-    @PutMapping("/conversation/{conversationId}/mark-read")
+    // New endpoints using receiverId (customerId or employeeId) - query parameter format
+    @GetMapping("/unread-count")
     @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_ADMIN')")
-    public ResponseEntity<?> markMessagesAsRead(
-            @PathVariable String conversationId,
-            @RequestParam String accountId) {
+    public ResponseEntity<?> getUnreadMessageCountByReceiverId(@RequestParam String receiverId) {
         try {
-            chatMessageService.markMessagesAsRead(conversationId, accountId);
+            Long count = chatMessageService.getUnreadMessageCountBySenderId(receiverId);
             return ResponseEntity.ok(Map.of(
                     "success", true,
-                    "message", "Messages marked as read"
+                    "data", Map.of(
+                            "receiverId", receiverId,
+                            "unreadCount", count
+                    )
             ));
         } catch (Exception e) {
-            log.error("Error marking messages as read: ", e);
+            log.error("Error getting unread count for receiverId {}: ", receiverId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "success", false,
+                    "message", "Failed to get unread count: " + e.getMessage()
+            ));
+        }
+    }
+
+    @PutMapping("/conversation/{conversationId}/mark-read")
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_ADMIN')")
+    public ResponseEntity<?> markMessagesAsReadByReceiverIdAndConversation(
+            @PathVariable String conversationId,
+            @RequestParam String receiverId) {
+        try {
+            int updatedCount = chatMessageService.markMessagesAsReadBySenderIdAndConversation(receiverId, conversationId);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Messages marked as read",
+                    "data", Map.of(
+                            "receiverId", receiverId,
+                            "conversationId", conversationId,
+                            "markedCount", updatedCount
+                    )
+            ));
+        } catch (Exception e) {
+            log.error("Error marking messages as read for receiverId {} in conversation {}: ", receiverId, conversationId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                     "success", false,
                     "message", "Failed to mark messages as read: " + e.getMessage()
+            ));
+        }
+    }
+
+    @PutMapping("/mark-all-read")
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_ADMIN')")
+    public ResponseEntity<?> markAllMessagesAsReadByReceiverId(@RequestParam String receiverId) {
+        try {
+            int updatedCount = chatMessageService.markAllMessagesAsReadBySenderId(receiverId);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "All messages marked as read",
+                    "data", Map.of(
+                            "receiverId", receiverId,
+                            "markedCount", updatedCount
+                    )
+            ));
+        } catch (Exception e) {
+            log.error("Error marking all messages as read for receiverId {}: ", receiverId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "success", false,
+                    "message", "Failed to mark all messages as read: " + e.getMessage()
             ));
         }
     }

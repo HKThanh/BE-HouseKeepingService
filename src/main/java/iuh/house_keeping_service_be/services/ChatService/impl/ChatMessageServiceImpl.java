@@ -126,14 +126,14 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
     @Override
     @Transactional(readOnly = true)
-    public Long getUnreadMessageCount(String conversationId, String accountId) {
-        return chatMessageRepository.countUnreadMessages(conversationId, accountId);
+    public Long getUnreadMessageCount(String conversationId, String receiverId) {
+        return chatMessageRepository.countUnreadMessages(conversationId, receiverId);
     }
 
     @Override
     @Transactional
-    public void markMessagesAsRead(String conversationId, String accountId) {
-        chatMessageRepository.markAllAsRead(conversationId, accountId);
+    public void markMessagesAsRead(String conversationId, String receiverId) {
+        chatMessageRepository.markAllAsRead(conversationId, receiverId);
     }
 
     private String uploadImage(MultipartFile file) {
@@ -192,5 +192,23 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         }
         
         return null;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Long getUnreadMessageCountBySenderId(String senderId) {
+        return chatMessageRepository.countUnreadMessagesBySenderId(senderId);
+    }
+
+    @Override
+    @Transactional
+    public int markMessagesAsReadBySenderIdAndConversation(String senderId, String conversationId) {
+        return chatMessageRepository.markAsReadBySenderIdAndConversation(senderId, conversationId);
+    }
+
+    @Override
+    @Transactional
+    public int markAllMessagesAsReadBySenderId(String senderId) {
+        return chatMessageRepository.markAllAsReadBySenderId(senderId);
     }
 }

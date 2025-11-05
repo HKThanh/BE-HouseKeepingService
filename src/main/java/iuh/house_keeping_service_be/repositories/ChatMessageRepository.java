@@ -18,10 +18,48 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, String
 
     List<ChatMessage> findByConversation_ConversationIdOrderByCreatedAtAsc(String conversationId);
 
-    @Query("SELECT COUNT(m) FROM ChatMessage m WHERE m.conversation.conversationId = :conversationId AND m.isRead = false AND m.sender.accountId != :accountId")
-    Long countUnreadMessages(@Param("conversationId") String conversationId, @Param("accountId") String accountId);
+    @Query("SELECT COUNT(m) FROM ChatMessage m " +
+           "JOIN m.conversation c " +
+           "WHERE m.conversation.conversationId = :conversationId " +
+           "AND m.isRead = false " +
+           "AND ((c.customer.customerId = :receiverId AND m.sender.accountId != c.customer.account.accountId) " +
+           "OR (c.employee.employeeId = :receiverId AND m.sender.accountId != c.employee.account.accountId))")
+    Long countUnreadMessages(@Param("conversationId") String conversationId, @Param("receiverId") String receiverId);
 
     @Modifying
-    @Query("UPDATE ChatMessage m SET m.isRead = true WHERE m.conversation.conversationId = :conversationId AND m.sender.accountId != :accountId AND m.isRead = false")
-    void markAllAsRead(@Param("conversationId") String conversationId, @Param("accountId") String accountId);
+    @Query("UPDATE ChatMessage m SET m.isRead = true " +
+           "WHERE m.conversation.conversationId = :conversationId " +
+           "AND m.isRead = false " +
+           "AND ((m.conversation.customer.customerId = :receiverId AND m.sender.accountId != m.conversation.customer.account.accountId) " +
+           "OR (m.conversation.employee.employeeId = :receiverId AND m.sender.accountId != m.conversation.employee.account.accountId))")
+    void markAllAsRead(@Param("conversationId") String conversationId, @Param("receiverId") String receiverId);
+
+    // Count unread messages for a sender (customerId or employeeId)
+    // Messages where sender is NOT the given senderId and isRead = false
+    @Query("SELECT COUNT(m) FROM ChatMessage m " +
+           "JOIN m.conversation c " +
+           "WHERE (c.customer.customerId = :senderId OR c.employee.employeeId = :senderId) " +
+           "AND m.isRead = false " +
+           "AND ((c.customer.customerId = :senderId AND m.sender.accountId != c.customer.account.accountId) " +
+           "OR (c.employee.employeeId = :senderId AND m.sender.accountId != c.employee.account.accountId))")
+    Long countUnreadMessagesBySenderId(@Param("senderId") String senderId);
+
+    // Mark all unread messages as read for a sender in a specific conversation
+    @Modifying
+    @Query("UPDATE ChatMessage m SET m.isRead = true " +
+           "WHERE m.conversation.conversationId = :conversationId " +
+           "AND m.isRead = false " +
+           "AND ((m.conversation.customer.customerId = :senderId AND m.sender.accountId != m.conversation.customer.account.accountId) " +
+           "OR (m.conversation.employee.employeeId = :senderId AND m.sender.accountId != m.conversation.employee.account.accountId))")
+    int markAsReadBySenderIdAndConversation(@Param("senderId") String senderId, @Param("conversationId") String conversationId);
+
+    // Mark all unread messages as read for a sender (across all conversations)
+    @Modifying
+    @Query("UPDATE ChatMessage m SET m.isRead = true " +
+           "WHERE m.conversation.conversationId IN " +
+           "(SELECT c.conversationId FROM Conversation c WHERE c.customer.customerId = :senderId OR c.employee.employeeId = :senderId) " +
+           "AND m.isRead = false " +
+           "AND ((m.conversation.customer.customerId = :senderId AND m.sender.accountId != m.conversation.customer.account.accountId) " +
+           "OR (m.conversation.employee.employeeId = :senderId AND m.sender.accountId != m.conversation.employee.account.accountId))")
+    int markAllAsReadBySenderId(@Param("senderId") String senderId);
 }
