@@ -176,4 +176,26 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
            "LEFT JOIN FETCH b.promotion p " +
            "ORDER BY b.bookingTime DESC")
     Page<Booking> findAllBookingsOrderByBookingTimeDesc(Pageable pageable);
+
+    // Get service booking statistics for a date range
+    @Query("SELECT bd.service.serviceId, bd.service.name, COUNT(bd.id) " +
+           "FROM BookingDetail bd " +
+           "WHERE bd.booking.createdAt BETWEEN :startDate AND :endDate " +
+           "GROUP BY bd.service.serviceId, bd.service.name " +
+           "ORDER BY COUNT(bd.id) DESC")
+    List<Object[]> getServiceBookingStatistics(@Param("startDate") LocalDateTime startDate, 
+                                               @Param("endDate") LocalDateTime endDate);
+
+    // Get revenue statistics for a date range
+    @Query("SELECT " +
+           "COALESCE(SUM(b.totalAmount), 0), " +
+           "COUNT(b.bookingId), " +
+           "COALESCE(AVG(b.totalAmount), 0), " +
+           "COALESCE(MAX(b.totalAmount), 0), " +
+           "COALESCE(MIN(b.totalAmount), 0) " +
+           "FROM Booking b " +
+           "WHERE b.bookingTime BETWEEN :startDate AND :endDate " +
+           "AND b.status = iuh.house_keeping_service_be.enums.BookingStatus.COMPLETED")
+    Object[] getRevenueStatistics(@Param("startDate") LocalDateTime startDate, 
+                                  @Param("endDate") LocalDateTime endDate);
 }

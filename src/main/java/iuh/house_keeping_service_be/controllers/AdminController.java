@@ -2,6 +2,8 @@ package iuh.house_keeping_service_be.controllers;
 
 import iuh.house_keeping_service_be.dtos.Booking.request.BookingVerificationRequest;
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingResponse;
+import iuh.house_keeping_service_be.dtos.Statistics.RevenueStatisticsResponse;
+import iuh.house_keeping_service_be.dtos.Statistics.ServiceBookingStatisticsResponse;
 import iuh.house_keeping_service_be.services.AdminService.AdminService;
 import iuh.house_keeping_service_be.services.AuthorizationService.AuthorizationService;
 import iuh.house_keeping_service_be.services.BookingService.BookingService;
@@ -11,11 +13,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.Map;
 
 @RestController
@@ -158,6 +162,128 @@ public class AdminController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                 "success", false,
                 "message", "Đã xảy ra lỗi khi xác minh booking"
+            ));
+        }
+    }
+
+    @GetMapping("/statistics/service-bookings")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    public ResponseEntity<?> getServiceBookingStatistics(
+            @RequestParam(required = false, defaultValue = "MONTH") String period,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        
+        log.info("Admin getting service booking statistics - period: {}, startDate: {}, endDate: {}", 
+                 period, startDate, endDate);
+        
+        try {
+            // Validate period
+            if (period != null && startDate == null && endDate == null) {
+                String upperPeriod = period.toUpperCase();
+                if (!upperPeriod.equals("DAY") && !upperPeriod.equals("WEEK") && 
+                    !upperPeriod.equals("MONTH") && !upperPeriod.equals("QUARTER") && 
+                    !upperPeriod.equals("YEAR")) {
+                    return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "Period phải là DAY, WEEK, MONTH, QUARTER, hoặc YEAR"
+                    ));
+                }
+            }
+
+            // Validate custom date range
+            if ((startDate != null && endDate == null) || (startDate == null && endDate != null)) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Phải cung cấp cả startDate và endDate cho khoảng thời gian tùy chỉnh"
+                ));
+            }
+
+            if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "startDate không thể sau endDate"
+                ));
+            }
+
+            ServiceBookingStatisticsResponse statistics = adminService.getServiceBookingStatistics(
+                    period, startDate, endDate);
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "data", statistics
+            ));
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid parameters for statistics: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            log.error("Error getting service booking statistics: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "success", false,
+                "message", "Đã xảy ra lỗi khi lấy thống kê dịch vụ"
+            ));
+        }
+    }
+
+    @GetMapping("/statistics/revenue")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    public ResponseEntity<?> getRevenueStatistics(
+            @RequestParam(required = false, defaultValue = "MONTH") String period,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        
+        log.info("Admin getting revenue statistics - period: {}, startDate: {}, endDate: {}", 
+                 period, startDate, endDate);
+        
+        try {
+            // Validate period
+            if (period != null && startDate == null && endDate == null) {
+                String upperPeriod = period.toUpperCase();
+                if (!upperPeriod.equals("DAY") && !upperPeriod.equals("WEEK") && 
+                    !upperPeriod.equals("MONTH") && !upperPeriod.equals("QUARTER") && 
+                    !upperPeriod.equals("YEAR")) {
+                    return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "Period phải là DAY, WEEK, MONTH, QUARTER, hoặc YEAR"
+                    ));
+                }
+            }
+
+            // Validate custom date range
+            if ((startDate != null && endDate == null) || (startDate == null && endDate != null)) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Phải cung cấp cả startDate và endDate cho khoảng thời gian tùy chỉnh"
+                ));
+            }
+
+            if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "startDate không thể sau endDate"
+                ));
+            }
+
+            RevenueStatisticsResponse statistics = adminService.getRevenueStatistics(
+                    period, startDate, endDate);
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "data", statistics
+            ));
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid parameters for revenue statistics: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            log.error("Error getting revenue statistics: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "success", false,
+                "message", "Đã xảy ra lỗi khi lấy thống kê doanh thu"
             ));
         }
     }
