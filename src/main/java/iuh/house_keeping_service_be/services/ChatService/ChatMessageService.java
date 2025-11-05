@@ -19,7 +19,14 @@ public interface ChatMessageService {
     
     List<ChatMessageResponse> getAllMessagesByConversation(String conversationId);
     
-    Long getUnreadMessageCount(String conversationId, String accountId);
+    Long getUnreadMessageCount(String conversationId, String receiverId);
     
-    void markMessagesAsRead(String conversationId, String accountId);
+    void markMessagesAsRead(String conversationId, String receiverId);
+    
+    // New methods using senderId (customerId or employeeId)
+    Long getUnreadMessageCountBySenderId(String senderId);
+    
+    int markMessagesAsReadBySenderIdAndConversation(String senderId, String conversationId);
+    
+    int markAllMessagesAsReadBySenderId(String senderId);
 }
