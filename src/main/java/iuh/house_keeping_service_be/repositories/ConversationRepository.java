@@ -25,6 +25,8 @@ public interface ConversationRepository extends JpaRepository<Conversation, Stri
 
     Page<Conversation> findByEmployee_EmployeeIdOrderByLastMessageTimeDesc(String employeeId, Pageable pageable);
 
-    @Query("SELECT c FROM Conversation c WHERE (c.customer.customerId = :accountId OR c.employee.employeeId = :accountId) AND c.isActive = true ORDER BY c.lastMessageTime DESC")
+    @Query("SELECT c FROM Conversation c " +
+           "WHERE (c.customer.account.accountId = :accountId OR c.employee.account.accountId = :accountId) " +
+           "ORDER BY c.lastMessageTime DESC")
     Page<Conversation> findActiveConversationsByAccount(@Param("accountId") String accountId, Pageable pageable);
 }

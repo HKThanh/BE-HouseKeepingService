@@ -23,6 +23,7 @@ public class ConversationResponse {
     private String lastMessage;
     private LocalDateTime lastMessageTime;
     private Boolean isActive;
+    private Boolean canChat; // Flag để kiểm tra quyền chat
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

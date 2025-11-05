@@ -163,4 +163,27 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
     Optional<Assignment> findByIdWithDetails(@Param("assignmentId") String assignmentId);
 
     boolean existsByBookingDetail_Booking_BookingIdAndEmployee_EmployeeId(String bookingId, String employeeId);
+
+    // Check if employee has any assignment with customer where booking status is COMPLETED
+    @Query("SELECT CASE WHEN COUNT(a) > 0 THEN true ELSE false END FROM Assignment a " +
+            "JOIN a.bookingDetail bd " +
+            "JOIN bd.booking b " +
+            "WHERE a.employee.employeeId = :employeeId " +
+            "AND b.customer.customerId = :customerId " +
+            "AND b.status = 'COMPLETED'")
+    boolean existsByEmployeeAndCustomerWithCompletedBooking(
+            @Param("employeeId") String employeeId,
+            @Param("customerId") String customerId);
+
+    // Check if employee has any assignment with customer where booking status is not COMPLETED
+    @Query("SELECT CASE WHEN COUNT(a) > 0 THEN true ELSE false END FROM Assignment a " +
+            "JOIN a.bookingDetail bd " +
+            "JOIN bd.booking b " +
+            "WHERE a.employee.employeeId = :employeeId " +
+            "AND b.customer.customerId = :customerId " +
+            "AND b.status != 'COMPLETED' " +
+            "AND b.status != 'CANCELLED'")
+    boolean existsByEmployeeAndCustomerWithActiveBooking(
+            @Param("employeeId") String employeeId,
+            @Param("customerId") String customerId);
 }

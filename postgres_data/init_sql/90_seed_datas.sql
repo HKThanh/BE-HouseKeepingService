@@ -737,11 +737,11 @@ INSERT INTO notifications (notification_id, account_id, type, title, message, re
 -- Thêm Conversations (Cuộc trò chuyện)
 -- Conversation 1: john_doe (Customer) <-> jane_smith (Employee)
 INSERT INTO conversations (conversation_id, customer_id, employee_id, booking_id, last_message, last_message_time, is_active, created_at, updated_at) VALUES
-('conv0001-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000001', 'b0000001-0000-0000-0000-000000000001', 'Cảm ơn bạn!', '2025-11-03 11:00:00+07', true, '2025-11-03 10:00:00+07', '2025-11-03 11:00:00+07');
+('conv0001-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000001', 'b0000001-0000-0000-0000-000000000001', 'Cảm ơn bạn!', '2025-11-03 11:00:00+07', false, '2025-11-03 10:00:00+07', '2025-11-03 11:00:00+07');
 
 -- Conversation 2: john_doe (Customer) <-> bob_wilson (Employee)
 INSERT INTO conversations (conversation_id, customer_id, employee_id, booking_id, last_message, last_message_time, is_active, created_at, updated_at) VALUES
-('conv0002-0000-0000-0000-000000000002', 'c1000001-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000002', NULL, 'Tôi sẽ đến lúc 9h sáng', '2025-11-02 15:30:00+07', true, '2025-11-02 14:00:00+07', '2025-11-02 15:30:00+07');
+('conv0002-0000-0000-0000-000000000002', 'c1000001-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000002', 'b0000001-0000-0000-0000-000000000002', 'Tôi sẽ đến lúc 9h sáng', '2025-11-02 15:30:00+07', true, '2025-11-02 14:00:00+07', '2025-11-02 15:30:00+07');
 
 -- Conversation 3: nguyenvana (Customer) <-> tranvanl (Employee)
 INSERT INTO conversations (conversation_id, customer_id, employee_id, booking_id, last_message, last_message_time, is_active, created_at, updated_at) VALUES
@@ -749,7 +749,7 @@ INSERT INTO conversations (conversation_id, customer_id, employee_id, booking_id
 
 -- Conversation 4: tranthib (Customer) <-> nguyenthim (Employee)
 INSERT INTO conversations (conversation_id, customer_id, employee_id, booking_id, last_message, last_message_time, is_active, created_at, updated_at) VALUES
-('conv0004-0000-0000-0000-000000000004', 'c1000001-0000-0000-0000-000000000005', 'e1000001-0000-0000-0000-000000000004', NULL, 'Có thể đổi lịch được không?', '2025-11-02 16:00:00+07', true, '2025-11-02 15:00:00+07', '2025-11-02 16:00:00+07');
+('conv0004-0000-0000-0000-000000000004', 'c1000001-0000-0000-0000-000000000005', 'e1000001-0000-0000-0000-000000000004', 'b0000001-0000-0000-0000-000000000004', 'Có thể đổi lịch được không?', '2025-11-02 16:00:00+07', true, '2025-11-02 15:00:00+07', '2025-11-02 16:00:00+07');
 
 -- Conversation 5: levanc (Customer) <-> levann (Employee)
 INSERT INTO conversations (conversation_id, customer_id, employee_id, booking_id, last_message, last_message_time, is_active, created_at, updated_at) VALUES
@@ -798,9 +798,9 @@ INSERT INTO chat_messages (message_id, conversation_id, sender_id, message_type,
 
 -- Thêm conversation với booking được liên kết
 INSERT INTO conversations (conversation_id, customer_id, employee_id, booking_id, last_message, last_message_time, is_active, created_at, updated_at) VALUES
-('conv0006-0000-0000-0000-000000000006', 'c1000001-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000001', 'b0000001-0000-0000-0000-000000000002', 'Tôi sẽ hoàn thành công việc đúng hạn', '2025-08-28 16:00:00+07', true, '2025-08-28 14:30:00+07', '2025-08-28 16:00:00+07');
+('conv0006-0000-0000-0000-000000000006', 'c1000001-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000001', 'b0000001-0000-0000-0000-000000000007', 'Tôi sẽ hoàn thành công việc đúng hạn', '2025-08-28 16:00:00+07', true, '2025-08-28 14:30:00+07', '2025-08-28 16:00:00+07');
 
 -- Messages cho conversation liên kết với booking
 INSERT INTO chat_messages (message_id, conversation_id, sender_id, message_type, content, image_url, is_read, created_at) VALUES
-('msg00023-0000-0000-0000-000000000023', 'conv0006-0000-0000-0000-000000000006', 'a1000001-0000-0000-0000-000000000001', 'TEXT', 'Xin chào, tôi đã đặt lịch dọn dẹp cho ngày mai', NULL, true, '2025-08-28 14:35:00+07'),
-('msg00024-0000-0000-0000-000000000024', 'conv0006-0000-0000-0000-000000000006', 'a1000001-0000-0000-0000-000000000002', 'TEXT', 'Vâng, tôi đã nhận được booking BK000002. Tôi sẽ hoàn thành công việc đúng hạn', NULL, true, '2025-08-28 16:00:00+07');
+('msg00023-0000-0000-0000-000000000023', 'conv0006-0000-0000-0000-000000000006', 'a1000001-0000-0000-0000-000000000001', 'TEXT', 'Xin chào, tôi muốn hỏi về dịch vụ dọn dẹp', NULL, true, '2025-08-28 14:35:00+07'),
+('msg00024-0000-0000-0000-000000000024', 'conv0006-0000-0000-0000-000000000006', 'a1000001-0000-0000-0000-000000000002', 'TEXT', 'Vâng, tôi sẵn sàng hỗ trợ. Tôi sẽ hoàn thành công việc đúng hạn', NULL, true, '2025-08-28 16:00:00+07');
