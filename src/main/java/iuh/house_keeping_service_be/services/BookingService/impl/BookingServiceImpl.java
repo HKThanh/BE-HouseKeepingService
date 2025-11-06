@@ -848,6 +848,77 @@ public class BookingServiceImpl implements BookingService {
     }
 
     @Override
+    public Page<BookingHistoryResponse> getBookingsByCustomerId(String customerId, LocalDateTime fromDate, Pageable pageable) {
+        log.info("Fetching bookings for customer {} from date {} with pagination", customerId, fromDate);
+
+        // First verify customer exists
+        if (!customerRepository.existsById(customerId)) {
+            log.warn("Customer {} not found", customerId);
+            return Page.empty(pageable);
+        }
+
+        // Fetch paginated bookings for the customer with date filter
+        Page<Booking> bookingPage;
+        if (fromDate != null) {
+            bookingPage = bookingRepository.findByCustomerIdWithPaginationAndDate(customerId, fromDate, pageable);
+        } else {
+            bookingPage = bookingRepository.findByCustomerIdWithPagination(customerId, pageable);
+        }
+
+        if (bookingPage.isEmpty()) {
+            log.info("No bookings found for customer {} from date {}", customerId, fromDate);
+            return Page.empty(pageable);
+        }
+
+        Page<BookingHistoryResponse> bookingHistoryResponsePage = bookingPage.map(booking -> {
+            CustomerAddressInfo addressInfo = bookingMapper.toCustomerAddressInfo(booking.getAddress());
+            PaymentInfo paymentInfo = booking.getPayments().isEmpty() ? null : bookingMapper.toPaymentInfo(booking.getPayments().get(0));
+            PromotionInfo promotionInfo = booking.getPromotion() != null ? bookingMapper.toPromotionInfo(booking.getPromotion()) : null;
+
+            // Get all assignments for this booking
+            List<EmployeeInfo> assignedEmployees = booking.getBookingDetails().stream()
+                    .flatMap(detail -> detail.getAssignments().stream())
+                    .map(assignment -> bookingMapper.toEmployeeInfo(assignment.getEmployee()))
+                    .distinct()
+                    .toList();
+
+            // Get all services for this booking
+            List<ServiceInfo> services = booking.getBookingDetails().stream()
+                    .map(detail -> bookingMapper.toServiceInfo(detail.getService()))
+                    .distinct()
+                    .toList();
+
+            return new BookingHistoryResponse(
+                    booking.getBookingId(),
+                    booking.getBookingCode(),
+                    booking.getCustomer().getCustomerId(),
+                    booking.getCustomer().getFullName(),
+                    addressInfo,
+                    booking.getBookingTime().toString(),
+                    booking.getNote(),
+                    BookingDTOFormatter.formatPrice(booking.getTotalAmount()),
+                    booking.getStatus().toString(),
+                    promotionInfo,
+                    paymentInfo,
+                    booking.getTitle(),
+                    booking.getImageUrl(),
+                    booking.getIsVerified(),
+                    assignedEmployees,
+                    services
+            );
+        });
+
+        log.info("Found {} bookings for customer {} from date {} (page {} of {})",
+                bookingPage.getNumberOfElements(),
+                customerId,
+                fromDate,
+                bookingPage.getNumber() + 1,
+                bookingPage.getTotalPages());
+
+        return bookingHistoryResponsePage;
+    }
+
+    @Override
     @Transactional
     public BookingResponse convertBookingToPost(String bookingId, ConvertBookingToPostRequest request) {
         log.info("Updating booking {} with title: {}, imageUrl: {}", bookingId, request.title(), request.imageUrl());
@@ -876,6 +947,28 @@ public class BookingServiceImpl implements BookingService {
         log.info("Fetching unverified bookings for admin review");
 
         Page<Booking> unverifiedBookings = bookingRepository.findUnverifiedBookingsOrderByCreatedAtDesc(pageable);
+
+        Page<BookingResponse> response = unverifiedBookings.map(bookingMapper::toBookingResponse);
+
+        log.info("Found {} unverified bookings (page {} of {})",
+                unverifiedBookings.getNumberOfElements(),
+                unverifiedBookings.getNumber() + 1,
+                unverifiedBookings.getTotalPages());
+
+        return response;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<BookingResponse> getUnverifiedBookings(LocalDateTime fromDate, Pageable pageable) {
+        log.info("Fetching unverified bookings for admin review with fromDate: {}", fromDate);
+
+        Page<Booking> unverifiedBookings;
+        if (fromDate != null) {
+            unverifiedBookings = bookingRepository.findUnverifiedBookingsOrderByCreatedAtDescWithDate(fromDate, pageable);
+        } else {
+            unverifiedBookings = bookingRepository.findUnverifiedBookingsOrderByCreatedAtDesc(pageable);
+        }
 
         Page<BookingResponse> response = unverifiedBookings.map(bookingMapper::toBookingResponse);
 
@@ -922,6 +1015,8 @@ public class BookingServiceImpl implements BookingService {
             if (request.rejectionReason() != null && !request.rejectionReason().trim().isEmpty()) {
                 booking.setAdminComment(request.rejectionReason());
             }
+
+            booking.setIsVerified(true);
 
             // TODO: Send notification to customer about rejection with reason
             // For now, we'll just cancel the booking
@@ -1059,6 +1154,29 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional(readOnly = true)
+    public Page<BookingResponse> getVerifiedAwaitingEmployeeBookings(LocalDateTime fromDate, Pageable pageable) {
+        log.info("Fetching verified bookings awaiting employee from date {}", fromDate);
+
+        Page<Booking> verifiedAwaitingBookings;
+        if (fromDate != null) {
+            verifiedAwaitingBookings = bookingRepository.findVerifiedAwaitingEmployeeBookingsWithDate(fromDate, pageable);
+        } else {
+            verifiedAwaitingBookings = bookingRepository.findVerifiedAwaitingEmployeeBookings(pageable);
+        }
+
+        Page<BookingResponse> response = verifiedAwaitingBookings.map(bookingMapper::toBookingResponse);
+
+        log.info("Found {} verified bookings awaiting employee from date {} (page {} of {})",
+                verifiedAwaitingBookings.getNumberOfElements(),
+                fromDate,
+                verifiedAwaitingBookings.getNumber() + 1,
+                verifiedAwaitingBookings.getTotalPages());
+
+        return response;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public Page<BookingResponse> getAllBookingsSortedByBookingTime(Pageable pageable) {
         log.info("Admin fetching all bookings sorted by booking time descending");
 
@@ -1072,5 +1190,96 @@ public class BookingServiceImpl implements BookingService {
                 allBookings.getTotalPages());
 
         return response;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<BookingResponse> getAllBookingsSortedByBookingTime(LocalDateTime fromDate, Pageable pageable) {
+        log.info("Admin fetching all bookings sorted by booking time descending with fromDate: {}", fromDate);
+
+        Page<Booking> allBookings;
+        if (fromDate != null) {
+            allBookings = bookingRepository.findAllBookingsOrderByBookingTimeDescWithDate(fromDate, pageable);
+        } else {
+            allBookings = bookingRepository.findAllBookingsOrderByBookingTimeDesc(pageable);
+        }
+
+        Page<BookingResponse> response = allBookings.map(bookingMapper::toBookingResponse);
+
+        log.info("Found {} bookings (page {} of {})",
+                allBookings.getNumberOfElements(),
+                allBookings.getNumber() + 1,
+                allBookings.getTotalPages());
+
+        return response;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<BookingResponse> getBookingsByEmployeeId(String employeeId, Pageable pageable) {
+        log.info("Employee {} fetching their assigned bookings", employeeId);
+
+        Page<Booking> employeeBookings = bookingRepository.findBookingsByEmployeeIdOrderByBookingTime(employeeId, pageable);
+
+        Page<BookingResponse> response = employeeBookings.map(bookingMapper::toBookingResponse);
+
+        log.info("Found {} bookings for employee {} (page {} of {})",
+                employeeBookings.getNumberOfElements(),
+                employeeId,
+                employeeBookings.getNumber() + 1,
+                employeeBookings.getTotalPages());
+
+        return response;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<BookingResponse> getBookingsByEmployeeId(String employeeId, LocalDateTime fromDate, Pageable pageable) {
+        log.info("Employee {} fetching assigned bookings from date {}", employeeId, fromDate);
+
+        Page<Booking> employeeBookings;
+        if (fromDate != null) {
+            employeeBookings = bookingRepository.findBookingsByEmployeeIdOrderByBookingTimeWithDate(employeeId, fromDate, pageable);
+        } else {
+            employeeBookings = bookingRepository.findBookingsByEmployeeIdOrderByBookingTime(employeeId, pageable);
+        }
+
+        Page<BookingResponse> response = employeeBookings.map(bookingMapper::toBookingResponse);
+
+        log.info("Found {} bookings for employee {} from date {} (page {} of {})",
+                employeeBookings.getNumberOfElements(),
+                employeeId,
+                fromDate,
+                employeeBookings.getNumber() + 1,
+                employeeBookings.getTotalPages());
+
+        return response;
+    }
+
+    @Override
+    @Transactional
+    public BookingResponse updateBookingStatus(String bookingId, UpdateBookingStatusRequest request) {
+        log.info("Admin updating booking {} status to {}", bookingId, request.getStatus());
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking với ID: " + bookingId));
+
+        // Update booking status
+        booking.setStatus(request.getStatus());
+        
+        // Set isVerified to true when admin updates status
+        booking.setIsVerified(true);
+        
+        // Save admin comment if provided
+        if (request.getAdminComment() != null && !request.getAdminComment().trim().isEmpty()) {
+            booking.setAdminComment(request.getAdminComment());
+            log.info("Booking {} status updated to {} with admin comment", bookingId, request.getStatus());
+        } else {
+            log.info("Booking {} status updated to {} by admin", bookingId, request.getStatus());
+        }
+
+        Booking savedBooking = bookingRepository.save(booking);
+
+        return bookingMapper.toBookingResponse(savedBooking);
     }
 }

@@ -36,11 +36,16 @@ public class BookingMapper {
                                     List<BookingDetailInfo> detailInfos,
                                     PaymentInfo paymentInfo,
                                     PromotionInfo promotionInfo) {
+        // Calculate isPost: true if title OR imageUrl is not null
+        boolean isPost = (booking.getTitle() != null && !booking.getTitle().trim().isEmpty()) 
+                      || (booking.getImageUrl() != null && !booking.getImageUrl().trim().isEmpty());
+        
         BookingData data = new BookingData(
             booking.getBookingId(),
             booking.getBookingCode(),
             booking.getCustomer().getCustomerId(),
             booking.getCustomer().getFullName(),
+            toCustomerInfo(booking.getCustomer()),
             addressInfo,
             booking.getBookingTime(),
             booking.getNote(),
@@ -49,6 +54,7 @@ public class BookingMapper {
             booking.getStatus().toString(),
             booking.getTitle(),
             booking.getImageUrl(),
+            isPost,
             booking.getIsVerified(),
             booking.getAdminComment(),
             promotionInfo,
@@ -86,6 +92,20 @@ public class BookingMapper {
             address.getLatitude() != null ? address.getLatitude().doubleValue() : null,
             address.getLongitude() != null ? address.getLongitude().doubleValue() : null,
             address.getIsDefault()
+        );
+    }
+
+    public CustomerInfo toCustomerInfo(Customer customer) {
+        return new CustomerInfo(
+            customer.getCustomerId(),
+            customer.getFullName(),
+            customer.getAvatar(),
+            customer.getEmail(),
+            customer.getAccount() != null ? customer.getAccount().getPhoneNumber() : null,
+            customer.getIsMale(),
+            customer.getBirthdate(),
+            customer.getRating() != null ? customer.getRating().toString() : null,
+            customer.getVipLevel()
         );
     }
 

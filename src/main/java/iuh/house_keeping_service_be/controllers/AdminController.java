@@ -1,6 +1,7 @@
 package iuh.house_keeping_service_be.controllers;
 
 import iuh.house_keeping_service_be.dtos.Booking.request.BookingVerificationRequest;
+import iuh.house_keeping_service_be.dtos.Booking.request.UpdateBookingStatusRequest;
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingResponse;
 import iuh.house_keeping_service_be.dtos.Statistics.RevenueStatisticsResponse;
 import iuh.house_keeping_service_be.dtos.Statistics.ServiceBookingStatisticsResponse;
@@ -20,6 +21,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Map;
 
 @RestController
@@ -72,9 +74,11 @@ public class AdminController {
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<?> getAllBookings(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate) {
         
-        log.info("Admin fetching all bookings sorted by booking time (page: {}, size: {})", page, size);
+        log.info("Admin fetching all bookings sorted by booking time (page: {}, size: {}, fromDate: {})", 
+                 page, size, fromDate);
         
         try {
             // Validate pagination parameters
@@ -82,7 +86,13 @@ public class AdminController {
             if (size <= 0 || size > 100) size = 10;
             
             Pageable pageable = PageRequest.of(page, size);
-            Page<BookingResponse> allBookings = bookingService.getAllBookingsSortedByBookingTime(pageable);
+            Page<BookingResponse> allBookings;
+            
+            if (fromDate != null) {
+                allBookings = bookingService.getAllBookingsSortedByBookingTime(fromDate, pageable);
+            } else {
+                allBookings = bookingService.getAllBookingsSortedByBookingTime(pageable);
+            }
             
             return ResponseEntity.ok(Map.of(
                 "success", true,
@@ -104,16 +114,24 @@ public class AdminController {
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<?> getUnverifiedBookings(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate) {
         
-        log.info("Admin fetching unverified bookings (page: {}, size: {})", page, size);
+        log.info("Admin fetching unverified bookings (page: {}, size: {}, fromDate: {})", 
+                 page, size, fromDate);
         
         try {
             if (page < 0) page = 0;
             if (size <= 0 || size > 100) size = 10;
             
             Pageable pageable = PageRequest.of(page, size);
-            Page<BookingResponse> unverifiedBookings = bookingService.getUnverifiedBookings(pageable);
+            Page<BookingResponse> unverifiedBookings;
+            
+            if (fromDate != null) {
+                unverifiedBookings = bookingService.getUnverifiedBookings(fromDate, pageable);
+            } else {
+                unverifiedBookings = bookingService.getUnverifiedBookings(pageable);
+            }
             
             return ResponseEntity.ok(Map.of(
                 "success", true,
@@ -162,6 +180,37 @@ public class AdminController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                 "success", false,
                 "message", "Đã xảy ra lỗi khi xác minh booking"
+            ));
+        }
+    }
+
+    @PutMapping("/bookings/{bookingId}/status")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    public ResponseEntity<?> updateBookingStatus(
+            @PathVariable String bookingId,
+            @Valid @RequestBody UpdateBookingStatusRequest request) {
+        
+        log.info("Admin updating booking {} status to {}", bookingId, request.getStatus());
+        
+        try {
+            BookingResponse response = bookingService.updateBookingStatus(bookingId, request);
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Cập nhật trạng thái booking thành công",
+                "data", response
+            ));
+        } catch (IllegalArgumentException e) {
+            log.error("Error updating booking status: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            log.error("Unexpected error updating booking status: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "success", false,
+                "message", "Đã xảy ra lỗi khi cập nhật trạng thái booking"
             ));
         }
     }
@@ -286,5 +335,15 @@ public class AdminController {
                 "message", "Đã xảy ra lỗi khi lấy thống kê doanh thu"
             ));
         }
+    }
+
+    @GetMapping("/bookings/{bookingId}")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
+    public ResponseEntity<BookingResponse> getBooking(@PathVariable String bookingId) {
+        log.info("Getting booking details: {}", bookingId);
+        
+        BookingResponse response = bookingService.getBookingDetails(bookingId);
+
+        return ResponseEntity.ok(response);
     }
 }
