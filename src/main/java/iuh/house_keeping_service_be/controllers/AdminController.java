@@ -1,6 +1,7 @@
 package iuh.house_keeping_service_be.controllers;
 
 import iuh.house_keeping_service_be.dtos.Booking.request.BookingVerificationRequest;
+import iuh.house_keeping_service_be.dtos.Booking.request.UpdateBookingStatusRequest;
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingResponse;
 import iuh.house_keeping_service_be.dtos.Statistics.RevenueStatisticsResponse;
 import iuh.house_keeping_service_be.dtos.Statistics.ServiceBookingStatisticsResponse;
@@ -166,6 +167,37 @@ public class AdminController {
         }
     }
 
+    @PutMapping("/bookings/{bookingId}/status")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    public ResponseEntity<?> updateBookingStatus(
+            @PathVariable String bookingId,
+            @Valid @RequestBody UpdateBookingStatusRequest request) {
+        
+        log.info("Admin updating booking {} status to {}", bookingId, request.getStatus());
+        
+        try {
+            BookingResponse response = bookingService.updateBookingStatus(bookingId, request);
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Cập nhật trạng thái booking thành công",
+                "data", response
+            ));
+        } catch (IllegalArgumentException e) {
+            log.error("Error updating booking status: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            log.error("Unexpected error updating booking status: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "success", false,
+                "message", "Đã xảy ra lỗi khi cập nhật trạng thái booking"
+            ));
+        }
+    }
+
     @GetMapping("/statistics/service-bookings")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<?> getServiceBookingStatistics(
@@ -286,5 +318,15 @@ public class AdminController {
                 "message", "Đã xảy ra lỗi khi lấy thống kê doanh thu"
             ));
         }
+    }
+
+    @GetMapping("/bookings/{bookingId}")
+    @PreAuthorize("hasAnyRole('ROLE_ADMIN')")
+    public ResponseEntity<BookingResponse> getBooking(@PathVariable String bookingId) {
+        log.info("Getting booking details: {}", bookingId);
+        
+        BookingResponse response = bookingService.getBookingDetails(bookingId);
+
+        return ResponseEntity.ok(response);
     }
 }

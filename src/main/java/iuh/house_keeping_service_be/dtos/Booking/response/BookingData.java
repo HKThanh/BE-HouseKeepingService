@@ -15,8 +15,12 @@ import java.util.List;
 public class BookingData {
     private String bookingId;
     private String bookingCode;
+    
+    // Customer information
     private String customerId;
     private String customerName;
+    private CustomerInfo customer;
+    
     private CustomerAddressInfo address;
     
     @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss")

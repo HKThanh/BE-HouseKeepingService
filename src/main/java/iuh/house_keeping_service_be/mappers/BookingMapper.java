@@ -41,6 +41,7 @@ public class BookingMapper {
             booking.getBookingCode(),
             booking.getCustomer().getCustomerId(),
             booking.getCustomer().getFullName(),
+            toCustomerInfo(booking.getCustomer()),
             addressInfo,
             booking.getBookingTime(),
             booking.getNote(),
@@ -86,6 +87,20 @@ public class BookingMapper {
             address.getLatitude() != null ? address.getLatitude().doubleValue() : null,
             address.getLongitude() != null ? address.getLongitude().doubleValue() : null,
             address.getIsDefault()
+        );
+    }
+
+    public CustomerInfo toCustomerInfo(Customer customer) {
+        return new CustomerInfo(
+            customer.getCustomerId(),
+            customer.getFullName(),
+            customer.getAvatar(),
+            customer.getEmail(),
+            customer.getAccount() != null ? customer.getAccount().getPhoneNumber() : null,
+            customer.getIsMale(),
+            customer.getBirthdate(),
+            customer.getRating() != null ? customer.getRating().toString() : null,
+            customer.getVipLevel()
         );
     }
 

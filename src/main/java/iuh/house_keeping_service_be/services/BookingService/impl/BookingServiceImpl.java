@@ -923,6 +923,8 @@ public class BookingServiceImpl implements BookingService {
                 booking.setAdminComment(request.rejectionReason());
             }
 
+            booking.setIsVerified(true);
+
             // TODO: Send notification to customer about rejection with reason
             // For now, we'll just cancel the booking
             booking.setStatus(BookingStatus.CANCELLED);
@@ -1072,5 +1074,50 @@ public class BookingServiceImpl implements BookingService {
                 allBookings.getTotalPages());
 
         return response;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<BookingResponse> getBookingsByEmployeeId(String employeeId, Pageable pageable) {
+        log.info("Employee {} fetching their assigned bookings", employeeId);
+
+        Page<Booking> employeeBookings = bookingRepository.findBookingsByEmployeeIdOrderByBookingTime(employeeId, pageable);
+
+        Page<BookingResponse> response = employeeBookings.map(bookingMapper::toBookingResponse);
+
+        log.info("Found {} bookings for employee {} (page {} of {})",
+                employeeBookings.getNumberOfElements(),
+                employeeId,
+                employeeBookings.getNumber() + 1,
+                employeeBookings.getTotalPages());
+
+        return response;
+    }
+
+    @Override
+    @Transactional
+    public BookingResponse updateBookingStatus(String bookingId, UpdateBookingStatusRequest request) {
+        log.info("Admin updating booking {} status to {}", bookingId, request.getStatus());
+
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy booking với ID: " + bookingId));
+
+        // Update booking status
+        booking.setStatus(request.getStatus());
+        
+        // Set isVerified to true when admin updates status
+        booking.setIsVerified(true);
+        
+        // Save admin comment if provided
+        if (request.getAdminComment() != null && !request.getAdminComment().trim().isEmpty()) {
+            booking.setAdminComment(request.getAdminComment());
+            log.info("Booking {} status updated to {} with admin comment", bookingId, request.getStatus());
+        } else {
+            log.info("Booking {} status updated to {} by admin", bookingId, request.getStatus());
+        }
+
+        Booking savedBooking = bookingRepository.save(booking);
+
+        return bookingMapper.toBookingResponse(savedBooking);
     }
 }

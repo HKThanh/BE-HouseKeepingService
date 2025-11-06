@@ -3,6 +3,7 @@ package iuh.house_keeping_service_be.services.BookingService;
 import iuh.house_keeping_service_be.dtos.Booking.request.BookingCreateRequest;
 import iuh.house_keeping_service_be.dtos.Booking.request.ConvertBookingToPostRequest;
 import iuh.house_keeping_service_be.dtos.Booking.request.BookingVerificationRequest;
+import iuh.house_keeping_service_be.dtos.Booking.request.UpdateBookingStatusRequest;
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingHistoryResponse;
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingResponse;
 import iuh.house_keeping_service_be.dtos.Booking.summary.BookingCreationSummary;
@@ -25,6 +26,9 @@ public interface BookingService {
     // Admin verify/reject booking post
     BookingResponse verifyBooking(String bookingId, BookingVerificationRequest request);
     
+    // Admin update booking status
+    BookingResponse updateBookingStatus(String bookingId, UpdateBookingStatusRequest request);
+    
     // Customer cancel booking
     BookingResponse cancelBooking(String bookingId, String customerId, String reason);
     
@@ -33,4 +37,7 @@ public interface BookingService {
     
     // Get all bookings sorted by booking time descending (for Admin only)
     Page<BookingResponse> getAllBookingsSortedByBookingTime(Pageable pageable);
+    
+    // Get bookings where employee has assignment, sorted by booking time
+    Page<BookingResponse> getBookingsByEmployeeId(String employeeId, Pageable pageable);
 }

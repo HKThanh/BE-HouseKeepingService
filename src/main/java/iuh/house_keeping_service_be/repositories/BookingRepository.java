@@ -198,4 +198,15 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
            "AND b.status = iuh.house_keeping_service_be.enums.BookingStatus.COMPLETED")
     Object[] getRevenueStatistics(@Param("startDate") LocalDateTime startDate, 
                                   @Param("endDate") LocalDateTime endDate);
+
+    // Find bookings where employee has assignment, ordered by booking time
+    @Query("SELECT DISTINCT b FROM Booking b " +
+           "LEFT JOIN FETCH b.customer c " +
+           "LEFT JOIN FETCH b.address addr " +
+           "LEFT JOIN FETCH b.promotion p " +
+           "JOIN b.bookingDetails bd " +
+           "JOIN bd.assignments asn " +
+           "WHERE asn.employee.employeeId = :employeeId " +
+           "ORDER BY b.bookingTime ASC")
+    Page<Booking> findBookingsByEmployeeIdOrderByBookingTime(@Param("employeeId") String employeeId, Pageable pageable);
 }
