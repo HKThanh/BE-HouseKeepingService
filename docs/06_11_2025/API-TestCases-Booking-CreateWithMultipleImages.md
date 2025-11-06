@@ -1,7 +1,7 @@
 # Test Cases - Tạo Booking Mới Với Nhiều Ảnh
 
 ## API Endpoint
-**POST** `/api/bookings`
+**POST** `/api/v1/customer/bookings`
 
 ## Content-Type
 `multipart/form-data`
