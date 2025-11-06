@@ -37,8 +37,8 @@ public interface BookingService {
     BookingResponse cancelBooking(String bookingId, String customerId, String reason);
     
     // Get verified bookings that are still awaiting employee (for Employee and Admin)
-    Page<BookingResponse> getVerifiedAwaitingEmployeeBookings(Pageable pageable);
-    Page<BookingResponse> getVerifiedAwaitingEmployeeBookings(LocalDateTime fromDate, Pageable pageable);
+    Page<BookingResponse> getVerifiedAwaitingEmployeeBookings(String employeeId, boolean matchEmployeeZones, Pageable pageable);
+    Page<BookingResponse> getVerifiedAwaitingEmployeeBookings(String employeeId, boolean matchEmployeeZones, LocalDateTime fromDate, Pageable pageable);
     
     // Get all bookings sorted by booking time descending (for Admin only)
     Page<BookingResponse> getAllBookingsSortedByBookingTime(Pageable pageable);

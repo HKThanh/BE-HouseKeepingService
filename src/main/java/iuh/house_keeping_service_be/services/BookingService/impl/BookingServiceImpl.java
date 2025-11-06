@@ -17,12 +17,15 @@ import iuh.house_keeping_service_be.utils.BookingDTOFormatter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.text.Normalizer;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -1137,42 +1140,182 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<BookingResponse> getVerifiedAwaitingEmployeeBookings(Pageable pageable) {
-        log.info("Fetching verified bookings that are awaiting employee assignment");
-
-        Page<Booking> verifiedAwaitingBookings = bookingRepository.findVerifiedAwaitingEmployeeBookings(pageable);
-
-        Page<BookingResponse> response = verifiedAwaitingBookings.map(bookingMapper::toBookingResponse);
-
-        log.info("Found {} verified bookings awaiting employee (page {} of {})",
-                verifiedAwaitingBookings.getNumberOfElements(),
-                verifiedAwaitingBookings.getNumber() + 1,
-                verifiedAwaitingBookings.getTotalPages());
-
-        return response;
+    public Page<BookingResponse> getVerifiedAwaitingEmployeeBookings(String employeeId, boolean matchEmployeeZones, Pageable pageable) {
+        return getVerifiedAwaitingEmployeeBookings(employeeId, matchEmployeeZones, null, pageable);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<BookingResponse> getVerifiedAwaitingEmployeeBookings(LocalDateTime fromDate, Pageable pageable) {
-        log.info("Fetching verified bookings awaiting employee from date {}", fromDate);
+    public Page<BookingResponse> getVerifiedAwaitingEmployeeBookings(String employeeId,
+                                                                     boolean matchEmployeeZones,
+                                                                     LocalDateTime fromDate,
+                                                                     Pageable pageable) {
+        log.info("Fetching recommended verified bookings awaiting employee for employeeId={} from date {} (matchEmployeeZones={})",
+                employeeId, fromDate, matchEmployeeZones);
 
-        Page<Booking> verifiedAwaitingBookings;
-        if (fromDate != null) {
-            verifiedAwaitingBookings = bookingRepository.findVerifiedAwaitingEmployeeBookingsWithDate(fromDate, pageable);
-        } else {
-            verifiedAwaitingBookings = bookingRepository.findVerifiedAwaitingEmployeeBookings(pageable);
+        List<Booking> awaitingBookings = fromDate != null
+                ? bookingRepository.findAllVerifiedAwaitingEmployeeBookingsFromDate(fromDate)
+                : bookingRepository.findAllVerifiedAwaitingEmployeeBookings();
+
+        if (employeeId == null || employeeId.isBlank()) {
+            log.debug("No employee context provided; returning bookings ordered by booking time");
+            return toRecommendationPage(awaitingBookings, pageable);
         }
 
-        Page<BookingResponse> response = verifiedAwaitingBookings.map(bookingMapper::toBookingResponse);
+        Employee employee = employeeRepository.findEmployeeWithDetails(employeeId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nhân viên với ID: " + employeeId));
 
-        log.info("Found {} verified bookings awaiting employee from date {} (page {} of {})",
-                verifiedAwaitingBookings.getNumberOfElements(),
-                fromDate,
-                verifiedAwaitingBookings.getNumber() + 1,
-                verifiedAwaitingBookings.getTotalPages());
+        List<Booking> rankedBookings = rankBookingsForEmployee(employee, awaitingBookings, matchEmployeeZones);
 
-        return response;
+        log.info("Generated ranked booking list for employee {} with {} candidate bookings (matchEmployeeZones={})",
+                employeeId, rankedBookings.size(), matchEmployeeZones);
+
+        return toRecommendationPage(rankedBookings, pageable);
+    }
+
+    private List<Booking> rankBookingsForEmployee(Employee employee,
+                                                  List<Booking> awaitingBookings,
+                                                  boolean matchEmployeeZones) {
+        if (awaitingBookings == null || awaitingBookings.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Set<String> normalizedZones = Optional.ofNullable(employee.getWorkingZones())
+                .orElseGet(Collections::emptyList)
+                .stream()
+                .map(zone -> buildZoneKey(zone.getWard(), zone.getCity()))
+                .filter(key -> !key.isEmpty())
+                .collect(Collectors.toSet());
+
+        List<BookingRecommendationScore> scoredBookings = awaitingBookings.stream()
+                .map(booking -> computeRecommendationScore(booking, normalizedZones))
+                .collect(Collectors.toList());
+
+        boolean hasDefinedZones = !normalizedZones.isEmpty();
+        boolean filterToMatches = matchEmployeeZones && hasDefinedZones;
+        boolean prioritiseZoneMatches = !filterToMatches && hasDefinedZones
+                && scoredBookings.stream().anyMatch(BookingRecommendationScore::zoneMatched);
+
+        if (matchEmployeeZones && !hasDefinedZones) {
+            log.debug("Employee {} has no working zones; ignoring matchEmployeeZones flag", employee.getEmployeeId());
+        }
+
+        log.debug("Ranking {} awaiting bookings for employee {} across {} working zones (filterToMatches={}, prioritiseZoneMatches={})",
+                awaitingBookings.size(),
+                employee.getEmployeeId(),
+                normalizedZones.size(),
+                filterToMatches,
+                prioritiseZoneMatches);
+
+        Comparator<BookingRecommendationScore> comparator = Comparator
+                .comparingDouble(BookingRecommendationScore::score).reversed()
+                .thenComparing(BookingRecommendationScore::timeScore, Comparator.reverseOrder())
+                .thenComparing(BookingRecommendationScore::ratingScore, Comparator.reverseOrder())
+                .thenComparing(score -> score.booking().getBookingTime(), Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(score -> score.booking().getCreatedAt(), Comparator.nullsLast(Comparator.naturalOrder()));
+
+        return scoredBookings.stream()
+                .filter(score -> !filterToMatches || score.zoneMatched())
+                .filter(score -> !prioritiseZoneMatches || score.zoneMatched())
+                .sorted(comparator)
+                .map(BookingRecommendationScore::booking)
+                .collect(Collectors.toList());
+    }
+
+    private Page<BookingResponse> toRecommendationPage(List<Booking> orderedBookings, Pageable pageable) {
+        List<Booking> safeBookings = Optional.ofNullable(orderedBookings).orElseGet(Collections::emptyList);
+        if (pageable == null || pageable.isUnpaged()) {
+            List<BookingResponse> content = safeBookings.stream()
+                    .map(bookingMapper::toBookingResponse)
+                    .collect(Collectors.toList());
+            return new PageImpl<>(content);
+        }
+
+        int total = safeBookings.size();
+        int start = Math.min((int) pageable.getOffset(), total);
+        int end = Math.min(start + pageable.getPageSize(), total);
+        List<BookingResponse> content = safeBookings.subList(start, end).stream()
+                .map(bookingMapper::toBookingResponse)
+                .collect(Collectors.toList());
+
+        return new PageImpl<>(content, pageable, total);
+    }
+
+    private BookingRecommendationScore computeRecommendationScore(Booking booking, Set<String> normalizedZones) {
+        String bookingZoneKey = buildZoneKey(
+                booking.getAddress() != null ? booking.getAddress().getWard() : null,
+                booking.getAddress() != null ? booking.getAddress().getCity() : null);
+
+        boolean hasDefinedZones = normalizedZones != null && !normalizedZones.isEmpty();
+        boolean zoneMatched = hasDefinedZones ? normalizedZones.contains(bookingZoneKey) : true;
+
+        double locationScore = zoneMatched ? 1.0 : hasDefinedZones ? 0.0 : 0.5;
+        double timeScore = calculateTimeScore(booking.getBookingTime());
+        double ratingScore = calculateRatingScore(booking.getCustomer());
+
+        double combinedScore = (0.5 * locationScore) + (0.3 * timeScore) + (0.2 * ratingScore);
+        if (hasDefinedZones && !zoneMatched) {
+            combinedScore *= 0.35;
+        }
+
+        return new BookingRecommendationScore(booking, combinedScore, zoneMatched, timeScore, ratingScore);
+    }
+
+    private double calculateTimeScore(LocalDateTime bookingTime) {
+        if (bookingTime == null) {
+            return 0.0;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        long minutesUntil = Duration.between(now, bookingTime).toMinutes();
+        if (minutesUntil <= 0) {
+            return 0.2;
+        }
+
+        double hoursUntil = minutesUntil / 60.0;
+        double score = Math.exp(-hoursUntil / 24.0);
+        return Math.min(Math.max(score, 0.0), 1.0);
+    }
+
+    private double calculateRatingScore(Customer customer) {
+        if (customer == null || customer.getRating() == null) {
+            return 0.5;
+        }
+
+        return switch (customer.getRating()) {
+            case LOWEST -> 0.2;
+            case LOW -> 0.4;
+            case MEDIUM -> 0.6;
+            case HIGH -> 0.8;
+            case HIGHEST -> 1.0;
+        };
+    }
+
+    private String buildZoneKey(String ward, String city) {
+        String normalizedWard = normalizeText(ward);
+        String normalizedCity = normalizeText(city);
+        if (normalizedWard.isEmpty() && normalizedCity.isEmpty()) {
+            return "";
+        }
+        return normalizedWard + "|" + normalizedCity;
+    }
+
+    private String normalizeText(String value) {
+        if (value == null) {
+            return "";
+        }
+        String lower = value.trim().toLowerCase(Locale.ROOT);
+        String normalized = Normalizer.normalize(lower, Normalizer.Form.NFD);
+        return normalized.replaceAll("\\p{M}", "");
+    }
+
+    private record BookingRecommendationScore(
+            Booking booking,
+            double score,
+            boolean zoneMatched,
+            double timeScore,
+            double ratingScore
+    ) {
     }
 
     @Override
