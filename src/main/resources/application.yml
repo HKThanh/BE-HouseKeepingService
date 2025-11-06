@@ -15,6 +15,9 @@ spring:
       hibernate:
         jdbc:
           time_zone: Asia/Ho_Chi_Minh
+  logging:
+    level:
+      iuh.house_keeping_service_be: DEBUG
   data:
     redis:
       host: localhost

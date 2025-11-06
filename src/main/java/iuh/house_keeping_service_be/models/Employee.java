@@ -77,6 +77,6 @@ public class Employee {
     private List<Assignment> assignments;
 
     @OneToMany(mappedBy = "employee", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonIgnore
+    // @JsonIgnore
     private List<EmployeeWorkingZone> workingZones;
 }

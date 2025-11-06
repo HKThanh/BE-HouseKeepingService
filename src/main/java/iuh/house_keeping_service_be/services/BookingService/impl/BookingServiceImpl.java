@@ -1187,17 +1187,26 @@ public class BookingServiceImpl implements BookingService {
                 .filter(key -> !key.isEmpty())
                 .collect(Collectors.toSet());
 
+        log.debug("Employee {} has {} working zones: {}",
+                employee.getEmployeeId(),
+                normalizedZones.size(),
+                normalizedZones);
+
         List<BookingRecommendationScore> scoredBookings = awaitingBookings.stream()
                 .map(booking -> computeRecommendationScore(booking, normalizedZones))
                 .collect(Collectors.toList());
 
         boolean hasDefinedZones = !normalizedZones.isEmpty();
+        boolean anyZoneMatches = scoredBookings.stream().anyMatch(BookingRecommendationScore::zoneMatched);
         boolean filterToMatches = matchEmployeeZones && hasDefinedZones;
-        boolean prioritiseZoneMatches = !filterToMatches && hasDefinedZones
-                && scoredBookings.stream().anyMatch(BookingRecommendationScore::zoneMatched);
+        boolean prioritiseZoneMatches = false;
 
-        if (matchEmployeeZones && !hasDefinedZones) {
-            log.debug("Employee {} has no working zones; ignoring matchEmployeeZones flag", employee.getEmployeeId());
+        if (matchEmployeeZones) {
+            if (!hasDefinedZones) {
+                log.debug("Employee {} has no working zones; unable to apply zone filter", employee.getEmployeeId());
+            } else if (!anyZoneMatches) {
+                log.debug("Employee {} requested zone-only bookings but no matches were found for zones {}", employee.getEmployeeId(), normalizedZones);
+            }
         }
 
         log.debug("Ranking {} awaiting bookings for employee {} across {} working zones (filterToMatches={}, prioritiseZoneMatches={})",
@@ -1307,6 +1316,20 @@ public class BookingServiceImpl implements BookingService {
         String lower = value.trim().toLowerCase(Locale.ROOT);
         String normalized = Normalizer.normalize(lower, Normalizer.Form.NFD);
         return normalized.replaceAll("\\p{M}", "");
+        // String noDiacritics = normalized.replaceAll("\\p{M}", "");
+        // noDiacritics = noDiacritics
+        //         .replace("tphcm", "thanh pho ho chi minh")
+        //         .replace("tp ho chi minh", "thanh pho ho chi minh")
+        //         .replace("tp. ho chi minh", "thanh pho ho chi minh")
+        //         .replace("tp ho. chi minh", "thanh pho ho chi minh")
+        //         .replace("ho chi minh city", "thanh pho ho chi minh")
+        //         .replace("tp hcm", "thanh pho ho chi minh")
+        //         .replace("tp.", "thanh pho")
+        //         .replace("tp ", "thanh pho ");
+        // noDiacritics = noDiacritics
+        //         .replace('đ', 'd')
+        //         .replaceAll("[^a-z0-9\\s]", " ");
+        // return noDiacritics.replaceAll("\\s+", " ").trim();
     }
 
     private record BookingRecommendationScore(
