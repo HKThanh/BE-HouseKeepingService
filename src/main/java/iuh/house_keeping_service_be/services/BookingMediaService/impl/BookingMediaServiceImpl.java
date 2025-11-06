@@ -41,9 +41,9 @@ public class BookingMediaServiceImpl implements BookingMediaService {
             throw new IllegalArgumentException("File phải là định dạng ảnh");
         }
 
-        // Validate file size (max 5MB)
-        if (file.getSize() > 5 * 1024 * 1024) {
-            throw new IllegalArgumentException("Kích thước file không được vượt quá 5MB");
+        // Validate file size (max 10MB)
+        if (file.getSize() > 10 * 1024 * 1024) {
+            throw new IllegalArgumentException("Kích thước file không được vượt quá 10MB");
         }
 
         try {

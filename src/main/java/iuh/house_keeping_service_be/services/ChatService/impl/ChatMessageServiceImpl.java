@@ -68,6 +68,18 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             if (request.getImageFile() == null || request.getImageFile().isEmpty()) {
                 throw new IllegalArgumentException("Image file is required for image messages");
             }
+            
+            // Validate file type
+            String contentType = request.getImageFile().getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                throw new IllegalArgumentException("File phải là định dạng ảnh");
+            }
+            
+            // Validate file size (max 10MB)
+            if (request.getImageFile().getSize() > 10 * 1024 * 1024) {
+                throw new IllegalArgumentException("Kích thước file không được vượt quá 10MB");
+            }
+            
             String imageUrl = uploadImage(request.getImageFile());
             message.setImageUrl(imageUrl);
             message.setContent(request.getContent()); // Optional caption

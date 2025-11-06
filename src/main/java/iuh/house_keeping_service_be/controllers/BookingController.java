@@ -345,11 +345,11 @@ public class BookingController {
                 ));
             }
 
-            // Validate file size (max 5MB)
-            if (file.getSize() > 5 * 1024 * 1024) {
+            // Validate file size (max 10MB)
+            if (file.getSize() > 10 * 1024 * 1024) {
                 return ResponseEntity.badRequest().body(Map.of(
                     "success", false,
-                    "message", "Kích thước file không được vượt quá 5MB"
+                    "message", "Kích thước file không được vượt quá 10MB"
                 ));
             }
 
