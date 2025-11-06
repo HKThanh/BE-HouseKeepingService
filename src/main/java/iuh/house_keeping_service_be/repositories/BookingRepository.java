@@ -192,6 +192,27 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
            "ORDER BY b.bookingTime ASC")
     Page<Booking> findVerifiedAwaitingEmployeeBookingsWithDate(@Param("fromDate") java.time.LocalDateTime fromDate, Pageable pageable);
 
+    // Find all verified bookings awaiting employee without pagination
+    @Query("SELECT b FROM Booking b " +
+           "LEFT JOIN FETCH b.customer c " +
+           "LEFT JOIN FETCH b.address a " +
+           "LEFT JOIN FETCH b.promotion p " +
+           "WHERE b.isVerified = true " +
+           "AND b.status = iuh.house_keeping_service_be.enums.BookingStatus.AWAITING_EMPLOYEE " +
+           "ORDER BY b.bookingTime ASC")
+    List<Booking> findAllVerifiedAwaitingEmployeeBookings();
+
+    // Find all verified bookings awaiting employee from a date without pagination
+    @Query("SELECT b FROM Booking b " +
+           "LEFT JOIN FETCH b.customer c " +
+           "LEFT JOIN FETCH b.address a " +
+           "LEFT JOIN FETCH b.promotion p " +
+           "WHERE b.isVerified = true " +
+           "AND b.status = iuh.house_keeping_service_be.enums.BookingStatus.AWAITING_EMPLOYEE " +
+           "AND b.bookingTime >= :fromDate " +
+           "ORDER BY b.bookingTime ASC")
+    List<Booking> findAllVerifiedAwaitingEmployeeBookingsFromDate(@Param("fromDate") java.time.LocalDateTime fromDate);
+
     // Find all bookings ordered by booking time descending (for admin)
     @Query("SELECT b FROM Booking b " +
            "LEFT JOIN FETCH b.customer c " +

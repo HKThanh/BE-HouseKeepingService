@@ -32,6 +32,18 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("File tải lên không hợp lệ");
         }
+        
+        // Validate file size (max 10MB)
+        if (file.getSize() > 10 * 1024 * 1024) {
+            throw new IllegalArgumentException("Kích thước file không được vượt quá 10MB");
+        }
+        
+        // Validate file type
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new IllegalArgumentException("File phải là định dạng ảnh");
+        }
+        
         try {
             Map<String, Object> options = new HashMap<>();
             if (customerFolder != null && !customerFolder.isBlank()) {
@@ -54,6 +66,18 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("File tải lên không hợp lệ");
         }
+        
+        // Validate file size (max 10MB)
+        if (file.getSize() > 10 * 1024 * 1024) {
+            throw new IllegalArgumentException("Kích thước file không được vượt quá 10MB");
+        }
+        
+        // Validate file type
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new IllegalArgumentException("File phải là định dạng ảnh");
+        }
+        
         try {
             Map<String, Object> options = new HashMap<>();
             if (employeeFolder != null && !employeeFolder.isBlank()) {
@@ -76,6 +100,18 @@ public class CloudinaryServiceImpl implements CloudinaryService {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("File tải lên không hợp lệ");
         }
+        
+        // Validate file size (max 10MB)
+        if (file.getSize() > 10 * 1024 * 1024) {
+            throw new IllegalArgumentException("Kích thước file không được vượt quá 10MB");
+        }
+        
+        // Validate file type
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new IllegalArgumentException("File phải là định dạng ảnh");
+        }
+        
         try {
             Map<String, Object> options = new HashMap<>();
             if (bookingFolder != null && !bookingFolder.isBlank()) {

@@ -33,6 +33,8 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -101,7 +103,7 @@ public class BookingController {
     @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_ADMIN')")
     public ResponseEntity<?> createBooking(
             @RequestPart(value = "booking", required = true) String bookingJson,
-            @RequestPart(value = "image", required = false) MultipartFile image) {
+            @RequestPart(value = "images", required = false) List<MultipartFile> images) {
         
         log.info("Received booking creation request");
         
@@ -119,44 +121,66 @@ public class BookingController {
                 ));
             }
             
-            String imageUrl = null;
+            List<String> imageUrls = new ArrayList<>();
             
-            // Upload image to Cloudinary if provided
-            if (image != null && !image.isEmpty()) {
-                log.info("Uploading booking image to Cloudinary");
+            // Upload images to Cloudinary if provided
+            if (images != null && !images.isEmpty()) {
+                log.info("Uploading {} booking images to Cloudinary", images.size());
                 
-                // Validate file type
-                String contentType = image.getContentType();
-                if (contentType == null || !contentType.startsWith("image/")) {
+                // Validate number of images (max 10)
+                if (images.size() > 10) {
                     return ResponseEntity.badRequest().body(Map.of(
                         "success", false,
-                        "message", "File phải là định dạng ảnh"
+                        "message", "Số lượng ảnh không được vượt quá 10"
                     ));
                 }
                 
-                // Validate file size (max 10MB)
-                if (image.getSize() > 10 * 1024 * 1024) {
-                    return ResponseEntity.badRequest().body(Map.of(
-                        "success", false,
-                        "message", "Kích thước file không được vượt quá 10MB"
-                    ));
+                for (MultipartFile image : images) {
+                    if (image == null || image.isEmpty()) {
+                        continue;
+                    }
+                    
+                    // Validate file type
+                    String contentType = image.getContentType();
+                    if (contentType == null || !contentType.startsWith("image/")) {
+                        return ResponseEntity.badRequest().body(Map.of(
+                            "success", false,
+                            "message", "Tất cả file phải là định dạng ảnh"
+                        ));
+                    }
+                    
+                    // Validate file size (max 10MB)
+                    if (image.getSize() > 10 * 1024 * 1024) {
+                        return ResponseEntity.badRequest().body(Map.of(
+                            "success", false,
+                            "message", "Kích thước mỗi file không được vượt quá 10MB"
+                        ));
+                    }
+                    
+                    try {
+                        CloudinaryUploadResult uploadResult = cloudinaryService.uploadBookingImage(image);
+                        imageUrls.add(uploadResult.secureUrl());
+                        log.info("Image uploaded successfully: {}", uploadResult.secureUrl());
+                    } catch (Exception e) {
+                        log.error("Failed to upload image: {}", e.getMessage());
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                            "success", false,
+                            "message", "Lỗi khi tải ảnh lên: " + e.getMessage()
+                        ));
+                    }
                 }
-                
-                CloudinaryUploadResult uploadResult = cloudinaryService.uploadBookingImage(image);
-                imageUrl = uploadResult.secureUrl();
-                log.info("Image uploaded successfully: {}", imageUrl);
             }
             
-            // Create new request with image URL if uploaded
+            // Create new request with image URLs if uploaded
             BookingCreateRequest bookingRequest = request;
-            if (imageUrl != null) {
+            if (!imageUrls.isEmpty()) {
                 bookingRequest = new BookingCreateRequest(
                     request.addressId(),
                     request.newAddress(),
                     request.bookingTime(),
                     request.note(),
                     request.title(),
-                    imageUrl,
+                    imageUrls,
                     request.promoCode(),
                     request.bookingDetails(),
                     request.assignments(),
@@ -345,11 +369,11 @@ public class BookingController {
                 ));
             }
 
-            // Validate file size (max 5MB)
-            if (file.getSize() > 5 * 1024 * 1024) {
+            // Validate file size (max 10MB)
+            if (file.getSize() > 10 * 1024 * 1024) {
                 return ResponseEntity.badRequest().body(Map.of(
                     "success", false,
-                    "message", "Kích thước file không được vượt quá 5MB"
+                    "message", "Kích thước file không được vượt quá 10MB"
                 ));
             }
 

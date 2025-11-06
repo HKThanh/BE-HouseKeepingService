@@ -23,6 +23,11 @@ public class CloudinaryService {
             throw new IllegalArgumentException("File must not be null or empty");
         }
 
+        // Validate file size (max 10MB)
+        if (file.getSize() > 10 * 1024 * 1024) {
+            throw new IllegalArgumentException("Kích thước file không được vượt quá 10MB");
+        }
+
         Map<String, Object> options = new HashMap<>();
         String resourceType = determineResourceType(file.getContentType());
         options.put("resource_type", resourceType);

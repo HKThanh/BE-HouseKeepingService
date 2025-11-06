@@ -160,7 +160,7 @@ public class EmployeeAssignmentController {
     public ResponseEntity<?> checkInAssignment(
             @PathVariable String assignmentId,
             @RequestPart(value = "request", required = true) String requestJson,
-            @RequestPart(value = "image", required = false) MultipartFile image) {
+            @RequestPart(value = "images", required = false) List<MultipartFile> images) {
 
         try {
             // Parse JSON string to AssignmentCheckInRequest object
@@ -176,30 +176,40 @@ public class EmployeeAssignmentController {
                 ));
             }
 
-            // Validate image if provided
-            if (image != null && !image.isEmpty()) {
-                String contentType = image.getContentType();
-                if (contentType == null || !contentType.startsWith("image/")) {
+            // Validate images if provided
+            if (images != null && !images.isEmpty()) {
+                if (images.size() > 10) {
                     return ResponseEntity.badRequest().body(new AssignmentActionResponse(
                             false,
-                            "File phải là định dạng ảnh",
+                            "Số lượng ảnh không được vượt quá 10",
                             null
                     ));
                 }
 
-                if (image.getSize() > 5 * 1024 * 1024) {
-                    return ResponseEntity.badRequest().body(new AssignmentActionResponse(
-                            false,
-                            "Kích thước file không được vượt quá 5MB",
-                            null
-                    ));
+                for (MultipartFile image : images) {
+                    String contentType = image.getContentType();
+                    if (contentType == null || !contentType.startsWith("image/")) {
+                        return ResponseEntity.badRequest().body(new AssignmentActionResponse(
+                                false,
+                                "Tất cả file phải là định dạng ảnh",
+                                null
+                        ));
+                    }
+
+                    if (image.getSize() > 10 * 1024 * 1024) {
+                        return ResponseEntity.badRequest().body(new AssignmentActionResponse(
+                                false,
+                                "Kích thước mỗi file không được vượt quá 10MB",
+                                null
+                        ));
+                    }
                 }
             }
 
             AssignmentDetailResponse response = assignmentService.checkIn(
                     assignmentId, 
                     request.employeeId(), 
-                    image, 
+                    images, 
                     request.imageDescription()
             );
 
@@ -237,7 +247,7 @@ public class EmployeeAssignmentController {
     public ResponseEntity<?> checkOutAssignment(
             @PathVariable String assignmentId,
             @RequestPart(value = "request", required = true) String requestJson,
-            @RequestPart(value = "image", required = false) MultipartFile image) {
+            @RequestPart(value = "images", required = false) List<MultipartFile> images) {
 
         try {
             // Parse JSON string to AssignmentCheckOutRequest object
@@ -253,30 +263,40 @@ public class EmployeeAssignmentController {
                 ));
             }
 
-            // Validate image if provided
-            if (image != null && !image.isEmpty()) {
-                String contentType = image.getContentType();
-                if (contentType == null || !contentType.startsWith("image/")) {
+            // Validate images if provided
+            if (images != null && !images.isEmpty()) {
+                if (images.size() > 10) {
                     return ResponseEntity.badRequest().body(new AssignmentActionResponse(
                             false,
-                            "File phải là định dạng ảnh",
+                            "Số lượng ảnh không được vượt quá 10",
                             null
                     ));
                 }
 
-                if (image.getSize() > 5 * 1024 * 1024) {
-                    return ResponseEntity.badRequest().body(new AssignmentActionResponse(
-                            false,
-                            "Kích thước file không được vượt quá 5MB",
-                            null
-                    ));
+                for (MultipartFile image : images) {
+                    String contentType = image.getContentType();
+                    if (contentType == null || !contentType.startsWith("image/")) {
+                        return ResponseEntity.badRequest().body(new AssignmentActionResponse(
+                                false,
+                                "Tất cả file phải là định dạng ảnh",
+                                null
+                        ));
+                    }
+
+                    if (image.getSize() > 10 * 1024 * 1024) {
+                        return ResponseEntity.badRequest().body(new AssignmentActionResponse(
+                                false,
+                                "Kích thước mỗi file không được vượt quá 10MB",
+                                null
+                        ));
+                    }
                 }
             }
 
             AssignmentDetailResponse response = assignmentService.checkOut(
                     assignmentId, 
                     request.employeeId(), 
-                    image, 
+                    images, 
                     request.imageDescription()
             );
 

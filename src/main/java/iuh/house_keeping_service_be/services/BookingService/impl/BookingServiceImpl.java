@@ -17,12 +17,15 @@ import iuh.house_keeping_service_be.utils.BookingDTOFormatter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.text.Normalizer;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -90,16 +93,16 @@ public class BookingServiceImpl implements BookingService {
             // If has assignments, set isVerified = true (normal booking)
             booking.setIsVerified(hasAssignments);
 
-            // Set title and imageUrl from request if provided
+            // Set title and imageUrls from request if provided
             if (request.title() != null && !request.title().trim().isEmpty()) {
                 booking.setTitle(request.title());
             }
-            if (request.imageUrl() != null && !request.imageUrl().trim().isEmpty()) {
-                booking.setImageUrl(request.imageUrl());
+            if (request.imageUrls() != null && !request.imageUrls().isEmpty()) {
+                booking.setImageUrls(request.imageUrls());
             }
 
-            log.info("Booking isVerified={}, hasAssignments={}, title={}, imageUrl={}",
-                    booking.getIsVerified(), hasAssignments, booking.getTitle(), booking.getImageUrl());
+            log.info("Booking isVerified={}, hasAssignments={}, title={}, imageUrls={}",
+                    booking.getIsVerified(), hasAssignments, booking.getTitle(), booking.getImageUrls());
 
             // Step 4: Create booking details
             List<BookingDetail> bookingDetails = createBookingDetails(booking, request, validation);
@@ -751,7 +754,7 @@ public class BookingServiceImpl implements BookingService {
                 .formattedTotalAmount(BookingDTOFormatter.formatPrice(booking.getTotalAmount()))
                 .bookingTime(booking.getBookingTime())
                 .title(booking.getTitle())
-                .imageUrl(booking.getImageUrl())
+                .imageUrls(booking.getImageUrls())
                 .isVerified(booking.getIsVerified())
                 .adminComment(booking.getAdminComment())
                 .customerInfo(addressInfo)
@@ -831,7 +834,7 @@ public class BookingServiceImpl implements BookingService {
                     promotionInfo,
                     paymentInfo,
                     booking.getTitle(),
-                    booking.getImageUrl(),
+                    booking.getImageUrls(),
                     booking.getIsVerified(),
                     assignedEmployees,
                     services
@@ -901,7 +904,7 @@ public class BookingServiceImpl implements BookingService {
                     promotionInfo,
                     paymentInfo,
                     booking.getTitle(),
-                    booking.getImageUrl(),
+                    booking.getImageUrls(),
                     booking.getIsVerified(),
                     assignedEmployees,
                     services
@@ -921,7 +924,7 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional
     public BookingResponse convertBookingToPost(String bookingId, ConvertBookingToPostRequest request) {
-        log.info("Updating booking {} with title: {}, imageUrl: {}", bookingId, request.title(), request.imageUrl());
+        log.info("Updating booking {} with title: {}, imageUrls: {}", bookingId, request.title(), request.imageUrls());
 
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new IllegalArgumentException("KhĂ´ng tĂ¬m tháº¥y booking vá»›i ID: " + bookingId));
@@ -931,12 +934,12 @@ public class BookingServiceImpl implements BookingService {
             throw new IllegalStateException("KhĂ´ng thá»ƒ cáº­p nháº­t booking Ä‘Ă£ Ä‘Æ°á»£c xĂ¡c minh (cĂ³ nhĂ¢n viĂªn)");
         }
 
-        // Update title and image URL
+        // Update title and image URLs
         booking.setTitle(request.title());
-        booking.setImageUrl(request.imageUrl());
+        booking.setImageUrls(request.imageUrls());
 
         Booking savedBooking = bookingRepository.save(booking);
-        log.info("Successfully updated booking {} title and image", bookingId);
+        log.info("Successfully updated booking {} title and images", bookingId);
 
         return bookingMapper.toBookingResponse(savedBooking);
     }
@@ -1137,42 +1140,205 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<BookingResponse> getVerifiedAwaitingEmployeeBookings(Pageable pageable) {
-        log.info("Fetching verified bookings that are awaiting employee assignment");
-
-        Page<Booking> verifiedAwaitingBookings = bookingRepository.findVerifiedAwaitingEmployeeBookings(pageable);
-
-        Page<BookingResponse> response = verifiedAwaitingBookings.map(bookingMapper::toBookingResponse);
-
-        log.info("Found {} verified bookings awaiting employee (page {} of {})",
-                verifiedAwaitingBookings.getNumberOfElements(),
-                verifiedAwaitingBookings.getNumber() + 1,
-                verifiedAwaitingBookings.getTotalPages());
-
-        return response;
+    public Page<BookingResponse> getVerifiedAwaitingEmployeeBookings(String employeeId, boolean matchEmployeeZones, Pageable pageable) {
+        return getVerifiedAwaitingEmployeeBookings(employeeId, matchEmployeeZones, null, pageable);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<BookingResponse> getVerifiedAwaitingEmployeeBookings(LocalDateTime fromDate, Pageable pageable) {
-        log.info("Fetching verified bookings awaiting employee from date {}", fromDate);
+    public Page<BookingResponse> getVerifiedAwaitingEmployeeBookings(String employeeId,
+                                                                     boolean matchEmployeeZones,
+                                                                     LocalDateTime fromDate,
+                                                                     Pageable pageable) {
+        log.info("Fetching recommended verified bookings awaiting employee for employeeId={} from date {} (matchEmployeeZones={})",
+                employeeId, fromDate, matchEmployeeZones);
 
-        Page<Booking> verifiedAwaitingBookings;
-        if (fromDate != null) {
-            verifiedAwaitingBookings = bookingRepository.findVerifiedAwaitingEmployeeBookingsWithDate(fromDate, pageable);
-        } else {
-            verifiedAwaitingBookings = bookingRepository.findVerifiedAwaitingEmployeeBookings(pageable);
+        List<Booking> awaitingBookings = fromDate != null
+                ? bookingRepository.findAllVerifiedAwaitingEmployeeBookingsFromDate(fromDate)
+                : bookingRepository.findAllVerifiedAwaitingEmployeeBookings();
+
+        if (employeeId == null || employeeId.isBlank()) {
+            log.debug("No employee context provided; returning bookings ordered by booking time");
+            return toRecommendationPage(awaitingBookings, pageable);
         }
 
-        Page<BookingResponse> response = verifiedAwaitingBookings.map(bookingMapper::toBookingResponse);
+        Employee employee = employeeRepository.findEmployeeWithDetails(employeeId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nhân viên với ID: " + employeeId));
 
-        log.info("Found {} verified bookings awaiting employee from date {} (page {} of {})",
-                verifiedAwaitingBookings.getNumberOfElements(),
-                fromDate,
-                verifiedAwaitingBookings.getNumber() + 1,
-                verifiedAwaitingBookings.getTotalPages());
+        List<Booking> rankedBookings = rankBookingsForEmployee(employee, awaitingBookings, matchEmployeeZones);
 
-        return response;
+        log.info("Generated ranked booking list for employee {} with {} candidate bookings (matchEmployeeZones={})",
+                employeeId, rankedBookings.size(), matchEmployeeZones);
+
+        return toRecommendationPage(rankedBookings, pageable);
+    }
+
+    private List<Booking> rankBookingsForEmployee(Employee employee,
+                                                  List<Booking> awaitingBookings,
+                                                  boolean matchEmployeeZones) {
+        if (awaitingBookings == null || awaitingBookings.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Set<String> normalizedZones = Optional.ofNullable(employee.getWorkingZones())
+                .orElseGet(Collections::emptyList)
+                .stream()
+                .map(zone -> buildZoneKey(zone.getWard(), zone.getCity()))
+                .filter(key -> !key.isEmpty())
+                .collect(Collectors.toSet());
+
+        log.debug("Employee {} has {} working zones: {}",
+                employee.getEmployeeId(),
+                normalizedZones.size(),
+                normalizedZones);
+
+        List<BookingRecommendationScore> scoredBookings = awaitingBookings.stream()
+                .map(booking -> computeRecommendationScore(booking, normalizedZones))
+                .collect(Collectors.toList());
+
+        boolean hasDefinedZones = !normalizedZones.isEmpty();
+        boolean anyZoneMatches = scoredBookings.stream().anyMatch(BookingRecommendationScore::zoneMatched);
+        boolean filterToMatches = matchEmployeeZones && hasDefinedZones;
+        boolean prioritiseZoneMatches = false;
+
+        if (matchEmployeeZones) {
+            if (!hasDefinedZones) {
+                log.debug("Employee {} has no working zones; unable to apply zone filter", employee.getEmployeeId());
+            } else if (!anyZoneMatches) {
+                log.debug("Employee {} requested zone-only bookings but no matches were found for zones {}", employee.getEmployeeId(), normalizedZones);
+            }
+        }
+
+        log.debug("Ranking {} awaiting bookings for employee {} across {} working zones (filterToMatches={}, prioritiseZoneMatches={})",
+                awaitingBookings.size(),
+                employee.getEmployeeId(),
+                normalizedZones.size(),
+                filterToMatches,
+                prioritiseZoneMatches);
+
+        Comparator<BookingRecommendationScore> comparator = Comparator
+                .comparingDouble(BookingRecommendationScore::score).reversed()
+                .thenComparing(BookingRecommendationScore::timeScore, Comparator.reverseOrder())
+                .thenComparing(BookingRecommendationScore::ratingScore, Comparator.reverseOrder())
+                .thenComparing(score -> score.booking().getBookingTime(), Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(score -> score.booking().getCreatedAt(), Comparator.nullsLast(Comparator.naturalOrder()));
+
+        return scoredBookings.stream()
+                .filter(score -> !filterToMatches || score.zoneMatched())
+                .filter(score -> !prioritiseZoneMatches || score.zoneMatched())
+                .sorted(comparator)
+                .map(BookingRecommendationScore::booking)
+                .collect(Collectors.toList());
+    }
+
+    private Page<BookingResponse> toRecommendationPage(List<Booking> orderedBookings, Pageable pageable) {
+        List<Booking> safeBookings = Optional.ofNullable(orderedBookings).orElseGet(Collections::emptyList);
+        if (pageable == null || pageable.isUnpaged()) {
+            List<BookingResponse> content = safeBookings.stream()
+                    .map(bookingMapper::toBookingResponse)
+                    .collect(Collectors.toList());
+            return new PageImpl<>(content);
+        }
+
+        int total = safeBookings.size();
+        int start = Math.min((int) pageable.getOffset(), total);
+        int end = Math.min(start + pageable.getPageSize(), total);
+        List<BookingResponse> content = safeBookings.subList(start, end).stream()
+                .map(bookingMapper::toBookingResponse)
+                .collect(Collectors.toList());
+
+        return new PageImpl<>(content, pageable, total);
+    }
+
+    private BookingRecommendationScore computeRecommendationScore(Booking booking, Set<String> normalizedZones) {
+        String bookingZoneKey = buildZoneKey(
+                booking.getAddress() != null ? booking.getAddress().getWard() : null,
+                booking.getAddress() != null ? booking.getAddress().getCity() : null);
+
+        boolean hasDefinedZones = normalizedZones != null && !normalizedZones.isEmpty();
+        boolean zoneMatched = hasDefinedZones ? normalizedZones.contains(bookingZoneKey) : true;
+
+        double locationScore = zoneMatched ? 1.0 : hasDefinedZones ? 0.0 : 0.5;
+        double timeScore = calculateTimeScore(booking.getBookingTime());
+        double ratingScore = calculateRatingScore(booking.getCustomer());
+
+        double combinedScore = (0.5 * locationScore) + (0.3 * timeScore) + (0.2 * ratingScore);
+        if (hasDefinedZones && !zoneMatched) {
+            combinedScore *= 0.35;
+        }
+
+        return new BookingRecommendationScore(booking, combinedScore, zoneMatched, timeScore, ratingScore);
+    }
+
+    private double calculateTimeScore(LocalDateTime bookingTime) {
+        if (bookingTime == null) {
+            return 0.0;
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        long minutesUntil = Duration.between(now, bookingTime).toMinutes();
+        if (minutesUntil <= 0) {
+            return 0.2;
+        }
+
+        double hoursUntil = minutesUntil / 60.0;
+        double score = Math.exp(-hoursUntil / 24.0);
+        return Math.min(Math.max(score, 0.0), 1.0);
+    }
+
+    private double calculateRatingScore(Customer customer) {
+        if (customer == null || customer.getRating() == null) {
+            return 0.5;
+        }
+
+        return switch (customer.getRating()) {
+            case LOWEST -> 0.2;
+            case LOW -> 0.4;
+            case MEDIUM -> 0.6;
+            case HIGH -> 0.8;
+            case HIGHEST -> 1.0;
+        };
+    }
+
+    private String buildZoneKey(String ward, String city) {
+        String normalizedWard = normalizeText(ward);
+        String normalizedCity = normalizeText(city);
+        if (normalizedWard.isEmpty() && normalizedCity.isEmpty()) {
+            return "";
+        }
+        return normalizedWard + "|" + normalizedCity;
+    }
+
+    private String normalizeText(String value) {
+        if (value == null) {
+            return "";
+        }
+        String lower = value.trim().toLowerCase(Locale.ROOT);
+        String normalized = Normalizer.normalize(lower, Normalizer.Form.NFD);
+        return normalized.replaceAll("\\p{M}", "");
+        // String noDiacritics = normalized.replaceAll("\\p{M}", "");
+        // noDiacritics = noDiacritics
+        //         .replace("tphcm", "thanh pho ho chi minh")
+        //         .replace("tp ho chi minh", "thanh pho ho chi minh")
+        //         .replace("tp. ho chi minh", "thanh pho ho chi minh")
+        //         .replace("tp ho. chi minh", "thanh pho ho chi minh")
+        //         .replace("ho chi minh city", "thanh pho ho chi minh")
+        //         .replace("tp hcm", "thanh pho ho chi minh")
+        //         .replace("tp.", "thanh pho")
+        //         .replace("tp ", "thanh pho ");
+        // noDiacritics = noDiacritics
+        //         .replace('đ', 'd')
+        //         .replaceAll("[^a-z0-9\\s]", " ");
+        // return noDiacritics.replaceAll("\\s+", " ").trim();
+    }
+
+    private record BookingRecommendationScore(
+            Booking booking,
+            double score,
+            boolean zoneMatched,
+            double timeScore,
+            double ratingScore
+    ) {
     }
 
     @Override

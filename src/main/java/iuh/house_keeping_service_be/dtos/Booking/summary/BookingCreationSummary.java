@@ -25,7 +25,7 @@ public class BookingCreationSummary {
     
     // Booking post fields
     private String title;
-    private String imageUrl;
+    private List<String> imageUrls;
     private Boolean isVerified;
     private String adminComment;
     

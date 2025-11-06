@@ -123,21 +123,49 @@ public class EmployeeBookingController {
     public ResponseEntity<?> getVerifiedAwaitingEmployeeBookings(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(name = "matchEmployeeZones", defaultValue = "true") boolean matchEmployeeZones) {
         
         log.info("Fetching verified bookings awaiting employee from date: {} (page: {}, size: {})", fromDate, page, size);
         
         try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String username = authentication.getName();
+
+            Account account = accountRepository.findByUsername(username)
+                    .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy tài khoản"));
+
+            boolean isAdmin = authentication.getAuthorities().stream()
+                    .anyMatch(grantedAuthority -> grantedAuthority.getAuthority().equals("ROLE_ADMIN"));
+
+            String employeeId = employeeRepository.findByAccount_AccountId(account.getAccountId())
+                    .map(Employee::getEmployeeId)
+                    .orElse(null);
+
+            if (!isAdmin && employeeId == null) {
+                throw new IllegalArgumentException("Không tìm thấy thông tin nhân viên cho tài khoản hiện tại");
+            }
+            
             if (page < 0) page = 0;
             if (size <= 0 || size > 100) size = 10;
             
             Pageable pageable = PageRequest.of(page, size);
             Page<BookingResponse> verifiedAwaitingBookings;
+            boolean effectiveMatchFlag = shouldMatchEmployeeZones(isAdmin, employeeId, matchEmployeeZones);
             
             if (fromDate != null) {
-                verifiedAwaitingBookings = bookingService.getVerifiedAwaitingEmployeeBookings(fromDate, pageable);
+                verifiedAwaitingBookings = bookingService.getVerifiedAwaitingEmployeeBookings(
+                        employeeId,
+                        effectiveMatchFlag,
+                        fromDate,
+                        pageable
+                );
             } else {
-                verifiedAwaitingBookings = bookingService.getVerifiedAwaitingEmployeeBookings(pageable);
+                verifiedAwaitingBookings = bookingService.getVerifiedAwaitingEmployeeBookings(
+                        employeeId,
+                        effectiveMatchFlag,
+                        pageable
+                );
             }
             
             return ResponseEntity.ok(Map.of(
@@ -154,5 +182,12 @@ public class EmployeeBookingController {
                 "message", "Đã xảy ra lỗi khi lấy danh sách booking đã xác minh đang chờ nhân viên"
             ));
         }
+    }
+
+    private boolean shouldMatchEmployeeZones(boolean isAdmin, String employeeId, boolean requestMatchFlag) {
+        if (isAdmin && (employeeId == null || employeeId.isBlank())) {
+            return false;
+        }
+        return requestMatchFlag;
     }
 }

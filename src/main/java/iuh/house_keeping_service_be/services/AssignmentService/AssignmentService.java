@@ -16,6 +16,6 @@ public interface AssignmentService {
     List<BookingSummary> getAvailableBookings(String employeeId, int page, int size);
     AssignmentDetailResponse acceptBookingDetail(String detailId, String employeeId);
 
-    AssignmentDetailResponse checkIn(String assignmentId, String employeeId, MultipartFile image, String imageDescription);
-    AssignmentDetailResponse checkOut(String assignmentId, String employeeId, MultipartFile image, String imageDescription);
+    AssignmentDetailResponse checkIn(String assignmentId, String employeeId, List<MultipartFile> images, String imageDescription);
+    AssignmentDetailResponse checkOut(String assignmentId, String employeeId, List<MultipartFile> images, String imageDescription);
 }
