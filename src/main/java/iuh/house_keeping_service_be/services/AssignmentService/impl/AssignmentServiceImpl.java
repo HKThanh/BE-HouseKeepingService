@@ -224,7 +224,7 @@ public class AssignmentServiceImpl implements AssignmentService {
 
     @Override
     @Transactional
-    public AssignmentDetailResponse checkIn(String assignmentId, String employeeId, MultipartFile image, String imageDescription) {
+    public AssignmentDetailResponse checkIn(String assignmentId, String employeeId, List<MultipartFile> images, String imageDescription) {
         Assignment assignment = assignmentRepository.findByIdWithDetails(assignmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy công việc"));
 
@@ -263,14 +263,18 @@ public class AssignmentServiceImpl implements AssignmentService {
         assignment.setStatus(AssignmentStatus.IN_PROGRESS);
         Assignment savedAssignment = assignmentRepository.save(assignment);
 
-        // Upload check-in image if provided
-        if (image != null && !image.isEmpty()) {
-            try {
-                bookingMediaService.uploadMedia(savedAssignment, image, MediaType.CHECK_IN_IMAGE, imageDescription);
-                log.info("Check-in image uploaded successfully for assignment {}", assignmentId);
-            } catch (Exception e) {
-                log.error("Failed to upload check-in image for assignment {}: {}", assignmentId, e.getMessage());
-                // Don't fail the check-in if image upload fails
+        // Upload check-in images if provided
+        if (images != null && !images.isEmpty()) {
+            for (MultipartFile image : images) {
+                if (image != null && !image.isEmpty()) {
+                    try {
+                        bookingMediaService.uploadMedia(savedAssignment, image, MediaType.CHECK_IN_IMAGE, imageDescription);
+                        log.info("Check-in image uploaded successfully for assignment {}", assignmentId);
+                    } catch (Exception e) {
+                        log.error("Failed to upload check-in image for assignment {}: {}", assignmentId, e.getMessage());
+                        // Don't fail the check-in if image upload fails
+                    }
+                }
             }
         }
 
@@ -281,7 +285,7 @@ public class AssignmentServiceImpl implements AssignmentService {
 
     @Override
     @Transactional
-    public AssignmentDetailResponse checkOut(String assignmentId, String employeeId, MultipartFile image, String imageDescription) {
+    public AssignmentDetailResponse checkOut(String assignmentId, String employeeId, List<MultipartFile> images, String imageDescription) {
         Assignment assignment = assignmentRepository.findByIdWithDetails(assignmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy công việc"));
 
@@ -301,14 +305,18 @@ public class AssignmentServiceImpl implements AssignmentService {
 
         Assignment savedAssignment = assignmentRepository.save(assignment);
 
-        // Upload check-out image if provided
-        if (image != null && !image.isEmpty()) {
-            try {
-                bookingMediaService.uploadMedia(savedAssignment, image, MediaType.CHECK_OUT_IMAGE, imageDescription);
-                log.info("Check-out image uploaded successfully for assignment {}", assignmentId);
-            } catch (Exception e) {
-                log.error("Failed to upload check-out image for assignment {}: {}", assignmentId, e.getMessage());
-                // Don't fail the check-out if image upload fails
+        // Upload check-out images if provided
+        if (images != null && !images.isEmpty()) {
+            for (MultipartFile image : images) {
+                if (image != null && !image.isEmpty()) {
+                    try {
+                        bookingMediaService.uploadMedia(savedAssignment, image, MediaType.CHECK_OUT_IMAGE, imageDescription);
+                        log.info("Check-out image uploaded successfully for assignment {}", assignmentId);
+                    } catch (Exception e) {
+                        log.error("Failed to upload check-out image for assignment {}: {}", assignmentId, e.getMessage());
+                        // Don't fail the check-out if image upload fails
+                    }
+                }
             }
         }
 

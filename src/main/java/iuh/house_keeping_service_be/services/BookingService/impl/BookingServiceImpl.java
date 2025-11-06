@@ -93,16 +93,16 @@ public class BookingServiceImpl implements BookingService {
             // If has assignments, set isVerified = true (normal booking)
             booking.setIsVerified(hasAssignments);
 
-            // Set title and imageUrl from request if provided
+            // Set title and imageUrls from request if provided
             if (request.title() != null && !request.title().trim().isEmpty()) {
                 booking.setTitle(request.title());
             }
-            if (request.imageUrl() != null && !request.imageUrl().trim().isEmpty()) {
-                booking.setImageUrl(request.imageUrl());
+            if (request.imageUrls() != null && !request.imageUrls().isEmpty()) {
+                booking.setImageUrls(request.imageUrls());
             }
 
-            log.info("Booking isVerified={}, hasAssignments={}, title={}, imageUrl={}",
-                    booking.getIsVerified(), hasAssignments, booking.getTitle(), booking.getImageUrl());
+            log.info("Booking isVerified={}, hasAssignments={}, title={}, imageUrls={}",
+                    booking.getIsVerified(), hasAssignments, booking.getTitle(), booking.getImageUrls());
 
             // Step 4: Create booking details
             List<BookingDetail> bookingDetails = createBookingDetails(booking, request, validation);
@@ -754,7 +754,7 @@ public class BookingServiceImpl implements BookingService {
                 .formattedTotalAmount(BookingDTOFormatter.formatPrice(booking.getTotalAmount()))
                 .bookingTime(booking.getBookingTime())
                 .title(booking.getTitle())
-                .imageUrl(booking.getImageUrl())
+                .imageUrls(booking.getImageUrls())
                 .isVerified(booking.getIsVerified())
                 .adminComment(booking.getAdminComment())
                 .customerInfo(addressInfo)
@@ -834,7 +834,7 @@ public class BookingServiceImpl implements BookingService {
                     promotionInfo,
                     paymentInfo,
                     booking.getTitle(),
-                    booking.getImageUrl(),
+                    booking.getImageUrls(),
                     booking.getIsVerified(),
                     assignedEmployees,
                     services
@@ -904,7 +904,7 @@ public class BookingServiceImpl implements BookingService {
                     promotionInfo,
                     paymentInfo,
                     booking.getTitle(),
-                    booking.getImageUrl(),
+                    booking.getImageUrls(),
                     booking.getIsVerified(),
                     assignedEmployees,
                     services
@@ -924,7 +924,7 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional
     public BookingResponse convertBookingToPost(String bookingId, ConvertBookingToPostRequest request) {
-        log.info("Updating booking {} with title: {}, imageUrl: {}", bookingId, request.title(), request.imageUrl());
+        log.info("Updating booking {} with title: {}, imageUrls: {}", bookingId, request.title(), request.imageUrls());
 
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new IllegalArgumentException("KhĂ´ng tĂ¬m tháº¥y booking vá»›i ID: " + bookingId));
@@ -934,12 +934,12 @@ public class BookingServiceImpl implements BookingService {
             throw new IllegalStateException("KhĂ´ng thá»ƒ cáº­p nháº­t booking Ä‘Ă£ Ä‘Æ°á»£c xĂ¡c minh (cĂ³ nhĂ¢n viĂªn)");
         }
 
-        // Update title and image URL
+        // Update title and image URLs
         booking.setTitle(request.title());
-        booking.setImageUrl(request.imageUrl());
+        booking.setImageUrls(request.imageUrls());
 
         Booking savedBooking = bookingRepository.save(booking);
-        log.info("Successfully updated booking {} title and image", bookingId);
+        log.info("Successfully updated booking {} title and images", bookingId);
 
         return bookingMapper.toBookingResponse(savedBooking);
     }

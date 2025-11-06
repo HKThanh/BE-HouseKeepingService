@@ -32,7 +32,7 @@ public class BookingData {
     private String status;
     
     private String title;
-    private String imageUrl;
+    private List<String> imageUrls;
     private Boolean isPost;
     private Boolean isVerified;
     private String adminComment;

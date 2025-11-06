@@ -12,6 +12,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -60,8 +61,10 @@ public class Booking {
     @Column(name = "title", length = 255)
     private String title;
 
+    @ElementCollection
+    @CollectionTable(name = "booking_image_urls", joinColumns = @JoinColumn(name = "booking_id"))
     @Column(name = "image_url", length = 500)
-    private String imageUrl;
+    private List<String> imageUrls = new ArrayList<>();
 
     @Column(name = "is_verified", nullable = false)
     private Boolean isVerified = true;

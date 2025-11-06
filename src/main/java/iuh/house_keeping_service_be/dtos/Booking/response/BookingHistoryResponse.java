@@ -15,7 +15,7 @@ public record BookingHistoryResponse(
         PromotionInfo promotion,
         PaymentInfo payment,
         String title,
-        String imageUrl,
+        List<String> imageUrls,
         Boolean isVerified,
         List<EmployeeInfo> assignedEmployees,
         List<ServiceInfo> services

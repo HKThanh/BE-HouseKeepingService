@@ -51,49 +51,50 @@ Authorization: Bearer {customer_token_john_doe}
         },
         "address": {
             "addressId": "adrs0001-0000-0000-0000-000000000001",
-            "fullAddress": "123 Đường Nguyễn Văn Linh, Phường Tân Phú",
-            "ward": "Phường Tân Phú",
-            "city": "Quận 7",
-            "latitude": 10.7333,
-            "longitude": 106.7181,
+            "fullAddress": "123 Lê Trọng Tấn, Phường Thủ Dầu Một, Thành phố Hồ Chí Minh",
+            "ward": "Phường Thủ Dầu Một",
+            "city": "Thành phố Hồ Chí Minh",
+            "latitude": 10.7943,
+            "longitude": 106.6256,
             "isDefault": true
         },
         "bookingTime": "2025-08-20T09:00:00",
         "note": "Nhà có trẻ nhỏ, vui lòng lau dọn kỹ khu vực phòng khách.",
-        "totalAmount": 80000.00,
-        "formattedTotalAmount": "80.000 ₫",
+        "totalAmount": 480000.00,
+        "formattedTotalAmount": "480,000đ",
         "status": "COMPLETED",
         "title": null,
-        "imageUrl": null,
+        "imageUrls": [],
+        "isPost": false,
         "isVerified": true,
         "adminComment": null,
         "promotion": {
-            "promotionId": "promo001",
+            "promotionId": 1,
             "promoCode": "GIAM20K",
-            "description": "Giảm 20.000đ cho đơn hàng đầu tiên",
+            "description": "Giảm giá 20,000đ cho mọi đơn hàng",
             "discountType": "FIXED_AMOUNT",
-            "discountValue": 20000.0,
-            "maxDiscountAmount": 20000.00
+            "discountValue": 20000.00,
+            "maxDiscountAmount": null
         },
         "bookingDetails": [
             {
-                "id": "bd000001-0000-0000-0000-000000000001",
+                "bookingDetailId": "bd000001-0000-0000-0000-000000000001",
                 "service": {
                     "serviceId": 2,
                     "name": "Tổng vệ sinh",
-                    "description": "Dịch vụ vệ sinh tổng thể toàn bộ ngôi nhà",
+                    "description": "Làm sạch sâu toàn diện, bao gồm các khu vực khó tiếp cận, trần nhà, lau cửa kính. Thích hợp cho nhà mới hoặc dọn dẹp theo mùa.",
                     "basePrice": 100000.00,
-                    "unit": "lần",
-                    "estimatedDurationHours": 4.0,
-                    "iconUrl": "https://example.com/icons/deep-cleaning.png",
-                    "categoryName": "Vệ sinh",
+                    "unit": "Gói",
+                    "estimatedDurationHours": 2.0,
+                    "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599581/house_cleaning_nob_umewqf.png",
+                    "categoryName": "Dọn dẹp nhà",
                     "isActive": true
                 },
                 "quantity": 1,
-                "pricePerUnit": 100000.00,
-                "formattedPricePerUnit": "100.000 ₫",
-                "subTotal": 100000.00,
-                "formattedSubTotal": "100.000 ₫",
+                "pricePerUnit": 500000.00,
+                "formattedPricePerUnit": "500,000đ",
+                "subTotal": 500000.00,
+                "formattedSubTotal": "500,000đ",
                 "selectedChoices": [],
                 "assignments": [
                     {
@@ -105,31 +106,34 @@ Authorization: Bearer {customer_token_john_doe}
                             "phoneNumber": "0923456789",
                             "avatar": "https://picsum.photos/200",
                             "rating": null,
-                            "employeeStatus": "ACTIVE",
-                            "skills": ["Deep Cleaning", "Laundry"],
+                            "employeeStatus": "AVAILABLE",
+                            "skills": [
+                                "Deep Cleaning",
+                                "Laundry"
+                            ],
                             "bio": "Chuyên gia giặt ủi và làm sạch sâu."
                         },
                         "status": "COMPLETED",
-                        "checkInTime": "2025-08-20T09:00:00",
-                        "checkOutTime": "2025-08-20T13:00:00",
+                        "checkInTime": "2025-08-20 09:00:00",
+                        "checkOutTime": "2025-08-20 13:00:00",
                         "createdAt": null,
                         "updatedAt": null
                     }
                 ],
-                "estimatedDuration": "4.0 giờ",
-                "formattedEstimatedDuration": "4.0 giờ"
+                "duration": "2 giờ",
+                "formattedDuration": "2 giờ"
             }
         ],
         "payment": {
-            "id": "pay00001-0000-0000-0000-000000000001",
-            "amount": 80000.00,
-            "paymentMethodName": "Tiền mặt",
+            "paymentId": "pay00001-0000-0000-0000-000000000001",
+            "amount": 480000.00,
+            "paymentMethod": "Cổng thanh toán VNPAY",
             "paymentStatus": "PAID",
-            "transactionCode": "TXN-20250820-001",
-            "createdAt": "2025-08-20T13:00:00",
-            "paidAt": "2025-08-20T13:05:00"
+            "transactionCode": "VNP123456789",
+            "createdAt": "2025-11-06 23:15:25",
+            "paidAt": "2025-08-20 13:05:00"
         },
-        "createdAt": "2025-08-20T08:00:00"
+        "createdAt": "2025-11-06T23:15:25"
     }
 }
 ```
@@ -168,70 +172,54 @@ Authorization: Bearer {employee_token_le_van_nam}
         },
         "address": {
             "addressId": "adrs0001-0000-0000-0000-000000000011",
-            "fullAddress": "789 Đường Võ Văn Ngân, Phường Linh Chiểu",
-            "ward": "Phường Linh Chiểu",
-            "city": "Thành phố Thủ Đức",
-            "latitude": 10.8507,
-            "longitude": 106.7634,
+            "fullAddress": "234 Võ Văn Tần, Phường Bến Cát, Thành phố Hồ Chí Minh",
+            "ward": "Phường Bến Cát",
+            "city": "Thành phố Hồ Chí Minh",
+            "latitude": 10.7788,
+            "longitude": 106.6897,
             "isDefault": true
         },
         "bookingTime": "2025-11-07T09:00:00",
         "note": "Vệ sinh sofa da chuyên dụng",
         "totalAmount": 200000.00,
-        "formattedTotalAmount": "200.000 ₫",
+        "formattedTotalAmount": "200,000đ",
         "status": "CONFIRMED",
         "title": null,
-        "imageUrl": null,
+        "imageUrls": [],
+        "isPost": false,
         "isVerified": true,
         "adminComment": null,
         "promotion": null,
         "bookingDetails": [
             {
-                "id": "bd000001-0000-0000-0000-000000000012",
+                "bookingDetailId": "bd000001-0000-0000-0000-000000000012",
                 "service": {
                     "serviceId": 3,
                     "name": "Vệ sinh Sofa - Nệm - Rèm",
-                    "description": "Dịch vụ vệ sinh chuyên sâu cho sofa, nệm và rèm cửa",
-                    "basePrice": 200000.00,
-                    "unit": "bộ",
-                    "estimatedDurationHours": 2.0,
-                    "iconUrl": "https://example.com/icons/sofa-cleaning.png",
-                    "categoryName": "Vệ sinh",
+                    "description": "Giặt sạch và khử khuẩn Sofa, Nệm, Rèm cửa bằng máy móc chuyên dụng.",
+                    "basePrice": 300000.00,
+                    "unit": "Gói",
+                    "estimatedDurationHours": 3.0,
+                    "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757600057/sofa_bed_vkkjz8.png",
+                    "categoryName": "Dọn dẹp nhà",
                     "isActive": true
                 },
                 "quantity": 1,
                 "pricePerUnit": 200000.00,
-                "formattedPricePerUnit": "200.000 ₫",
+                "formattedPricePerUnit": "200,000đ",
                 "subTotal": 200000.00,
-                "formattedSubTotal": "200.000 ₫",
+                "formattedSubTotal": "200,000đ",
                 "selectedChoices": [],
                 "assignments": [],
-                "estimatedDuration": "2.0 giờ",
-                "formattedEstimatedDuration": "2.0 giờ"
+                "duration": "3 giờ",
+                "formattedDuration": "3 giờ"
             }
         ],
         "payment": null,
-        "createdAt": "2025-11-07T08:00:00"
+        "createdAt": "2025-11-06T23:15:26"
     }
 }
 ```
-
----
-
-## Available Bookings in Seed Data
-
-### For Customer Testing:
-- **BK000001** (b0000001-0000-0000-0000-000000000001) - Customer: John Doe - COMPLETED - 80,000 VND - Has payment
-- **BK000002** (b0000001-0000-0000-0000-000000000002) - Customer: Jane Smith - CONFIRMED - 90,000 VND - Has assignment
-- **BK000003** (b0000001-0000-0000-0000-000000000003) - Customer: Nguyễn Văn An - PENDING - 500,000 VND
-- **BK000004** (b0000001-0000-0000-0000-000000000004) - Customer: Trần Thị Bích - PENDING - 300,000 VND
-- **BK000005** (b0000001-0000-0000-0000-000000000005) - Customer: Lê Văn Cường - PENDING - 350,000 VND
-
-### For Employee Testing:
-- **BK000010** (b0000001-0000-0000-0000-000000000010) - PENDING - 500,000 VND - Not verified
-- **BK000011** (b0000001-0000-0000-0000-000000000011) - PENDING - 150,000 VND - Not verified
-- **BK000012** (b0000001-0000-0000-0000-000000000012) - CONFIRMED - 200,000 VND - Verified
-- **BK000013** (b0000001-0000-0000-0000-000000000013) - PENDING - 100,000 VND - Not verified
 
 ---
 

@@ -21,8 +21,7 @@ public record BookingCreateRequest(
         @Size(max = 255, message = "Title cannot exceed 255 characters")
         String title,
 
-        @Size(max = 500, message = "Image URL cannot exceed 500 characters")
-        String imageUrl,
+        List<@Size(max = 500, message = "Image URL cannot exceed 500 characters") String> imageUrls,
 
         @Size(max = 20, message = "Promo code cannot exceed 20 characters")
         String promoCode,
