@@ -147,6 +147,18 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
            "ORDER BY b.createdAt DESC")
     Page<Booking> findByCustomerIdWithPagination(@Param("customerId") String customerId, Pageable pageable);
 
+    // Find bookings by customer with date filter
+    @Query("SELECT b FROM Booking b " +
+           "LEFT JOIN FETCH b.customer c " +
+           "LEFT JOIN FETCH b.address a " +
+           "LEFT JOIN FETCH b.promotion p " +
+           "WHERE b.customer.customerId = :customerId " +
+           "AND b.bookingTime >= :fromDate " +
+           "ORDER BY b.createdAt DESC")
+    Page<Booking> findByCustomerIdWithPaginationAndDate(@Param("customerId") String customerId, 
+                                                         @Param("fromDate") java.time.LocalDateTime fromDate, 
+                                                         Pageable pageable);
+
     // Find unverified bookings (posts) ordered by created date descending
     @Query("SELECT b FROM Booking b " +
            "LEFT JOIN FETCH b.customer c " +
@@ -169,6 +181,17 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
            "ORDER BY b.createdAt DESC")
     Page<Booking> findVerifiedAwaitingEmployeeBookings(Pageable pageable);
 
+    // Find verified bookings awaiting employee with date filter
+    @Query("SELECT b FROM Booking b " +
+           "LEFT JOIN FETCH b.customer c " +
+           "LEFT JOIN FETCH b.address a " +
+           "LEFT JOIN FETCH b.promotion p " +
+           "WHERE b.isVerified = true " +
+           "AND b.status = iuh.house_keeping_service_be.enums.BookingStatus.AWAITING_EMPLOYEE " +
+           "AND b.bookingTime >= :fromDate " +
+           "ORDER BY b.bookingTime ASC")
+    Page<Booking> findVerifiedAwaitingEmployeeBookingsWithDate(@Param("fromDate") java.time.LocalDateTime fromDate, Pageable pageable);
+
     // Find all bookings ordered by booking time descending (for admin)
     @Query("SELECT b FROM Booking b " +
            "LEFT JOIN FETCH b.customer c " +
@@ -176,6 +199,24 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
            "LEFT JOIN FETCH b.promotion p " +
            "ORDER BY b.bookingTime DESC")
     Page<Booking> findAllBookingsOrderByBookingTimeDesc(Pageable pageable);
+
+    // Find all bookings with date filter ordered by booking time descending (for admin)
+    @Query("SELECT b FROM Booking b " +
+           "LEFT JOIN FETCH b.customer c " +
+           "LEFT JOIN FETCH b.address a " +
+           "LEFT JOIN FETCH b.promotion p " +
+           "WHERE b.bookingTime >= :fromDate " +
+           "ORDER BY b.bookingTime DESC")
+    Page<Booking> findAllBookingsOrderByBookingTimeDescWithDate(@Param("fromDate") java.time.LocalDateTime fromDate, Pageable pageable);
+
+    // Find unverified bookings with date filter ordered by created date descending
+    @Query("SELECT b FROM Booking b " +
+           "LEFT JOIN FETCH b.customer c " +
+           "LEFT JOIN FETCH b.address a " +
+           "WHERE b.isVerified = false " +
+           "AND b.bookingTime >= :fromDate " +
+           "ORDER BY b.createdAt DESC")
+    Page<Booking> findUnverifiedBookingsOrderByCreatedAtDescWithDate(@Param("fromDate") java.time.LocalDateTime fromDate, Pageable pageable);
 
     // Get service booking statistics for a date range
     @Query("SELECT bd.service.serviceId, bd.service.name, COUNT(bd.id) " +
@@ -209,4 +250,18 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
            "WHERE asn.employee.employeeId = :employeeId " +
            "ORDER BY b.bookingTime ASC")
     Page<Booking> findBookingsByEmployeeIdOrderByBookingTime(@Param("employeeId") String employeeId, Pageable pageable);
+
+    // Find bookings by employee with date filter
+    @Query("SELECT DISTINCT b FROM Booking b " +
+           "LEFT JOIN FETCH b.customer c " +
+           "LEFT JOIN FETCH b.address addr " +
+           "LEFT JOIN FETCH b.promotion p " +
+           "JOIN b.bookingDetails bd " +
+           "JOIN bd.assignments asn " +
+           "WHERE asn.employee.employeeId = :employeeId " +
+           "AND b.bookingTime >= :fromDate " +
+           "ORDER BY b.bookingTime ASC")
+    Page<Booking> findBookingsByEmployeeIdOrderByBookingTimeWithDate(@Param("employeeId") String employeeId, 
+                                                                      @Param("fromDate") java.time.LocalDateTime fromDate, 
+                                                                      Pageable pageable);
 }

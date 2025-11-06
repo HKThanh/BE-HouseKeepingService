@@ -33,6 +33,7 @@ public class BookingData {
     
     private String title;
     private String imageUrl;
+    private Boolean isPost;
     private Boolean isVerified;
     private String adminComment;
     

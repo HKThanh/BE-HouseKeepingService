@@ -36,6 +36,10 @@ public class BookingMapper {
                                     List<BookingDetailInfo> detailInfos,
                                     PaymentInfo paymentInfo,
                                     PromotionInfo promotionInfo) {
+        // Calculate isPost: true if title OR imageUrl is not null
+        boolean isPost = (booking.getTitle() != null && !booking.getTitle().trim().isEmpty()) 
+                      || (booking.getImageUrl() != null && !booking.getImageUrl().trim().isEmpty());
+        
         BookingData data = new BookingData(
             booking.getBookingId(),
             booking.getBookingCode(),
@@ -50,6 +54,7 @@ public class BookingMapper {
             booking.getStatus().toString(),
             booking.getTitle(),
             booking.getImageUrl(),
+            isPost,
             booking.getIsVerified(),
             booking.getAdminComment(),
             promotionInfo,

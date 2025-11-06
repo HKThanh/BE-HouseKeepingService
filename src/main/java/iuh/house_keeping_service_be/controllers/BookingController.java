@@ -25,12 +25,14 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 
 @RestController
@@ -132,11 +134,11 @@ public class BookingController {
                     ));
                 }
                 
-                // Validate file size (max 5MB)
-                if (image.getSize() > 5 * 1024 * 1024) {
+                // Validate file size (max 10MB)
+                if (image.getSize() > 10 * 1024 * 1024) {
                     return ResponseEntity.badRequest().body(Map.of(
                         "success", false,
-                        "message", "Kích thước file không được vượt quá 5MB"
+                        "message", "Kích thước file không được vượt quá 10MB"
                     ));
                 }
                 
@@ -208,11 +210,12 @@ public class BookingController {
     @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_ADMIN')")
     public ResponseEntity<Page<BookingHistoryResponse>> getBookingsByCustomerId(
             @PathVariable String customerId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "createdAt,desc") String[] sort) {
 
-        log.info("Getting bookings for customer: {} (page: {}, size: {})", customerId, page, size);
+        log.info("Getting bookings for customer: {} from date: {} (page: {}, size: {})", customerId, fromDate, page, size);
 
         try {
             // Validate pagination parameters
@@ -229,7 +232,12 @@ public class BookingController {
 
             Pageable pageable = PageRequest.of(page, size, Sort.by(new Sort.Order(direction, sortProperty)));
 
-            Page<BookingHistoryResponse> bookingsPage = bookingService.getBookingsByCustomerId(customerId, pageable);
+            Page<BookingHistoryResponse> bookingsPage;
+            if (fromDate != null) {
+                bookingsPage = bookingService.getBookingsByCustomerId(customerId, fromDate, pageable);
+            } else {
+                bookingsPage = bookingService.getBookingsByCustomerId(customerId, pageable);
+            }
 
             log.info("Retrieved {} bookings for customer: {}", bookingsPage.getNumberOfElements(), customerId);
             return ResponseEntity.ok(bookingsPage);

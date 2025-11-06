@@ -21,6 +21,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Map;
 
 @RestController
@@ -73,9 +74,11 @@ public class AdminController {
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<?> getAllBookings(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate) {
         
-        log.info("Admin fetching all bookings sorted by booking time (page: {}, size: {})", page, size);
+        log.info("Admin fetching all bookings sorted by booking time (page: {}, size: {}, fromDate: {})", 
+                 page, size, fromDate);
         
         try {
             // Validate pagination parameters
@@ -83,7 +86,13 @@ public class AdminController {
             if (size <= 0 || size > 100) size = 10;
             
             Pageable pageable = PageRequest.of(page, size);
-            Page<BookingResponse> allBookings = bookingService.getAllBookingsSortedByBookingTime(pageable);
+            Page<BookingResponse> allBookings;
+            
+            if (fromDate != null) {
+                allBookings = bookingService.getAllBookingsSortedByBookingTime(fromDate, pageable);
+            } else {
+                allBookings = bookingService.getAllBookingsSortedByBookingTime(pageable);
+            }
             
             return ResponseEntity.ok(Map.of(
                 "success", true,
@@ -105,16 +114,24 @@ public class AdminController {
     @PreAuthorize("hasRole('ROLE_ADMIN')")
     public ResponseEntity<?> getUnverifiedBookings(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate) {
         
-        log.info("Admin fetching unverified bookings (page: {}, size: {})", page, size);
+        log.info("Admin fetching unverified bookings (page: {}, size: {}, fromDate: {})", 
+                 page, size, fromDate);
         
         try {
             if (page < 0) page = 0;
             if (size <= 0 || size > 100) size = 10;
             
             Pageable pageable = PageRequest.of(page, size);
-            Page<BookingResponse> unverifiedBookings = bookingService.getUnverifiedBookings(pageable);
+            Page<BookingResponse> unverifiedBookings;
+            
+            if (fromDate != null) {
+                unverifiedBookings = bookingService.getUnverifiedBookings(fromDate, pageable);
+            } else {
+                unverifiedBookings = bookingService.getUnverifiedBookings(pageable);
+            }
             
             return ResponseEntity.ok(Map.of(
                 "success", true,

@@ -11,17 +11,21 @@ import iuh.house_keeping_service_be.dtos.Booking.internal.BookingValidationResul
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDateTime;
+
 public interface BookingService {
     BookingCreationSummary createBooking(BookingCreateRequest request);
     BookingResponse getBookingDetails(String bookingId);
     BookingValidationResult validateBooking(BookingCreateRequest request);
     Page<BookingHistoryResponse> getBookingsByCustomerId(String customerId, Pageable pageable);
+    Page<BookingHistoryResponse> getBookingsByCustomerId(String customerId, LocalDateTime fromDate, Pageable pageable);
     
     // Convert booking to post (when no employee is selected)
     BookingResponse convertBookingToPost(String bookingId, ConvertBookingToPostRequest request);
     
     // Get unverified bookings for admin review
     Page<BookingResponse> getUnverifiedBookings(Pageable pageable);
+    Page<BookingResponse> getUnverifiedBookings(LocalDateTime fromDate, Pageable pageable);
     
     // Admin verify/reject booking post
     BookingResponse verifyBooking(String bookingId, BookingVerificationRequest request);
@@ -34,10 +38,13 @@ public interface BookingService {
     
     // Get verified bookings that are still awaiting employee (for Employee and Admin)
     Page<BookingResponse> getVerifiedAwaitingEmployeeBookings(Pageable pageable);
+    Page<BookingResponse> getVerifiedAwaitingEmployeeBookings(LocalDateTime fromDate, Pageable pageable);
     
     // Get all bookings sorted by booking time descending (for Admin only)
     Page<BookingResponse> getAllBookingsSortedByBookingTime(Pageable pageable);
+    Page<BookingResponse> getAllBookingsSortedByBookingTime(LocalDateTime fromDate, Pageable pageable);
     
     // Get bookings where employee has assignment, sorted by booking time
     Page<BookingResponse> getBookingsByEmployeeId(String employeeId, Pageable pageable);
+    Page<BookingResponse> getBookingsByEmployeeId(String employeeId, LocalDateTime fromDate, Pageable pageable);
 }

@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -18,6 +19,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 
 @RestController
@@ -43,10 +45,12 @@ public class EmployeeBookingController {
     @PreAuthorize("hasAnyRole('ROLE_EMPLOYEE', 'ROLE_ADMIN')")
     public ResponseEntity<?> getEmployeeAssignedBookings(
             @PathVariable String employeeId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         
-        log.info("Fetching assigned bookings for employee: {} (page: {}, size: {})", employeeId, page, size);
+        log.info("Fetching assigned bookings for employee: {} from date: {} (page: {}, size: {})", 
+                employeeId, fromDate, page, size);
         
         try {
             // Get current authenticated user
@@ -84,7 +88,13 @@ public class EmployeeBookingController {
             if (size <= 0 || size > 100) size = 10;
             
             Pageable pageable = PageRequest.of(page, size);
-            Page<BookingResponse> employeeBookings = bookingService.getBookingsByEmployeeId(employeeId, pageable);
+            Page<BookingResponse> employeeBookings;
+            
+            if (fromDate != null) {
+                employeeBookings = bookingService.getBookingsByEmployeeId(employeeId, fromDate, pageable);
+            } else {
+                employeeBookings = bookingService.getBookingsByEmployeeId(employeeId, pageable);
+            }
             
             return ResponseEntity.ok(Map.of(
                 "success", true,
@@ -111,17 +121,24 @@ public class EmployeeBookingController {
     @GetMapping("/verified-awaiting-employee")
     @PreAuthorize("hasAnyRole('ROLE_EMPLOYEE', 'ROLE_ADMIN')")
     public ResponseEntity<?> getVerifiedAwaitingEmployeeBookings(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         
-        log.info("Fetching verified bookings awaiting employee (page: {}, size: {})", page, size);
+        log.info("Fetching verified bookings awaiting employee from date: {} (page: {}, size: {})", fromDate, page, size);
         
         try {
             if (page < 0) page = 0;
             if (size <= 0 || size > 100) size = 10;
             
             Pageable pageable = PageRequest.of(page, size);
-            Page<BookingResponse> verifiedAwaitingBookings = bookingService.getVerifiedAwaitingEmployeeBookings(pageable);
+            Page<BookingResponse> verifiedAwaitingBookings;
+            
+            if (fromDate != null) {
+                verifiedAwaitingBookings = bookingService.getVerifiedAwaitingEmployeeBookings(fromDate, pageable);
+            } else {
+                verifiedAwaitingBookings = bookingService.getVerifiedAwaitingEmployeeBookings(pageable);
+            }
             
             return ResponseEntity.ok(Map.of(
                 "success", true,
