@@ -3,10 +3,6 @@
 
 -- Drop existing objects if they exist
 DROP TABLE IF EXISTS booking_media CASCADE;
-DROP TYPE IF EXISTS media_type CASCADE;
-
--- Create enum for media types
-CREATE TYPE media_type AS ENUM ('CHECK_IN_IMAGE', 'CHECK_OUT_IMAGE', 'PROGRESS_IMAGE', 'OTHER');
 
 -- Create booking_media table
 CREATE TABLE booking_media (
@@ -14,7 +10,7 @@ CREATE TABLE booking_media (
     assignment_id VARCHAR(255) NOT NULL,
     media_url VARCHAR(500) NOT NULL,
     public_id VARCHAR(255),
-    media_type media_type NOT NULL,
+    media_type VARCHAR(50) NOT NULL CHECK (media_type IN ('CHECK_IN_IMAGE', 'CHECK_OUT_IMAGE', 'PROGRESS_IMAGE', 'OTHER')),
     description VARCHAR(500),
     uploaded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     
