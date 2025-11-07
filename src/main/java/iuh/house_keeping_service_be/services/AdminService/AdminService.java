@@ -1,5 +1,6 @@
 package iuh.house_keeping_service_be.services.AdminService;
 
+import iuh.house_keeping_service_be.dtos.Admin.response.AdminProfileResponse;
 import iuh.house_keeping_service_be.dtos.Statistics.RevenueStatisticsResponse;
 import iuh.house_keeping_service_be.dtos.Statistics.ServiceBookingStatisticsResponse;
 import iuh.house_keeping_service_be.enums.RoleName;
@@ -13,6 +14,8 @@ public interface AdminService {
     AdminProfile findByContactInfoAndAccountRole(String contactInfo, RoleName roleName);
 
     AdminProfile findById(String id);
+    
+    AdminProfileResponse getAdminProfile(String adminProfileId);
 
     boolean isAdminByUsername(String username);
 
