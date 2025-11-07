@@ -65,3 +65,97 @@ INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity
 INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status, check_in_time, check_out_time) VALUES
 ('as000001-0000-0000-0000-000000000001', 'bd000001-0000-0000-0000-000000000001', 'e1000001-0000-0000-0000-000000000002', 'COMPLETED', '2025-08-20 09:00:00+07', '2025-08-20 13:00:00+07'),
 ('as000001-0000-0000-0000-000000000002', 'bd000001-0000-0000-0000-000000000002', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED', NULL, NULL);
+
+-- =================================================================================
+-- THÊM DỮ LIỆU TEST CHO CHỨC NĂNG ASSIGNMENT (GET, ACCEPT, CANCEL)
+-- =================================================================================
+
+-- Thêm các booking mới với thời gian trong tương lai để test
+-- Booking 8: Có assignment PENDING (test accept assignment)
+INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status, promotion_id, is_verified) VALUES
+('b0000001-0000-0000-0000-000000000008', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000001', 'BK000008', '2025-11-15 09:00:00+07', 'Test assignment PENDING - Dọn dẹp căn hộ', 200000.00, 'PENDING', NULL, true);
+
+-- Booking 9: Có assignment PENDING (test cancel trước 30 phút)
+INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status, promotion_id, is_verified) VALUES
+('b0000001-0000-0000-0000-000000000009', 'c1000001-0000-0000-0000-000000000003', 'adrs0001-0000-0000-0000-000000000003', 'BK000009', '2025-11-20 14:00:00+07', 'Test cancel assignment - Giặt ủi', 150000.00, 'PENDING', NULL, true);
+
+-- Booking 10: Có assignment ASSIGNED (test cancel assignment đã assigned)
+INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status, promotion_id, is_verified) VALUES
+('b0000001-0000-0000-0000-000000000010', 'c1000001-0000-0000-0000-000000000004', 'adrs0001-0000-0000-0000-000000000009', 'BK000010', '2025-11-18 10:00:00+07', 'Test assignment ASSIGNED - Vệ sinh máy lạnh', 300000.00, 'CONFIRMED', NULL, true);
+
+-- Booking 11: Có nhiều assignment PENDING (test accept nhiều assignment)
+INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status, promotion_id, is_verified) VALUES
+('b0000001-0000-0000-0000-000000000011', 'c1000001-0000-0000-0000-000000000005', 'adrs0001-0000-0000-0000-000000000010', 'BK000011', '2025-11-25 08:00:00+07', 'Test nhiều assignments - Tổng vệ sinh căn hộ lớn', 800000.00, 'PENDING', NULL, true);
+
+-- Booking 12: Assignment IN_PROGRESS (test get assignment đang làm việc)
+INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status, promotion_id, is_verified) VALUES
+('b0000001-0000-0000-0000-000000000012', 'c1000001-0000-0000-0000-000000000006', 'adrs0001-0000-0000-0000-000000000011', 'BK000012', '2025-11-07 08:00:00+07', 'Test assignment IN_PROGRESS', 250000.00, 'IN_PROGRESS', NULL, true);
+
+-- Booking 13: Assignment gần thời gian bắt đầu (test cancel không được do < 30 phút)
+INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status, promotion_id, is_verified) VALUES
+('b0000001-0000-0000-0000-000000000013', 'c1000001-0000-0000-0000-000000000007', 'adrs0001-0000-0000-0000-000000000012', 'BK000013', '2025-11-07 14:30:00+07', 'Test cancel gần giờ - không được phép', 180000.00, 'PENDING', NULL, true);
+
+-- Chi tiết dịch vụ cho các booking test
+INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
+-- Booking 8: 1 dịch vụ dọn dẹp theo giờ
+('bd000001-0000-0000-0000-000000000008', 'b0000001-0000-0000-0000-000000000008', (SELECT service_id FROM service WHERE name = 'Dọn dẹp theo giờ'), 4, 50000.00, 200000.00),
+-- Booking 9: 1 dịch vụ giặt sấy
+('bd000001-0000-0000-0000-000000000009', 'b0000001-0000-0000-0000-000000000009', (SELECT service_id FROM service WHERE name = 'Giặt sấy theo kg'), 5, 30000.00, 150000.00),
+-- Booking 10: 2 máy lạnh
+('bd000001-0000-0000-0000-000000000010', 'b0000001-0000-0000-0000-000000000010', (SELECT service_id FROM service WHERE name = 'Vệ sinh máy lạnh'), 2, 150000.00, 300000.00),
+-- Booking 11: Tổng vệ sinh + Vệ sinh sofa (cần nhiều nhân viên)
+('bd000001-0000-0000-0000-000000000011', 'b0000001-0000-0000-0000-000000000011', (SELECT service_id FROM service WHERE name = 'Tổng vệ sinh'), 2, 100000.00, 200000.00),
+('bd000001-0000-0000-0000-000000000012', 'b0000001-0000-0000-0000-000000000011', (SELECT service_id FROM service WHERE name = 'Vệ sinh Sofa - Nệm - Rèm'), 2, 300000.00, 600000.00),
+-- Booking 12: Dọn dẹp theo giờ
+('bd000001-0000-0000-0000-000000000013', 'b0000001-0000-0000-0000-000000000012', (SELECT service_id FROM service WHERE name = 'Dọn dẹp theo giờ'), 5, 50000.00, 250000.00),
+-- Booking 13: Giặt hấp cao cấp
+('bd000001-0000-0000-0000-000000000014', 'b0000001-0000-0000-0000-000000000013', (SELECT service_id FROM service WHERE name = 'Giặt hấp cao cấp'), 1, 120000.00, 120000.00);
+
+-- Phân công assignments cho các booking test
+INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status, check_in_time, check_out_time) VALUES
+-- Booking 8: 1 assignment PENDING (test accept)
+('as000001-0000-0000-0000-000000000003', 'bd000001-0000-0000-0000-000000000008', 'e1000001-0000-0000-0000-000000000001', 'PENDING', NULL, NULL),
+
+-- Booking 9: 1 assignment PENDING (test cancel - thời gian xa)
+('as000001-0000-0000-0000-000000000004', 'bd000001-0000-0000-0000-000000000009', 'e1000001-0000-0000-0000-000000000002', 'PENDING', NULL, NULL),
+
+-- Booking 10: 1 assignment ASSIGNED (test cancel assigned)
+('as000001-0000-0000-0000-000000000005', 'bd000001-0000-0000-0000-000000000010', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED', NULL, NULL),
+
+-- Booking 11: 3 assignments PENDING (test accept nhiều assignments)
+('as000001-0000-0000-0000-000000000006', 'bd000001-0000-0000-0000-000000000011', 'e1000001-0000-0000-0000-000000000001', 'PENDING', NULL, NULL),
+('as000001-0000-0000-0000-000000000007', 'bd000001-0000-0000-0000-000000000011', 'e1000001-0000-0000-0000-000000000002', 'PENDING', NULL, NULL),
+('as000001-0000-0000-0000-000000000008', 'bd000001-0000-0000-0000-000000000012', 'e1000001-0000-0000-0000-000000000003', 'PENDING', NULL, NULL),
+
+-- Booking 12: 1 assignment IN_PROGRESS (đang làm việc)
+('as000001-0000-0000-0000-000000000009', 'bd000001-0000-0000-0000-000000000013', 'e1000001-0000-0000-0000-000000000001', 'IN_PROGRESS', '2025-11-07 08:00:00+07', NULL),
+
+-- Booking 13: 1 assignment PENDING gần giờ (test cancel fail do < 30 phút)
+('as000001-0000-0000-0000-000000000010', 'bd000001-0000-0000-0000-000000000014', 'e1000001-0000-0000-0000-000000000002', 'PENDING', NULL, NULL);
+
+-- =================================================================================
+-- TEST SCENARIOS SUMMARY
+-- =================================================================================
+-- 
+-- 1. GET ASSIGNMENTS (Employee e1000001-0000-0000-0000-000000000001):
+--    - PENDING: as000001-0000-0000-0000-000000000003, as000001-0000-0000-0000-000000000006
+--    - ASSIGNED: as000001-0000-0000-0000-000000000005, as000001-0000-0000-0000-000000000002
+--    - IN_PROGRESS: as000001-0000-0000-0000-000000000009
+--    - COMPLETED: as000001-0000-0000-0000-000000000001
+--
+-- 2. ACCEPT ASSIGNMENT:
+--    ✅ Success: as000001-0000-0000-0000-000000000003 (PENDING → ASSIGNED)
+--    ❌ Fail: as000001-0000-0000-0000-000000000005 (đã ASSIGNED rồi)
+--
+-- 3. CANCEL ASSIGNMENT:
+--    ✅ Success (PENDING, > 30 min): as000001-0000-0000-0000-000000000004
+--    ✅ Success (ASSIGNED, > 30 min): as000001-0000-0000-0000-000000000005
+--    ❌ Fail (< 30 min): as000001-0000-0000-0000-000000000010
+--    ❌ Fail (IN_PROGRESS): as000001-0000-0000-0000-000000000009
+--
+-- 4. FILTER BY STATUS:
+--    status=PENDING: 4 assignments
+--    status=ASSIGNED: 2 assignments
+--    status=IN_PROGRESS: 1 assignment
+--    status=COMPLETED: 1 assignment
+-- =================================================================================
