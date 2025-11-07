@@ -1,6 +1,5 @@
 package iuh.house_keeping_service_be.services.AssignmentService.impl;
 
-import iuh.house_keeping_service_be.dtos.Assignment.request.AssignmentActionRequest;
 import iuh.house_keeping_service_be.dtos.Assignment.request.AssignmentCancelRequest;
 import iuh.house_keeping_service_be.dtos.Assignment.response.AssignmentDetailResponse;
 import iuh.house_keeping_service_be.dtos.Assignment.response.BookingSummary;
@@ -123,7 +122,7 @@ public class AssignmentServiceImpl implements AssignmentService {
 
             if (!zoneKeys.isEmpty()) {
                 Page<Booking> zoneBookingsPage = bookingRepository
-                        .findAwaitingEmployeeBookingsByZones(zoneKeys, pageable);
+                        .findPendingBookingsByZones(zoneKeys, pageable);
 
                 List<BookingSummary> zoneSummaries = mapToBookingSummaries(zoneBookingsPage.getContent());
                 result.addAll(zoneSummaries);
@@ -145,8 +144,8 @@ public class AssignmentServiceImpl implements AssignmentService {
                     .collect(Collectors.toList());
 
             List<Booking> outsideZoneBookings = zoneKeys.isEmpty()
-                ? bookingRepository.findAwaitingEmployeeBookings(PageRequest.of(0, remainingSlots * 2))
-                : bookingRepository.findAwaitingEmployeeBookingsOutsideZones(zoneKeys);
+                ? bookingRepository.findPendingBookings(PageRequest.of(0, remainingSlots * 2))
+                : bookingRepository.findPendingBookingsOutsideZones(zoneKeys);
 
             List<BookingSummary> sortedOutsideBookings = sortBookingsByProximity(
                 outsideZoneBookings, workingZones);
@@ -170,7 +169,7 @@ public class AssignmentServiceImpl implements AssignmentService {
             throw new IllegalStateException("Không thể xác định booking của chi tiết dịch vụ này");
         }
 
-        EnumSet<BookingStatus> allowedStatuses = EnumSet.of(BookingStatus.AWAITING_EMPLOYEE, BookingStatus.CONFIRMED);
+        EnumSet<BookingStatus> allowedStatuses = EnumSet.of(BookingStatus.PENDING, BookingStatus.AWAITING_EMPLOYEE, BookingStatus.CONFIRMED);
         if (!allowedStatuses.contains(booking.getStatus())) {
             throw new IllegalStateException(String.format(
                     "Không thể nhận booking khi đang ở trạng thái %s", booking.getStatus().name()));
@@ -179,7 +178,8 @@ public class AssignmentServiceImpl implements AssignmentService {
         LocalDateTime shiftStart = bookingDetail.getBooking().getBookingTime();
         LocalDateTime shiftEnd = calculateShiftEndTime(shiftStart, bookingDetail);
 
-        List<Assignment> conflictingAssignments = assignmentRepository.findConflictingAssignments(employeeId, shiftStart, shiftEnd);
+        List<Assignment> conflictingAssignments = assignmentRepository.findConflictingAssignments(
+                employeeId, shiftStart, shiftEnd, null);
         if (!conflictingAssignments.isEmpty()) {
             throw new IllegalStateException("Nhân viên đã được phân công công việc khác trong khung giờ này");
         }
@@ -357,18 +357,18 @@ public class AssignmentServiceImpl implements AssignmentService {
         Assignment assignment = assignmentRepository.findById(assignmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy công việc"));
 
-        // Check if assignment can be cancelled
-        if (assignment.getStatus() != AssignmentStatus.ASSIGNED) {
-            throw new IllegalStateException("Chỉ có thể hủy công việc đang ở trạng thái 'Đã nhận'");
+        // Check if assignment can be cancelled (PENDING or ASSIGNED)
+        if (assignment.getStatus() != AssignmentStatus.PENDING && assignment.getStatus() != AssignmentStatus.ASSIGNED) {
+            throw new IllegalStateException("Chỉ có thể hủy công việc đang ở trạng thái 'Chờ xác nhận' hoặc 'Đã nhận'");
         }
 
         BookingDetail bookingDetail = assignment.getBookingDetail();
         Booking booking = bookingDetail.getBooking();
 
-        // Check if booking is not too close to start time (e.g., within 2 hours)
+        // Check if booking is not too close to start time (30 minutes before)
         LocalDateTime now = LocalDateTime.now();
-        if (booking.getBookingTime().isBefore(now.plusHours(2))) {
-            throw new IllegalStateException("Không thể hủy công việc trong vòng 2 giờ trước giờ bắt đầu");
+        if (booking.getBookingTime().isBefore(now.plusMinutes(30))) {
+            throw new IllegalStateException("Không thể hủy công việc trong vòng 30 phút trước giờ bắt đầu");
         }
 
         try {
@@ -393,6 +393,67 @@ public class AssignmentServiceImpl implements AssignmentService {
         }
     }
 
+    @Override
+    @Transactional
+    public AssignmentDetailResponse acceptAssignment(String assignmentId, String employeeId) {
+        Assignment assignment = assignmentRepository.findByIdWithDetails(assignmentId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy công việc"));
+
+        ensureAssignmentBelongsToEmployee(assignment, employeeId);
+
+        // Check if assignment is in PENDING status
+        if (assignment.getStatus() != AssignmentStatus.PENDING) {
+            throw new IllegalStateException(String.format(
+                    "Không thể nhận công việc đang ở trạng thái %s. Chỉ có thể nhận công việc đang ở trạng thái PENDING.",
+                    assignment.getStatus().name()
+            ));
+        }
+
+        BookingDetail bookingDetail = assignment.getBookingDetail();
+        Booking booking = bookingDetail.getBooking();
+
+        // Check time conflict with other assignments (exclude current assignment)
+        LocalDateTime shiftStart = booking.getBookingTime();
+        LocalDateTime shiftEnd = calculateShiftEndTime(shiftStart, bookingDetail);
+
+        List<Assignment> conflictingAssignments = assignmentRepository.findConflictingAssignments(
+                employeeId, shiftStart, shiftEnd, assignmentId);
+        if (!conflictingAssignments.isEmpty()) {
+            throw new IllegalStateException("Nhân viên đã được phân công công việc khác trong khung giờ này");
+        }
+
+        // Check leave/unavailability conflict
+        List<EmployeeUnavailability> unavailabilities =
+                employeeUnavailabilityRepository.findByEmployeeAndPeriod(employeeId, shiftStart, shiftEnd);
+        boolean hasLeaveConflict = employeeUnavailabilityRepository.hasConflict(employeeId, shiftStart, shiftEnd);
+        if (!unavailabilities.isEmpty() || hasLeaveConflict) {
+            throw new IllegalStateException("Nhân viên đang có lịch nghỉ được phê duyệt trong khung giờ này");
+        }
+
+        // Update assignment status to ASSIGNED
+        assignment.setStatus(AssignmentStatus.ASSIGNED);
+        Assignment savedAssignment = assignmentRepository.save(assignment);
+
+        // Check if all assignments for the booking are now assigned
+        boolean allAssigned = booking.getBookingDetails().stream()
+                .allMatch(bd -> bd.getAssignments().stream()
+                        .filter(a -> a.getStatus() != AssignmentStatus.CANCELLED)
+                        .allMatch(a -> a.getStatus() == AssignmentStatus.ASSIGNED || 
+                                      a.getStatus() == AssignmentStatus.IN_PROGRESS || 
+                                      a.getStatus() == AssignmentStatus.COMPLETED)
+                );
+
+        if (allAssigned && booking.getStatus() == BookingStatus.PENDING) {
+            booking.setStatus(BookingStatus.CONFIRMED);
+            booking.setUpdatedAt(LocalDateTime.now());
+            bookingRepository.save(booking);
+        }
+
+        log.info("Assignment {} accepted by employee {}", assignmentId, employeeId);
+
+        return mapToAssignmentDetailResponse(savedAssignment);
+    }
+
     private void updateBookingStatusIfNeeded(String bookingId) {
         List<Assignment> bookingAssignments = assignmentRepository.findByBookingIdWithStatus(bookingId);
 
@@ -413,21 +474,20 @@ public class AssignmentServiceImpl implements AssignmentService {
     private void sendCrisisNotification(Booking booking, Assignment assignment, String reason) {
         try {
             // Send immediate notification to customer
-            String message = String.format(
-                    "THÔNG BÁO KHẨN: Lịch dọn dẹp %s của bạn vào %s đã bị hủy bởi nhân viên. " +
-                    "Lý do: %s. Vui lòng liên hệ 1900-xxx để được hỗ trợ đặt lại dịch vụ.",
-                    booking.getBookingCode(),
-                    booking.getBookingTime(),
-                    reason
-            );
+            // TODO: Implement notification service
+            // String message = String.format(
+            //         "THÔNG BÁO KHẨN: Lịch dọn dẹp %s của bạn vào %s đã bị hủy bởi nhân viên. " +
+            //         "Lý do: %s. Vui lòng liên hệ 1900-xxx để được hỗ trợ đặt lại dịch vụ.",
+            //         booking.getBookingCode(),
+            //         booking.getBookingTime(),
+            //         reason
+            // );
 
-            //TODO: Implement notification service
-
-//            notificationService.sendCrisisNotification(
-//                    booking.getCustomer().getCustomerId(),
-//                    "Lịch dịch vụ bị hủy khẩn cấp",
-//                    message
-//            );
+            // notificationService.sendCrisisNotification(
+            //         booking.getCustomer().getCustomerId(),
+            //         "Lịch dịch vụ bị hủy khẩn cấp",
+            //         message
+            // );
 
             // Log for admin monitoring
             log.warn("CRISIS: Assignment {} cancelled by employee {}. Booking: {}, Customer: {}, Reason: {}",

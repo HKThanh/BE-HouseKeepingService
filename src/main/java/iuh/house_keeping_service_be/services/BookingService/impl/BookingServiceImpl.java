@@ -562,7 +562,7 @@ public class BookingServiceImpl implements BookingService {
 
         // Check for conflicting assignments
         List<Assignment> conflictingAssignments = assignmentRepository.findConflictingAssignments(
-                employee.getEmployeeId(), bookingTime, endTime);
+                employee.getEmployeeId(), bookingTime, endTime, null);
 
         if (!conflictingAssignments.isEmpty()) {
             Assignment conflict = conflictingAssignments.get(0);
@@ -698,7 +698,7 @@ public class BookingServiceImpl implements BookingService {
                     Assignment assignment = new Assignment();
                     assignment.setBookingDetail(detail);
                     assignment.setEmployee(employee);
-                    assignment.setStatus(AssignmentStatus.ASSIGNED);
+                    assignment.setStatus(AssignmentStatus.PENDING);  // Changed from ASSIGNED to PENDING
 
                     assignments.add(assignment);
                 }

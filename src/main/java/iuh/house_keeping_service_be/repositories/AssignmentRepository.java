@@ -35,7 +35,7 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
             "JOIN FETCH a.bookingDetail bd " +
             "JOIN FETCH bd.booking b " +
             "WHERE a.employee.employeeId = :employeeId " +
-            "AND a.status IN (iuh.house_keeping_service_be.enums.AssignmentStatus.ASSIGNED, iuh.house_keeping_service_be.enums.AssignmentStatus.IN_PROGRESS) " +
+            "AND a.status IN (iuh.house_keeping_service_be.enums.AssignmentStatus.PENDING, iuh.house_keeping_service_be.enums.AssignmentStatus.ASSIGNED, iuh.house_keeping_service_be.enums.AssignmentStatus.IN_PROGRESS) " +
             "AND b.bookingTime >= :currentTime " +
             "ORDER BY b.bookingTime ASC")
     List<Assignment> findActiveByEmployee(
@@ -48,7 +48,7 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
             "JOIN bd.booking b " +
             "JOIN bd.service s " +
             "WHERE a.employee.employeeId = :employeeId " +
-            "AND a.status IN (iuh.house_keeping_service_be.enums.AssignmentStatus.ASSIGNED, iuh.house_keeping_service_be.enums.AssignmentStatus.IN_PROGRESS) " +
+            "AND a.status IN (iuh.house_keeping_service_be.enums.AssignmentStatus.PENDING, iuh.house_keeping_service_be.enums.AssignmentStatus.ASSIGNED, iuh.house_keeping_service_be.enums.AssignmentStatus.IN_PROGRESS) " +
             "AND b.bookingTime < :endTime " +
             "AND b.bookingTime + s.estimatedDurationHours HOUR > :startTime")
     boolean hasActiveAssignmentConflict(
@@ -82,11 +82,13 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
             "WHERE a.employee_id = :employeeId " +
             "AND a.status NOT IN ('CANCELLED', 'COMPLETED') " +
             "AND b.booking_time < :endTime " +
-            "AND (b.booking_time + (s.estimated_duration_hours * INTERVAL '1 hour')) > :startTime",
+            "AND (b.booking_time + (s.estimated_duration_hours * INTERVAL '1 hour')) > :startTime " +
+            "AND (:excludeAssignmentId IS NULL OR a.assignment_id != :excludeAssignmentId)",
             nativeQuery = true)
     List<Assignment> findConflictingAssignments(@Param("employeeId") String employeeId,
                                                 @Param("startTime") LocalDateTime startTime,
-                                                @Param("endTime") LocalDateTime endTime);
+                                                @Param("endTime") LocalDateTime endTime,
+                                                @Param("excludeAssignmentId") String excludeAssignmentId);
 
     // Get employee workload for specific date
     @Query("SELECT COUNT(a) FROM Assignment a " +

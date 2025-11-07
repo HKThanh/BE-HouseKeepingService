@@ -139,6 +139,36 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
             "AND (:zoneKeys IS NULL OR LOWER(CONCAT(b.address.ward, '|', b.address.city)) NOT IN :zoneKeys)")
     List<Booking> findAwaitingEmployeeBookingsOutsideZones(@Param("zoneKeys") List<String> zoneKeys);
 
+    // Pending bookings queries
+    @Query("SELECT DISTINCT b FROM Booking b " +
+            "LEFT JOIN b.bookingDetails bd " +
+            "LEFT JOIN bd.assignments a " +
+            "WHERE b.status = iuh.house_keeping_service_be.enums.BookingStatus.PENDING " +
+            "AND a IS NULL")
+    List<Booking> findPendingBookings(Pageable pageable);
+
+    @Query(value = "SELECT DISTINCT b FROM Booking b " +
+            "LEFT JOIN b.bookingDetails bd " +
+            "LEFT JOIN bd.assignments a " +
+            "WHERE b.status = iuh.house_keeping_service_be.enums.BookingStatus.PENDING " +
+            "AND a IS NULL " +
+            "AND (:zoneKeys IS NULL OR LOWER(CONCAT(b.address.ward, '|', b.address.city)) IN :zoneKeys)",
+            countQuery = "SELECT COUNT(DISTINCT b.bookingId) FROM Booking b " +
+                    "LEFT JOIN b.bookingDetails bd " +
+                    "LEFT JOIN bd.assignments a " +
+                    "WHERE b.status = iuh.house_keeping_service_be.enums.BookingStatus.PENDING " +
+                    "AND a IS NULL " +
+                    "AND (:zoneKeys IS NULL OR LOWER(CONCAT(b.address.ward, '|', b.address.city)) IN :zoneKeys)")
+    Page<Booking> findPendingBookingsByZones(@Param("zoneKeys") List<String> zoneKeys, Pageable pageable);
+
+    @Query(value = "SELECT DISTINCT b FROM Booking b " +
+            "LEFT JOIN b.bookingDetails bd " +
+            "LEFT JOIN bd.assignments a " +
+            "WHERE b.status = iuh.house_keeping_service_be.enums.BookingStatus.PENDING " +
+            "AND a IS NULL " +
+            "AND (:zoneKeys IS NULL OR LOWER(CONCAT(b.address.ward, '|', b.address.city)) NOT IN :zoneKeys)")
+    List<Booking> findPendingBookingsOutsideZones(@Param("zoneKeys") List<String> zoneKeys);
+
     @Query("SELECT b FROM Booking b " +
            "LEFT JOIN FETCH b.customer c " +
            "LEFT JOIN FETCH b.address a " +

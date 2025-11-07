@@ -94,6 +94,40 @@ public class EmployeeAssignmentController {
         }
     }
 
+    @PostMapping("/assignments/{assignmentId}/accept")
+    @PreAuthorize("hasAuthority('ROLE_EMPLOYEE')")
+    public ResponseEntity<?> acceptAssignment(
+            @PathVariable String assignmentId,
+            @RequestParam String employeeId) {
+
+        try {
+            AssignmentDetailResponse response = assignmentService.acceptAssignment(assignmentId, employeeId);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Nhận công việc thành công",
+                    "data", response
+            ));
+        } catch (IllegalStateException e) {
+            log.warn("Accept assignment failed: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()
+            ));
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid request when accepting assignment: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            log.error("Error accepting assignment: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "message", "Lỗi khi nhận công việc: " + e.getMessage()
+            ));
+        }
+    }
+
 
     @GetMapping("/available-bookings")
     @PreAuthorize("hasAnyAuthority('ROLE_EMPLOYEE', 'ROLE_ADMIN')")
