@@ -213,7 +213,7 @@ public class AssignmentServiceImpl implements AssignmentService {
 
         boolean allAssigned = booking.getBookingDetails().stream()
                 .allMatch(bd -> bd.getAssignments().size() >= bd.getQuantity());
-        if (allAssigned && booking.getStatus() == BookingStatus.AWAITING_EMPLOYEE) {
+        if (allAssigned && (booking.getStatus() == BookingStatus.PENDING || booking.getStatus() == BookingStatus.AWAITING_EMPLOYEE)) {
             booking.setStatus(BookingStatus.CONFIRMED);
             booking.setUpdatedAt(LocalDateTime.now());
             bookingRepository.save(booking);
