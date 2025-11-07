@@ -1,6 +1,7 @@
 package iuh.house_keeping_service_be.enums;
 
 public enum AssignmentStatus {
+    PENDING,      // Waiting for employee to accept
     ASSIGNED,
     IN_PROGRESS,
     COMPLETED,

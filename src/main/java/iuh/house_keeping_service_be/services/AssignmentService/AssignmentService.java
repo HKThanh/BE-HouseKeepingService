@@ -11,7 +11,7 @@ import java.util.List;
 public interface AssignmentService {
     List<AssignmentDetailResponse> getEmployeeAssignments(String employeeId, String status, int page, int size);
     boolean cancelAssignment(String assignmentId, AssignmentCancelRequest request);
-//    boolean acceptBooking(String assignmentId);
+    AssignmentDetailResponse acceptAssignment(String assignmentId, String employeeId);
 
     List<BookingSummary> getAvailableBookings(String employeeId, int page, int size);
     AssignmentDetailResponse acceptBookingDetail(String detailId, String employeeId);
