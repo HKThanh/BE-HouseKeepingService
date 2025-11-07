@@ -11,6 +11,7 @@ public record SuitableEmployeeResponse(
         String status,
         String[] workingWards,
         String workingCity,
-        Integer completedJobs
+        Integer completedJobs,
+        RecommendationMetadata recommendation
 ) {
 }

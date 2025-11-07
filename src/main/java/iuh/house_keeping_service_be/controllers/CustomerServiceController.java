@@ -7,6 +7,7 @@ import iuh.house_keeping_service_be.dtos.EmployeeSchedule.SuitableEmployeeRespon
 import iuh.house_keeping_service_be.dtos.Service.*;
 import iuh.house_keeping_service_be.services.AdminService.PermissionService;
 import iuh.house_keeping_service_be.services.EmployeeScheduleService.EmployeeScheduleService;
+import iuh.house_keeping_service_be.services.RecommendationService.EmployeeRecommendationService;
 import iuh.house_keeping_service_be.services.ServiceService.ServiceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,7 @@ public class CustomerServiceController {
     private final ServiceService serviceService;
     private final PermissionService permissionService;
     private final EmployeeScheduleService employeeScheduleService;
+    private final EmployeeRecommendationService employeeRecommendationService;
     private final JwtUtil jwtUtil;
 
     @GetMapping
@@ -269,12 +271,40 @@ public class CustomerServiceController {
             SuitableEmployeeRequest request = new SuitableEmployeeRequest(serviceId, bookingTime, ward, city);
             ApiResponse<List<SuitableEmployeeResponse>> response = employeeScheduleService.findSuitableEmployees(request);
 
-            return ResponseEntity.ok(response);
+            if (!response.success() || response.data() == null || response.data().isEmpty()) {
+                return ResponseEntity.ok(response);
+            }
+
+            List<SuitableEmployeeResponse> rankedEmployees =
+                    employeeRecommendationService.recommend(request, response.data());
+
+            String enrichedMessage = enrichRecommendationMessage(response.message(), rankedEmployees);
+            ApiResponse<List<SuitableEmployeeResponse>> enrichedResponse =
+                    new ApiResponse<>(response.success(), enrichedMessage, rankedEmployees);
+
+            return ResponseEntity.ok(enrichedResponse);
         } catch (Exception e) {
             log.error("Error in findSuitableEmployees: ", e);
             return ResponseEntity.internalServerError().body(
                     new ApiResponse<>(false, "Internal server error: " + e.getMessage(), null)
             );
         }
+    }
+
+    private String enrichRecommendationMessage(String originalMessage, List<SuitableEmployeeResponse> employees) {
+        if (employees == null || employees.isEmpty()) {
+            return originalMessage;
+        }
+
+        String safeMessage = (originalMessage == null || originalMessage.isBlank())
+                ? "Đã áp dụng máy học để xếp hạng nhân viên phù hợp"
+                : originalMessage;
+
+        String modelVersion = employeeRecommendationService.getModelVersion();
+        if ("disabled".equalsIgnoreCase(modelVersion)) {
+            return safeMessage;
+        }
+
+        return String.format("%s | Sắp xếp theo mô hình ML %s", safeMessage, modelVersion);
     }
 }

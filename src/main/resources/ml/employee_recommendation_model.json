@@ -1,0 +1,11 @@
+{
+  "version": "employee-rec-v1",
+  "bias": 0.35,
+  "weights": {
+    "rating": 0.5,
+    "completedJobs": 0.2,
+    "locationAffinity": 0.2,
+    "skillVersatility": 0.07,
+    "bookingTimeFit": 0.03
+  }
+}
