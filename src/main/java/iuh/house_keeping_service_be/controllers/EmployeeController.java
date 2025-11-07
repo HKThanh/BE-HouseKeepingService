@@ -47,10 +47,10 @@ public class EmployeeController {
     public ResponseEntity<?> getEmployeeById(@PathVariable String employeeId,
                                              @RequestHeader("Authorization") String authHeader) {
         try {
-            var employee = employeeService.findById(employeeId);
+            var employeeProfile = employeeService.getEmployeeProfile(employeeId);
             return ResponseEntity.ok(Map.of(
                     "success", true,
-                    "data", employee
+                    "data", employeeProfile
             ));
         } catch (IllegalArgumentException e) {
             log.error("Employee not found: {}", e.getMessage());

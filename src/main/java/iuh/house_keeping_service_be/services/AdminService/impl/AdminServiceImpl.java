@@ -1,9 +1,11 @@
 package iuh.house_keeping_service_be.services.AdminService.impl;
 
+import iuh.house_keeping_service_be.dtos.Admin.response.AdminProfileResponse;
 import iuh.house_keeping_service_be.dtos.Statistics.RevenueStatisticsResponse;
 import iuh.house_keeping_service_be.dtos.Statistics.ServiceBookingStatisticsResponse;
 import iuh.house_keeping_service_be.enums.RoleName;
 import iuh.house_keeping_service_be.models.AdminProfile;
+import iuh.house_keeping_service_be.models.Role;
 import iuh.house_keeping_service_be.repositories.AdminProfileRepository;
 import iuh.house_keeping_service_be.repositories.BookingRepository;
 import iuh.house_keeping_service_be.services.AdminService.AdminService;
@@ -19,6 +21,7 @@ import java.time.LocalTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -46,6 +49,32 @@ public class AdminServiceImpl implements AdminService {
     public AdminProfile findById(String id) {
         return adminProfileRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin"));
+    }
+
+    @Override
+    public AdminProfileResponse getAdminProfile(String adminProfileId) {
+        AdminProfile admin = findById(adminProfileId);
+        
+        return AdminProfileResponse.builder()
+                .adminProfileId(admin.getAdminProfileId())
+                .fullName(admin.getFullName())
+                .isMale(admin.getIsMale())
+                .department(admin.getDepartment())
+                .contactInfo(admin.getContactInfo())
+                .birthdate(admin.getBirthdate())
+                .hireDate(admin.getHireDate())
+                .account(AdminProfileResponse.AccountInfo.builder()
+                        .accountId(admin.getAccount().getAccountId())
+                        .phoneNumber(admin.getAccount().getPhoneNumber())
+                        .status(admin.getAccount().getStatus())
+                        .isPhoneVerified(admin.getAccount().getIsPhoneVerified())
+                        .lastLogin(admin.getAccount().getLastLogin())
+                        .roles(admin.getAccount().getRoles().stream()
+                                .map(Role::getRoleName)
+                                .map(Enum::name)
+                                .collect(Collectors.toList()))
+                        .build())
+                .build();
     }
 
     @Override

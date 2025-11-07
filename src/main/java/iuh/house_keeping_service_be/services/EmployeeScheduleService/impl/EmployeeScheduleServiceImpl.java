@@ -430,7 +430,8 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
                 "AVAILABLE",
                 wards,
                 city,
-                completedJobs
+                completedJobs,
+                null
         );
     }
 }

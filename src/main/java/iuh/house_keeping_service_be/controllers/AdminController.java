@@ -50,10 +50,10 @@ public class AdminController {
                 ));
             }
 
-            var admin = adminService.findById(adminId);
+            var adminProfile = adminService.getAdminProfile(adminId);
             return ResponseEntity.ok(Map.of(
                     "success", true,
-                    "data", admin
+                    "data", adminProfile
             ));
         } catch (IllegalArgumentException e) {
             log.error("Admin not found: {}", e.getMessage());

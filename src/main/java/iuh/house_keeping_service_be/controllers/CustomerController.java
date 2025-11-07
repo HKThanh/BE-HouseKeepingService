@@ -48,10 +48,10 @@ public class CustomerController {
     public ResponseEntity<?> getCustomerById(@PathVariable String customerId,
                                             @RequestHeader("Authorization") String authHeader) {
         try {
-            var customer = customerService.findById(customerId);
+            var customerProfile = customerService.getCustomerProfile(customerId);
             return ResponseEntity.ok(Map.of(
                 "success", true,
-                "data", customer
+                "data", customerProfile
             ));
         } catch (IllegalArgumentException e) {
             log.error("Customer not found: {}", e.getMessage());

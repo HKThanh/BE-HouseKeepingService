@@ -1,14 +1,18 @@
 package iuh.house_keeping_service_be.services.EmployeeService.impl;
 
 import iuh.house_keeping_service_be.dtos.Employee.UpdateEmployeeRequest;
+import iuh.house_keeping_service_be.dtos.Employee.response.EmployeeProfileResponse;
 import iuh.house_keeping_service_be.models.Account;
 import iuh.house_keeping_service_be.models.Employee;
+import iuh.house_keeping_service_be.models.Role;
 import iuh.house_keeping_service_be.repositories.EmployeeRepository;
 import iuh.house_keeping_service_be.services.EmployeeService.EmployeeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+
+import java.util.stream.Collectors;
 
 @Service
 public class EmployeeServiceImpl implements EmployeeService {
@@ -37,6 +41,44 @@ public class EmployeeServiceImpl implements EmployeeService {
     public Employee findById(String id) {
         return employeeRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy thông tin nhân viên"));
+    }
+
+    @Override
+    public EmployeeProfileResponse getEmployeeProfile(String employeeId) {
+        Employee employee = findById(employeeId);
+        
+        return EmployeeProfileResponse.builder()
+                .employeeId(employee.getEmployeeId())
+                .fullName(employee.getFullName())
+                .avatar(employee.getAvatar())
+                .isMale(employee.getIsMale())
+                .email(employee.getEmail())
+                .birthdate(employee.getBirthdate())
+                .hiredDate(employee.getHiredDate())
+                .skills(employee.getSkills())
+                .bio(employee.getBio())
+                .rating(employee.getRating())
+                .employeeStatus(employee.getEmployeeStatus())
+                .workingZones(employee.getWorkingZones() != null 
+                        ? employee.getWorkingZones().stream()
+                                .map(zone -> EmployeeProfileResponse.WorkingZoneInfo.builder()
+                                        .ward(zone.getWard())
+                                        .city(zone.getCity())
+                                        .build())
+                                .collect(Collectors.toList())
+                        : null)
+                .account(EmployeeProfileResponse.AccountInfo.builder()
+                        .accountId(employee.getAccount().getAccountId())
+                        .phoneNumber(employee.getAccount().getPhoneNumber())
+                        .status(employee.getAccount().getStatus())
+                        .isPhoneVerified(employee.getAccount().getIsPhoneVerified())
+                        .lastLogin(employee.getAccount().getLastLogin())
+                        .roles(employee.getAccount().getRoles().stream()
+                                .map(Role::getRoleName)
+                                .map(Enum::name)
+                                .collect(Collectors.toList()))
+                        .build())
+                .build();
     }
 
     @Override
