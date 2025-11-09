@@ -4,6 +4,9 @@ import iuh.house_keeping_service_be.dtos.Booking.internal.*;
 import iuh.house_keeping_service_be.dtos.Booking.request.*;
 import iuh.house_keeping_service_be.dtos.Booking.response.*;
 import iuh.house_keeping_service_be.dtos.Booking.summary.*;
+import iuh.house_keeping_service_be.dtos.EmployeeSchedule.ApiResponse;
+import iuh.house_keeping_service_be.dtos.EmployeeSchedule.SuitableEmployeeRequest;
+import iuh.house_keeping_service_be.dtos.EmployeeSchedule.SuitableEmployeeResponse;
 import iuh.house_keeping_service_be.dtos.Service.*;
 import iuh.house_keeping_service_be.enums.*;
 import iuh.house_keeping_service_be.exceptions.*;
@@ -11,6 +14,7 @@ import iuh.house_keeping_service_be.mappers.BookingMapper;
 import iuh.house_keeping_service_be.models.*;
 import iuh.house_keeping_service_be.repositories.*;
 import iuh.house_keeping_service_be.services.BookingService.BookingService;
+import iuh.house_keeping_service_be.services.EmployeeScheduleService.EmployeeScheduleService;
 import iuh.house_keeping_service_be.services.ServiceService.ServiceService;
 import iuh.house_keeping_service_be.utils.BookingDTOFormatter;
 
@@ -52,6 +56,7 @@ public class BookingServiceImpl implements BookingService {
     // Other Services
     private final ServiceService serviceService;
     private final BookingMapper bookingMapper;
+    private final EmployeeScheduleService employeeScheduleService;
 
     @Override
     @Transactional
@@ -75,14 +80,93 @@ public class BookingServiceImpl implements BookingService {
             }
 
             boolean hasAssignments = request.assignments() != null && !request.assignments().isEmpty();
+            boolean hasTitle = request.title() != null && !request.title().trim().isEmpty();
+            boolean hasImageUrls = request.imageUrls() != null && !request.imageUrls().isEmpty();
+
+            // Auto-assign employee if assignments, title, and imageUrls are all empty
+            BookingCreateRequest finalRequest = request;
+            List<SuitableEmployeeResponse> selectedEmployees = new ArrayList<>();
+            
+            if (!hasAssignments && !hasTitle && !hasImageUrls) {
+                log.info("No assignments, title, or imageUrls provided. Auto-assigning suitable employees...");
+                
+                // Get address information for finding suitable employees
+                Address bookingAddress = validation.getAddress();
+                if (bookingAddress == null) {
+                    bookingAddress = addressRepository.findById(request.addressId())
+                            .orElseThrow(() -> AddressNotFoundException.withId(request.addressId()));
+                }
+                
+                String ward = bookingAddress.getWard();
+                String city = bookingAddress.getCity();
+                
+                // Find suitable employees for each service in the booking
+                List<AssignmentRequest> autoAssignments = new ArrayList<>();
+                
+                for (BookingDetailRequest detailRequest : request.bookingDetails()) {
+                    SuitableEmployeeRequest employeeRequest = 
+                        new SuitableEmployeeRequest(
+                            detailRequest.serviceId(),
+                            request.bookingTime(),
+                            ward,
+                            city
+                        );
+                    
+                    ApiResponse<List<SuitableEmployeeResponse>> 
+                        suitableEmployeesResponse = employeeScheduleService.findSuitableEmployees(employeeRequest);
+                    
+                    if (suitableEmployeesResponse.success() && 
+                        suitableEmployeesResponse.data() != null && 
+                        !suitableEmployeesResponse.data().isEmpty()) {
+                        
+                        // Select the first (best) employee from the list
+                        SuitableEmployeeResponse selectedEmployee = 
+                            suitableEmployeesResponse.data().get(0);
+                        
+                        selectedEmployees.add(selectedEmployee);
+                        
+                        // Create assignment for this employee
+                        AssignmentRequest assignment = new AssignmentRequest(
+                            selectedEmployee.employeeId(),
+                            detailRequest.serviceId()
+                        );
+                        autoAssignments.add(assignment);
+                        
+                        log.info("Auto-assigned employee {} ({}) for service {}",
+                            selectedEmployee.employeeId(),
+                            selectedEmployee.fullName(),
+                            detailRequest.serviceId());
+                    } else {
+                        log.warn("No suitable employees found for service {}", detailRequest.serviceId());
+                    }
+                }
+                
+                // Update request with auto-assigned employees if any were found
+                if (!autoAssignments.isEmpty()) {
+                    finalRequest = new BookingCreateRequest(
+                        request.addressId(),
+                        request.newAddress(),
+                        request.bookingTime(),
+                        request.note(),
+                        request.title(),
+                        request.imageUrls(),
+                        request.promoCode(),
+                        request.bookingDetails(),
+                        autoAssignments,
+                        request.paymentMethodId()
+                    );
+                    hasAssignments = true;
+                    log.info("Auto-assigned {} employees to booking", autoAssignments.size());
+                }
+            }
 
             // Step 2: Re-validate employee availability (double-check for conflicts) if assignments provided
             if (hasAssignments) {
-                validateEmployeeAvailabilityFinal(request);
+                validateEmployeeAvailabilityFinal(finalRequest);
             }
 
             // Step 3: Create booking entity
-            Booking booking = createBookingEntity(request, validation);
+            Booking booking = createBookingEntity(finalRequest, validation);
 
             if (!hasAssignments) {
                 booking.setStatus(BookingStatus.AWAITING_EMPLOYEE);
@@ -94,26 +178,26 @@ public class BookingServiceImpl implements BookingService {
             booking.setIsVerified(hasAssignments);
 
             // Set title and imageUrls from request if provided
-            if (request.title() != null && !request.title().trim().isEmpty()) {
-                booking.setTitle(request.title());
+            if (finalRequest.title() != null && !finalRequest.title().trim().isEmpty()) {
+                booking.setTitle(finalRequest.title());
             }
-            if (request.imageUrls() != null && !request.imageUrls().isEmpty()) {
-                booking.setImageUrls(request.imageUrls());
+            if (finalRequest.imageUrls() != null && !finalRequest.imageUrls().isEmpty()) {
+                booking.setImageUrls(finalRequest.imageUrls());
             }
 
-            log.info("Booking isVerified={}, hasAssignments={}, title={}, imageUrls={}",
-                    booking.getIsVerified(), hasAssignments, booking.getTitle(), booking.getImageUrls());
+            log.info("Booking isVerified={}, hasAssignments={}, title={}, imageUrls={}, autoAssignedEmployees={}",
+                    booking.getIsVerified(), hasAssignments, booking.getTitle(), booking.getImageUrls(), selectedEmployees.size());
 
             // Step 4: Create booking details
-            List<BookingDetail> bookingDetails = createBookingDetails(booking, request, validation);
+            List<BookingDetail> bookingDetails = createBookingDetails(booking, finalRequest, validation);
 
             // Step 5: Create assignments if provided
             List<Assignment> assignments = hasAssignments
-                    ? createAssignments(bookingDetails, request)
+                    ? createAssignments(bookingDetails, finalRequest)
                     : Collections.emptyList();
 
             // Step 6: Create payment record
-            Payment payment = createPaymentRecord(booking, request.paymentMethodId());
+            Payment payment = createPaymentRecord(booking, finalRequest.paymentMethodId());
 
             // Step 7: Save all entities
             Booking savedBooking = bookingRepository.save(booking);
@@ -125,8 +209,9 @@ public class BookingServiceImpl implements BookingService {
 
             log.info("Booking created successfully with ID: {}", savedBooking.getBookingId());
 
-            // Step 8: Return creation summary
-            return createBookingCreationSummary(savedBooking, savedDetails, savedAssignments, savedPayment);
+            // Step 8: Return creation summary with auto-assignment info
+            boolean hasAutoAssignedEmployees = !selectedEmployees.isEmpty();
+            return createBookingCreationSummary(savedBooking, savedDetails, savedAssignments, savedPayment, hasAutoAssignedEmployees);
 
         } catch (BookingValidationException | EmployeeConflictException e) {
             // Re-throw validation and conflict exceptions
@@ -698,7 +783,7 @@ public class BookingServiceImpl implements BookingService {
                     Assignment assignment = new Assignment();
                     assignment.setBookingDetail(detail);
                     assignment.setEmployee(employee);
-                    assignment.setStatus(AssignmentStatus.PENDING);  // Changed from ASSIGNED to PENDING
+                    assignment.setStatus(AssignmentStatus.ASSIGNED);
 
                     assignments.add(assignment);
                 }
@@ -725,7 +810,8 @@ public class BookingServiceImpl implements BookingService {
     private BookingCreationSummary createBookingCreationSummary(Booking booking,
                                                                 List<BookingDetail> details,
                                                                 List<Assignment> assignments,
-                                                                Payment payment) {
+                                                                Payment payment,
+                                                                boolean hasAutoAssignedEmployees) {
         // Group assignments by BookingDetail ID
         Map<String, List<Assignment>> assignmentsByDetailId = assignments.stream()
                 .collect(Collectors.groupingBy(a -> a.getBookingDetail().getId()));
@@ -765,6 +851,7 @@ public class BookingServiceImpl implements BookingService {
                         .map(a -> bookingMapper.toEmployeeInfo(a.getEmployee()))
                         .toList())
                 .createdAt(booking.getCreatedAt())
+                .hasAutoAssignedEmployees(hasAutoAssignedEmployees)
                 .build();
 
         try {

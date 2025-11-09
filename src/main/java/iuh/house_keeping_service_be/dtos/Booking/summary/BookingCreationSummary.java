@@ -41,6 +41,7 @@ public class BookingCreationSummary {
     private int totalEmployees;
     private String estimatedDuration;
     private boolean hasPromotion;
+    private boolean hasAutoAssignedEmployees;
     
     // Factory method
     public static BookingCreationSummary from(String bookingId, String bookingCode, String status,
