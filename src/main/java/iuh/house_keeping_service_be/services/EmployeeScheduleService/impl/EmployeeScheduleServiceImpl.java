@@ -6,6 +6,8 @@ import iuh.house_keeping_service_be.enums.EmployeeStatus;
 import iuh.house_keeping_service_be.models.*;
 import iuh.house_keeping_service_be.repositories.*;
 import iuh.house_keeping_service_be.services.EmployeeScheduleService.EmployeeScheduleService;
+import iuh.house_keeping_service_be.services.RecommendationService.EmployeeRecommendationService;
+import iuh.house_keeping_service_be.enums.Rating;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -27,6 +29,8 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
     private final AssignmentRepository assignmentRepository;
     private final EmployeeWorkingZoneRepository workingZoneRepository;
     private final ServiceRepository serviceRepository;
+    private final EmployeeRecommendationService recommendationService;
+    private final ReviewDetailRepository reviewDetailRepository;
 
     @Override
     public ApiResponse<List<EmployeeScheduleResponse>> getAvailableEmployees(EmployeeScheduleRequest request) {
@@ -159,7 +163,8 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
                 .map(ewz -> new WorkingZone(ewz.getWard(), ewz.getCity()))
                 .collect(Collectors.toList());
 
-        String rating = employee.getRating() != null ? employee.getRating().toString() : "N/A";
+        Double averageRating = fetchAverageEmployeeRating(employee.getEmployeeId());
+        String rating = formatRatingString(averageRating, employee.getRating());
 
         List<TimeSlot> timeSlots = new ArrayList<>();
 
@@ -304,15 +309,10 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
                 }
             }
 
-            // 4. Sắp xếp theo rating giảm dần
-            availableEmployees.sort((e1, e2) -> {
-                if (e1.rating() == null && e2.rating() == null) return 0;
-                if (e1.rating() == null) return 1;
-                if (e2.rating() == null) return -1;
-                return e2.rating().compareTo(e1.rating());
-            });
+            // 4. Áp dụng recommendation engine (nếu được bật) để chấm điểm và sắp xếp
+            availableEmployees = recommendationService.recommend(request, availableEmployees);
 
-            log.info("Found {} available employees, sorted by rating", availableEmployees.size());
+            log.info("Found {} available employees after recommendation scoring", availableEmployees.size());
 
             String message = availableEmployees.isEmpty()
                     ? "Không có nhân viên nào rảnh trong thời gian được yêu cầu"
@@ -418,8 +418,8 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
             log.warn("Could not get completed jobs count for employee {}: {}", employee.getEmployeeId(), e.getMessage());
         }
 
-        // Convert rating to string format
-        String ratingStr = employee.getRating() != null ? employee.getRating().toString() : "N/A";
+        Double averageRating = fetchAverageEmployeeRating(employee.getEmployeeId());
+        String ratingStr = formatRatingString(averageRating, employee.getRating());
 
         return new SuitableEmployeeResponse(
                 employee.getEmployeeId(),
@@ -430,7 +430,44 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
                 "AVAILABLE",
                 wards,
                 city,
-                completedJobs
+                completedJobs,
+                null
         );
+    }
+
+    private String formatRatingString(Double averageRating, Rating tier) {
+        if (averageRating != null && averageRating > 0) {
+            String tierLabel = tier != null ? translateRatingTier(tier) : "Đang cập nhật";
+            return String.format(Locale.US, "%.2f/5 · %s", averageRating, tierLabel);
+        }
+
+        if (tier != null) {
+            return translateRatingTier(tier);
+        }
+
+        return "Chưa có đánh giá";
+    }
+
+    private Double fetchAverageEmployeeRating(String employeeId) {
+        try {
+            return reviewDetailRepository.findAverageRatingByEmployeeId(employeeId);
+        } catch (Exception e) {
+            log.warn("Could not load average rating for employee {}: {}", employeeId, e.getMessage());
+            return null;
+        }
+    }
+
+    private String translateRatingTier(Rating rating) {
+        if (rating == null) {
+            return "Đang cập nhật";
+        }
+
+        return switch (rating) {
+            case HIGHEST -> "Xuất sắc";
+            case HIGH -> "Tốt";
+            case MEDIUM -> "Khá";
+            case LOW -> "Trung bình";
+            case LOWEST -> "Cần cải thiện";
+        };
     }
 }

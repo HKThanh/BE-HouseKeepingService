@@ -2,6 +2,8 @@ package iuh.house_keeping_service_be.services.ChatService.impl;
 
 import iuh.house_keeping_service_be.dtos.Chat.ConversationRequest;
 import iuh.house_keeping_service_be.dtos.Chat.ConversationResponse;
+import iuh.house_keeping_service_be.enums.BookingStatus;
+import iuh.house_keeping_service_be.enums.MessageType;
 import iuh.house_keeping_service_be.models.*;
 import iuh.house_keeping_service_be.repositories.*;
 import iuh.house_keeping_service_be.services.ChatService.ConversationService;
@@ -21,38 +23,78 @@ public class ConversationServiceImpl implements ConversationService {
     private final CustomerRepository customerRepository;
     private final EmployeeRepository employeeRepository;
     private final BookingRepository bookingRepository;
+    private final ChatMessageRepository chatMessageRepository;
 
     @Override
     @Transactional
     public ConversationResponse createConversation(ConversationRequest request) {
+        // Validate required fields
+        if (request.getEmployeeId() == null) {
+            throw new IllegalArgumentException("Employee ID is required");
+        }
+        if (request.getCustomerId() == null) {
+            throw new IllegalArgumentException("Customer ID is required");
+        }
+        if (request.getBookingId() == null) {
+            throw new IllegalArgumentException("Booking ID is required");
+        }
+
+        // Fetch entities
         Customer customer = customerRepository.findById(request.getCustomerId())
                 .orElseThrow(() -> new RuntimeException("Customer not found"));
 
+        Employee employee = employeeRepository.findById(request.getEmployeeId())
+                .orElseThrow(() -> new RuntimeException("Employee not found"));
+
+        Booking booking = bookingRepository.findById(request.getBookingId())
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        // Create conversation
         Conversation conversation = new Conversation();
         conversation.setCustomer(customer);
+        conversation.setEmployee(employee);
+        conversation.setBooking(booking);
         conversation.setIsActive(true);
 
-        if (request.getEmployeeId() != null) {
-            Employee employee = employeeRepository.findById(request.getEmployeeId())
-                    .orElseThrow(() -> new RuntimeException("Employee not found"));
-            conversation.setEmployee(employee);
-        }
-
-        if (request.getBookingId() != null) {
-            Booking booking = bookingRepository.findById(request.getBookingId())
-                    .orElseThrow(() -> new RuntimeException("Booking not found"));
-            conversation.setBooking(booking);
-        }
-
         Conversation savedConversation = conversationRepository.save(conversation);
+
+        // Create automatic welcome message from employee
+        String welcomeMessage = "Cảm ơn bạn đã chọn tôi thực hiện dịch vụ cho bạn";
+        
+        ChatMessage welcomeChatMessage = new ChatMessage();
+        welcomeChatMessage.setConversation(savedConversation);
+        welcomeChatMessage.setSender(employee.getAccount());
+        welcomeChatMessage.setMessageType(MessageType.TEXT);
+        welcomeChatMessage.setContent(welcomeMessage);
+        welcomeChatMessage.setIsRead(false);
+        
+        chatMessageRepository.save(welcomeChatMessage);
+
+        // Update conversation's last message
+        savedConversation.setLastMessage(welcomeMessage);
+        savedConversation.setLastMessageTime(LocalDateTime.now());
+        conversationRepository.save(savedConversation);
+
         return mapToResponse(savedConversation);
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public ConversationResponse getConversationById(String conversationId) {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new RuntimeException("Conversation not found"));
+        
+        // Check booking status and disable conversation if completed or cancelled
+        if (conversation.getBooking() != null) {
+            BookingStatus bookingStatus = conversation.getBooking().getStatus();
+            if (bookingStatus == BookingStatus.COMPLETED || bookingStatus == BookingStatus.CANCELLED) {
+                if (conversation.getIsActive()) {
+                    conversation.setIsActive(false);
+                    conversationRepository.save(conversation);
+                }
+            }
+        }
+        
         return mapToResponse(conversation);
     }
 

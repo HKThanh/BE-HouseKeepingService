@@ -1,5 +1,10 @@
 package iuh.house_keeping_service_be.controllers;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.zxing.*;
+import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
+import com.google.zxing.common.GlobalHistogramBinarizer;
+import com.google.zxing.common.HybridBinarizer;
 import iuh.house_keeping_service_be.config.JwtUtil;
 import iuh.house_keeping_service_be.dtos.Authentication.*;
 import iuh.house_keeping_service_be.enums.AccountStatus;
@@ -18,7 +23,14 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.ImageIO;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
+import java.awt.image.RasterFormatException;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -27,6 +39,18 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class AuthController {
     private static final int EXPIRATION_TIME = 3600; // 1 hour in seconds
+    private static final int MAX_QR_PROCESS_DIMENSION = 2000;
+    private static final int MAX_BASE_IMAGE_DIMENSION = 2200;
+    private static final int MIN_CORNER_SIZE = 120;
+    private static final int MAX_DECODE_ATTEMPTS = 1500;
+    private static final long MAX_DECODE_DURATION_MS = 4500;
+    private static final double[] GLOBAL_SCALE_FACTORS = {1.0, 1.5, 2.0, 2.5, 3.0};
+    private static final double TOP_RIGHT_QUARTER_RATIO = 0.5;
+    private static final double[] CORNER_RATIOS = {0.55, 0.4, 0.3, 0.2, 0.15};
+    private static final double[] CORNER_ZOOM_FACTORS = {2.0, 3.2, 4.5, 6.0};
+    private static final double[] DEFAULT_WINDOW_RATIOS = {0.7, 0.5, 0.35};
+    private static final double[] TOP_RIGHT_WINDOW_RATIOS = {0.45, 0.32, 0.22, 0.15, 0.12};
+    private static final int[] ROTATION_ANGLES = {0, 90, 180, 270};
 
     @Autowired
     private AuthService authService;
@@ -54,6 +78,9 @@ public class AuthController {
 
     @Autowired
     private AddressService addressService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest) {
@@ -771,6 +798,556 @@ public class AuthController {
                     "success", false,
                     "message", "Đã xảy ra lỗi khi lấy vai trò"
             ));
+        }
+    }
+
+    @PostMapping("/decode-qr")
+    public ResponseEntity<?> decodeQrFromImage(@RequestParam("file") MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Ảnh chứa QR không được để trống"
+            ));
+        }
+
+        try {
+            BufferedImage bufferedImage = ImageIO.read(file.getInputStream());
+
+            if (bufferedImage == null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "Định dạng ảnh không hợp lệ"
+                ));
+            }
+
+            BufferedImage preparedImage = prepareImageForDecoding(bufferedImage);
+            if (preparedImage == null) {
+                return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(Map.of(
+                        "success", false,
+                        "message", "Không thể chuẩn hóa ảnh để giải mã QR"
+                ));
+            }
+
+            DecodeContext decodeContext = new DecodeContext();
+            String decodedValue = decodeQrFromCandidates(preparedImage, decodeContext);
+
+            if (decodedValue == null) {
+                String failureMessage = decodeContext.isExpired()
+                        ? "Không thể giải mã QR: ảnh quá lớn hoặc QR quá nhỏ. Vui lòng chụp gần hơn vào vùng QR."
+                        : "Không thể giải mã QR từ ảnh cung cấp";
+                return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(Map.of(
+                        "success", false,
+                        "message", failureMessage
+                ));
+            }
+
+            Object jsonPayload = parseJsonPayload(decodedValue);
+            if (jsonPayload == null) {
+                return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(Map.of(
+                        "success", false,
+                        "message", "QR không chứa dữ liệu JSON hợp lệ"
+                ));
+            }
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Giải mã QR thành công",
+                    "data", jsonPayload
+            ));
+        } catch (IOException e) {
+            log.error("Could not read QR image: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "success", false,
+                    "message", "Không thể đọc ảnh QR"
+            ));
+        }
+    }
+
+    private Object parseJsonPayload(String decodedValue) {
+        if (decodedValue == null || decodedValue.isBlank()) {
+            return null;
+        }
+
+        try {
+            return objectMapper.readTree(decodedValue);
+        } catch (Exception ex) {
+            log.warn("Decoded QR is not valid JSON: {}", ex.getMessage());
+            return null;
+        }
+    }
+
+    private BufferedImage prepareImageForDecoding(BufferedImage input) {
+        BufferedImage rgbImage = ensureRgbImage(input);
+        if (rgbImage == null) {
+            return null;
+        }
+
+        int maxSide = Math.max(rgbImage.getWidth(), rgbImage.getHeight());
+        if (maxSide <= MAX_BASE_IMAGE_DIMENSION) {
+            return rgbImage;
+        }
+
+        double factor = (double) MAX_BASE_IMAGE_DIMENSION / maxSide;
+        int targetWidth = Math.max(1, (int) Math.round(rgbImage.getWidth() * factor));
+        int targetHeight = Math.max(1, (int) Math.round(rgbImage.getHeight() * factor));
+
+        return resizeImage(rgbImage, targetWidth, targetHeight);
+    }
+
+    private String decodeTopRightQuarter(BufferedImage image, DecodeContext context) {
+        if (image == null || context == null || !context.canContinue()) {
+            return null;
+        }
+
+        int width = image.getWidth();
+        int height = image.getHeight();
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
+
+        int cropWidth = Math.max((int) Math.round(width * TOP_RIGHT_QUARTER_RATIO), MIN_CORNER_SIZE);
+        int cropHeight = Math.max((int) Math.round(height * TOP_RIGHT_QUARTER_RATIO), MIN_CORNER_SIZE);
+        cropWidth = Math.min(cropWidth, width);
+        cropHeight = Math.min(cropHeight, height);
+
+        int startX = Math.max(0, width - cropWidth);
+        int startY = 0;
+
+        try {
+            BufferedImage topRightQuarter = image.getSubimage(startX, startY, cropWidth, cropHeight);
+
+            String decoded = decodeAllVariants(topRightQuarter, context);
+            if (decoded != null) {
+                return decoded;
+            }
+
+            decoded = decodeSlidingWindowCandidates(topRightQuarter, context, TOP_RIGHT_WINDOW_RATIOS);
+            if (decoded != null) {
+                return decoded;
+            }
+
+            for (double zoom : CORNER_ZOOM_FACTORS) {
+                if (!context.canContinue()) {
+                    return null;
+                }
+                BufferedImage zoomedQuarter = scaleImage(topRightQuarter, zoom);
+                if (zoomedQuarter != topRightQuarter) {
+                    decoded = decodeAllVariants(zoomedQuarter, context);
+                    if (decoded != null) {
+                        return decoded;
+                    }
+
+                    decoded = decodeSlidingWindowCandidates(zoomedQuarter, context, TOP_RIGHT_WINDOW_RATIOS);
+                    if (decoded != null) {
+                        return decoded;
+                    }
+                }
+            }
+        } catch (RasterFormatException ex) {
+            log.warn("Top-right quarter crop failed: {}", ex.getMessage());
+        }
+
+        return null;
+    }
+
+    private String decodeQrFromCandidates(BufferedImage sourceImage, DecodeContext context) {
+        if (sourceImage == null || context == null) {
+            return null;
+        }
+
+        BufferedImage normalized = ensureRgbImage(sourceImage);
+
+        for (int angle : ROTATION_ANGLES) {
+            if (!context.canContinue()) {
+                return null;
+            }
+
+            BufferedImage oriented = angle == 0 ? normalized : rotateImage(normalized, angle);
+            String decoded = decodeOrientationPipeline(oriented, context);
+            if (decoded != null) {
+                return decoded;
+            }
+        }
+
+        return null;
+    }
+
+    private String decodeOrientationPipeline(BufferedImage orientedImage, DecodeContext context) {
+        if (orientedImage == null || context == null) {
+            return null;
+        }
+
+        String prioritizedTopRight = decodeTopRightQuarter(orientedImage, context);
+        if (prioritizedTopRight != null) {
+            return prioritizedTopRight;
+        }
+
+        for (double factor : GLOBAL_SCALE_FACTORS) {
+            if (!context.canContinue()) {
+                return null;
+            }
+            BufferedImage workingImage = factor == 1.0 ? orientedImage : scaleImage(orientedImage, factor);
+
+            String zoomedTopRight = decodeTopRightQuarter(workingImage, context);
+            if (zoomedTopRight != null) {
+                return zoomedTopRight;
+            }
+
+            String decoded = decodeAllVariants(workingImage, context);
+            if (decoded != null) {
+                return decoded;
+            }
+
+            decoded = decodeCornerCandidates(workingImage, context);
+            if (decoded != null) {
+                return decoded;
+            }
+
+            decoded = decodeSlidingWindowCandidates(workingImage, context, DEFAULT_WINDOW_RATIOS);
+            if (decoded != null) {
+                return decoded;
+            }
+        }
+
+        return null;
+    }
+
+    private String decodeCornerCandidates(BufferedImage sourceImage, DecodeContext context) {
+        if (sourceImage == null || context == null) {
+            return null;
+        }
+
+        for (double ratio : CORNER_RATIOS) {
+            if (!context.canContinue()) {
+                return null;
+            }
+            int cropWidth = Math.min(sourceImage.getWidth(), Math.max((int) (sourceImage.getWidth() * ratio), MIN_CORNER_SIZE));
+            int cropHeight = Math.min(sourceImage.getHeight(), Math.max((int) (sourceImage.getHeight() * ratio), MIN_CORNER_SIZE));
+
+            try {
+                BufferedImage topLeft = sourceImage.getSubimage(0, 0, cropWidth, cropHeight);
+                BufferedImage topRight = sourceImage.getSubimage(sourceImage.getWidth() - cropWidth, 0, cropWidth, cropHeight);
+                BufferedImage bottomLeft = sourceImage.getSubimage(0, sourceImage.getHeight() - cropHeight, cropWidth, cropHeight);
+                BufferedImage bottomRight = sourceImage.getSubimage(sourceImage.getWidth() - cropWidth, sourceImage.getHeight() - cropHeight, cropWidth, cropHeight);
+
+                List<BufferedImage> corners = Arrays.asList(topLeft, topRight, bottomLeft, bottomRight);
+                for (BufferedImage corner : corners) {
+                    if (!context.canContinue()) {
+                        return null;
+                    }
+                    String decoded = decodeAllVariants(corner, context);
+                    if (decoded != null) {
+                        return decoded;
+                    }
+
+                    for (double zoom : CORNER_ZOOM_FACTORS) {
+                        if (!context.canContinue()) {
+                            return null;
+                        }
+                        BufferedImage zoomedCorner = scaleImage(corner, zoom);
+                        if (zoomedCorner != corner) {
+                            decoded = decodeAllVariants(zoomedCorner, context);
+                            if (decoded != null) {
+                                return decoded;
+                            }
+                        }
+                    }
+                }
+            } catch (RasterFormatException ex) {
+                log.warn("Corner crop failed: {}", ex.getMessage());
+            }
+        }
+
+        return null;
+    }
+
+    private BufferedImage scaleImage(BufferedImage source, double factor) {
+        if (source == null || factor <= 1.0) {
+            return source;
+        }
+
+        double limiter = Math.min(
+                (double) MAX_QR_PROCESS_DIMENSION / source.getWidth(),
+                (double) MAX_QR_PROCESS_DIMENSION / source.getHeight()
+        );
+
+        double appliedFactor = Math.min(factor, limiter);
+
+        int targetWidth = (int) Math.round(source.getWidth() * appliedFactor);
+        int targetHeight = (int) Math.round(source.getHeight() * appliedFactor);
+
+        if (targetWidth <= source.getWidth() || targetHeight <= source.getHeight()) {
+            return source;
+        }
+
+        return resizeImage(source, targetWidth, targetHeight);
+    }
+
+    private BufferedImage resizeImage(BufferedImage source, int targetWidth, int targetHeight) {
+        if (source == null || targetWidth <= 0 || targetHeight <= 0) {
+            return source;
+        }
+
+        BufferedImage scaledImage = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics2D = scaledImage.createGraphics();
+        graphics2D.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+        graphics2D.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        graphics2D.drawImage(source, 0, 0, targetWidth, targetHeight, null);
+        graphics2D.dispose();
+        return scaledImage;
+    }
+
+    private String decodeSlidingWindowCandidates(BufferedImage image, DecodeContext context, double[] windowRatios) {
+        if (image == null || context == null) {
+            return null;
+        }
+
+        int minDimension = Math.min(image.getWidth(), image.getHeight());
+        if (minDimension <= 0) {
+            return null;
+        }
+
+        double[] ratiosToUse = (windowRatios == null || windowRatios.length == 0)
+                ? DEFAULT_WINDOW_RATIOS
+                : windowRatios;
+
+        for (double ratio : ratiosToUse) {
+            if (!context.canContinue()) {
+                return null;
+            }
+
+            int windowSize = Math.min(Math.max((int) Math.round(minDimension * ratio), MIN_CORNER_SIZE), minDimension);
+            if (windowSize <= 0) {
+                continue;
+            }
+
+            int step = Math.max(windowSize / 2, Math.max(MIN_CORNER_SIZE / 2, 20));
+
+            List<Integer> xPositions = computePositions(image.getWidth(), windowSize, step);
+            List<Integer> yPositions = computePositions(image.getHeight(), windowSize, step);
+
+            for (int y : yPositions) {
+                if (!context.canContinue()) {
+                    return null;
+                }
+                for (int x : xPositions) {
+                    if (!context.canContinue()) {
+                        return null;
+                    }
+                    try {
+                        BufferedImage window = image.getSubimage(x, y, windowSize, windowSize);
+                        String decoded = decodeAllVariants(window, context);
+                        if (decoded != null) {
+                            return decoded;
+                        }
+                    } catch (RasterFormatException ex) {
+                        log.warn("Sliding window crop failed: {}", ex.getMessage());
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private List<Integer> computePositions(int length, int windowSize, int step) {
+        List<Integer> positions = new ArrayList<>();
+        if (length <= 0 || windowSize <= 0) {
+            return positions;
+        }
+
+        if (windowSize >= length) {
+            positions.add(0);
+            return positions;
+        }
+
+        int pos = 0;
+        while (pos <= length - windowSize) {
+            positions.add(pos);
+            pos += step;
+        }
+
+        int lastStart = length - windowSize;
+        if (positions.get(positions.size() - 1) != lastStart) {
+            positions.add(lastStart);
+        }
+
+        return positions;
+    }
+
+    private String decodeAllVariants(BufferedImage image, DecodeContext context) {
+        if (image == null || context == null) {
+            return null;
+        }
+
+        BufferedImage normalized = ensureRgbImage(image);
+        for (int angle : ROTATION_ANGLES) {
+            if (!context.canContinue()) {
+                return null;
+            }
+            BufferedImage rotated = angle == 0 ? normalized : rotateImage(normalized, angle);
+            String decoded = decodeCandidateVariant(rotated, context);
+            if (decoded != null) {
+                return decoded;
+            }
+
+            BufferedImage gray = convertToGray(rotated);
+            decoded = decodeCandidateVariant(gray, context);
+            if (decoded != null) {
+                return decoded;
+            }
+        }
+
+        return null;
+    }
+
+    private String decodeCandidateVariant(BufferedImage candidate, DecodeContext context) {
+        if (candidate == null || context == null || !context.canContinue()) {
+            return null;
+        }
+
+        context.recordAttempt();
+        String decoded = normalizeDecodedText(decodeCandidate(candidate));
+        if (decoded != null) {
+            context.markSuccess();
+        }
+        return decoded;
+    }
+
+    private String normalizeDecodedText(String decodedText) {
+        if (decodedText == null) {
+            return null;
+        }
+
+        String trimmed = decodedText.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private BufferedImage ensureRgbImage(BufferedImage source) {
+        if (source == null) {
+            return null;
+        }
+
+        if (source.getType() == BufferedImage.TYPE_INT_RGB) {
+            return source;
+        }
+
+        BufferedImage rgbImage = new BufferedImage(source.getWidth(), source.getHeight(), BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics2D = rgbImage.createGraphics();
+        graphics2D.drawImage(source, 0, 0, null);
+        graphics2D.dispose();
+        return rgbImage;
+    }
+
+    private BufferedImage convertToGray(BufferedImage source) {
+        if (source == null) {
+            return null;
+        }
+
+        BufferedImage grayImage = new BufferedImage(source.getWidth(), source.getHeight(), BufferedImage.TYPE_BYTE_GRAY);
+        Graphics2D graphics2D = grayImage.createGraphics();
+        graphics2D.drawImage(source, 0, 0, null);
+        graphics2D.dispose();
+        return grayImage;
+    }
+
+    private BufferedImage rotateImage(BufferedImage source, int angle) {
+        if (source == null || angle % 360 == 0) {
+            return source;
+        }
+
+        int width = source.getWidth();
+        int height = source.getHeight();
+        int targetWidth = angle % 180 == 0 ? width : height;
+        int targetHeight = angle % 180 == 0 ? height : width;
+
+        BufferedImage rotatedImage = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics2D = rotatedImage.createGraphics();
+        graphics2D.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+
+        double radians = Math.toRadians(angle);
+
+        switch (angle % 360) {
+            case 90:
+                graphics2D.translate(targetWidth, 0);
+                break;
+            case 180:
+                graphics2D.translate(targetWidth, targetHeight);
+                break;
+            case 270:
+                graphics2D.translate(0, targetHeight);
+                break;
+            default:
+                graphics2D.translate(targetWidth / 2.0, targetHeight / 2.0);
+                graphics2D.rotate(radians);
+                graphics2D.translate(-width / 2.0, -height / 2.0);
+                graphics2D.drawImage(source, 0, 0, null);
+                graphics2D.dispose();
+                return rotatedImage;
+        }
+
+        graphics2D.rotate(radians);
+        graphics2D.drawImage(source, 0, 0, null);
+        graphics2D.dispose();
+        return rotatedImage;
+    }
+
+    private String decodeCandidate(BufferedImage candidate) {
+        try {
+            LuminanceSource source = new BufferedImageLuminanceSource(candidate);
+
+            Map<DecodeHintType, Object> hints = new EnumMap<>(DecodeHintType.class);
+            hints.put(DecodeHintType.POSSIBLE_FORMATS, Collections.singletonList(BarcodeFormat.QR_CODE));
+            hints.put(DecodeHintType.TRY_HARDER, Boolean.TRUE);
+            hints.put(DecodeHintType.CHARACTER_SET, "UTF-8");
+
+            BinaryBitmap hybridBitmap = new BinaryBitmap(new HybridBinarizer(source));
+            try {
+                Result result = new MultiFormatReader().decode(hybridBitmap, hints);
+                if (result != null) {
+                    return result.getText();
+                }
+            } catch (NotFoundException ignored) {
+            }
+
+            BinaryBitmap histogramBitmap = new BinaryBitmap(new GlobalHistogramBinarizer(source));
+            Result histogramResult = new MultiFormatReader().decode(histogramBitmap, hints);
+            return histogramResult.getText();
+        } catch (NotFoundException e) {
+            return null;
+        } catch (Exception e) {
+            log.warn("QR decode attempt failed: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private static class DecodeContext {
+        private final long startTimeNs = System.nanoTime();
+        private int attempts;
+        private boolean success;
+
+        boolean canContinue() {
+            return !success && !isExpiredInternal();
+        }
+
+        void recordAttempt() {
+            attempts++;
+        }
+
+        void markSuccess() {
+            success = true;
+        }
+
+        boolean isExpired() {
+            return isExpiredInternal();
+        }
+
+        private boolean isExpiredInternal() {
+            return attempts >= MAX_DECODE_ATTEMPTS || elapsedMs() > MAX_DECODE_DURATION_MS;
+        }
+
+        private long elapsedMs() {
+            return (System.nanoTime() - startTimeNs) / 1_000_000;
         }
     }
 }

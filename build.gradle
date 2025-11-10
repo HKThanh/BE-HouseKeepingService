@@ -28,6 +28,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-jdbc'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
     implementation 'org.springframework.session:spring-session-data-redis'
@@ -39,6 +40,10 @@ dependencies {
     implementation 'com.vladmihalcea:hibernate-types-60:2.21.1'
     // https://mvnrepository.com/artifact/com.cloudinary/cloudinary-http44
     implementation 'com.cloudinary:cloudinary-http44:1.39.0'
+    // https://mvnrepository.com/artifact/com.google.zxing/core (QR Code decoder)
+    implementation 'com.google.zxing:core:3.5.3'
+    // https://mvnrepository.com/artifact/com.google.zxing/javase (QR Code decoder for Java SE)
+    implementation 'com.google.zxing:javase:3.5.3'
     // https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt-impl
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
     // https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt-jackson

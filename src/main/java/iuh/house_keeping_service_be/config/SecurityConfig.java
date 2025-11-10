@@ -48,6 +48,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/refresh-token",
                                 "/api/v1/auth/change-password",
                                 "/api/v1/auth/get-role",
+                                "/api/v1/auth/decode-qr",
                                 "/api/v1/media/**",
                                 "/api/v1/reviews/**",
                                 "/api/v1/addresses/**",

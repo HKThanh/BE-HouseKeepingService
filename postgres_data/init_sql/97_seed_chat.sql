@@ -214,31 +214,31 @@ INSERT INTO chat_messages (message_id, conversation_id, sender_id, content, is_r
 
 -- Thêm booking COMPLETED cho Customer 'Hoàng Văn Em' và Employee 'Hoàng Thị Phương'
 INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status, promotion_id, is_verified) VALUES
-('b0000001-0000-0000-0000-000000000008', 'c1000001-0000-0000-0000-000000000008', 'adrs0001-0000-0000-0000-000000000013', 'BK000008', '2025-10-15 09:00:00+07', 'Vệ sinh tổng quát lần 1', 500000.00, 'COMPLETED', NULL, true);
+('b0000001-0000-0000-0000-000000000027', 'c1000001-0000-0000-0000-000000000008', 'adrs0001-0000-0000-0000-000000000013', 'BK000027', '2025-10-15 09:00:00+07', 'Vệ sinh tổng quát lần 1', 500000.00, 'COMPLETED', NULL, true);
 
 -- Thêm booking detail cho booking COMPLETED
 INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
-('bd000001-0000-0000-0000-000000000008', 'b0000001-0000-0000-0000-000000000008', 2, 1, 500000, 500000);
+('bd000001-0000-0000-0000-000000000027', 'b0000001-0000-0000-0000-000000000027', 2, 1, 500000, 500000);
 
 -- Thêm assignment cho booking COMPLETED
 INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status, check_in_time, check_out_time) VALUES
-('asgn0001-0000-0000-0000-000000000008', 'bd000001-0000-0000-0000-000000000008', 'e1000001-0000-0000-0000-000000000007', 'COMPLETED', '2025-10-15 09:00:00+07', '2025-10-15 11:30:00+07');
+('asgn0001-0000-0000-0000-000000000027', 'bd000001-0000-0000-0000-000000000027', 'e1000001-0000-0000-0000-000000000007', 'COMPLETED', '2025-10-15 09:00:00+07', '2025-10-15 11:30:00+07');
 
 -- Thêm booking MỚI (CONFIRMED) cho cùng customer và employee
 INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status, promotion_id, is_verified) VALUES
-('b0000001-0000-0000-0000-000000000009', 'c1000001-0000-0000-0000-000000000008', 'adrs0001-0000-0000-0000-000000000013', 'BK000009', '2025-11-10 14:00:00+07', 'Vệ sinh tổng quát lần 2', 500000.00, 'CONFIRMED', NULL, true);
+('b0000001-0000-0000-0000-000000000028', 'c1000001-0000-0000-0000-000000000008', 'adrs0001-0000-0000-0000-000000000013', 'BK000028', '2025-11-10 14:00:00+07', 'Vệ sinh tổng quát lần 2', 500000.00, 'CONFIRMED', NULL, true);
 
 -- Thêm booking detail cho booking mới
 INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
-('bd000001-0000-0000-0000-000000000009', 'b0000001-0000-0000-0000-000000000009', 2, 1, 500000, 500000);
+('bd000001-0000-0000-0000-000000000028', 'b0000001-0000-0000-0000-000000000028', 2, 1, 500000, 500000);
 
 -- Thêm assignment cho booking mới
 INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status) VALUES
-('asgn0001-0000-0000-0000-000000000009', 'bd000001-0000-0000-0000-000000000009', 'e1000001-0000-0000-0000-000000000007', 'ASSIGNED');
+('asgn0001-0000-0000-0000-000000000028', 'bd000001-0000-0000-0000-000000000028', 'e1000001-0000-0000-0000-000000000007', 'ASSIGNED');
 
 -- Thêm conversation cho test case này - canChat = true vì có booking mới
 INSERT INTO conversations (conversation_id, customer_id, employee_id, booking_id, last_message, last_message_time, is_active, created_at, updated_at) VALUES
-('conv0011-0000-0000-0000-000000000011', 'c1000001-0000-0000-0000-000000000008', 'e1000001-0000-0000-0000-000000000007', 'b0000001-0000-0000-0000-000000000009', 'Hẹn gặp lại chị lần sau!', '2025-11-05 10:00:00+07', true, '2025-10-15 08:30:00+07', '2025-11-05 10:00:00+07');
+('conv0011-0000-0000-0000-000000000011', 'c1000001-0000-0000-0000-000000000008', 'e1000001-0000-0000-0000-000000000007', 'b0000001-0000-0000-0000-000000000028', 'Hẹn gặp lại chị lần sau!', '2025-11-05 10:00:00+07', true, '2025-10-15 08:30:00+07', '2025-11-05 10:00:00+07');
 
 -- Thêm messages cho conversation này
 INSERT INTO chat_messages (message_id, conversation_id, sender_id, content, is_read, created_at) VALUES
@@ -278,8 +278,8 @@ INSERT INTO chat_messages (message_id, conversation_id, sender_id, content, is_r
 -- Conversation 11: canChat = TRUE (có booking COMPLETED nhưng có booking mới CONFIRMED)
 --   - Customer: Hoàng Văn Em (c1000001-0000-0000-0000-000000000008)
 --   - Employee: Hoàng Thị Phương (e1000001-0000-0000-0000-000000000007)
---   - Booking cũ: b0000001-0000-0000-0000-000000000008 (COMPLETED)
---   - Booking mới: b0000001-0000-0000-0000-000000000009 (CONFIRMED)
+--   - Booking cũ: b0000001-0000-0000-0000-000000000027 (COMPLETED)
+--   - Booking mới: b0000001-0000-0000-0000-000000000028 (CONFIRMED)
 --
 -- TỔNG QUAN UNREAD COUNT:
 -- - Customer John Doe (c1000001-0000-0000-0000-000000000001): 

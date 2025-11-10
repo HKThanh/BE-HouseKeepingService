@@ -24,6 +24,26 @@ spring:
       port: 6379
   jackson:
     time-zone: Asia/Ho_Chi_Minh
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    protocol: smtp
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:true}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS_ENABLE:true}
+          connectiontimeout: ${MAIL_SMTP_CONNECTION_TIMEOUT:5000}
+          timeout: ${MAIL_SMTP_TIMEOUT:5000}
+          writetimeout: ${MAIL_SMTP_WRITE_TIMEOUT:5000}
 
 jwt:
   secret: 81474ce734be3de9043102e50fa88519a6f3bc67d75e7efded4602f33062fb40
@@ -41,3 +61,15 @@ cloudinary:
     customer: ${CLOUDINARY_CUSTOMER_FOLDER:customer_avatars}
     employee: ${CLOUDINARY_EMPLOYEE_FOLDER:employee_avatars}
     chat: ${CLOUDINARY_CHAT_FOLDER:chat_images}
+
+ml:
+  recommendation:
+    employee:
+      enabled: true
+      model-path: classpath:ml/employee_recommendation_model.json
+
+mail:
+  enabled: ${MAIL_ENABLED:true}
+  from-address: ${MAIL_FROM_ADDRESS:no-reply@housekeeping.local}
+  from-name: ${MAIL_FROM_NAME:House Keeping Service}
+  base-url: ${MAIL_BASE_URL:http://localhost:8080}
