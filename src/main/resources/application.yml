@@ -73,3 +73,16 @@ mail:
   from-address: ${MAIL_FROM_ADDRESS:no-reply@housekeeping.local}
   from-name: ${MAIL_FROM_NAME:House Keeping Service}
   base-url: ${MAIL_BASE_URL:http://localhost:8080}
+
+firebase:
+  enabled: ${FIREBASE_ENABLED:false}
+  project-id: ${FIREBASE_PROJECT_ID:}
+  api-key: ${FIREBASE_API_KEY:}
+  service-account:
+    file-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:}
+    base64: ${FIREBASE_SERVICE_ACCOUNT_BASE64:}
+    inline-json: ${FIREBASE_SERVICE_ACCOUNT_JSON:}
+  phone-auth:
+    enabled: ${FIREBASE_PHONE_AUTH_ENABLED:false}
+    otp-length: ${FIREBASE_PHONE_OTP_LENGTH:6}
+    session-ttl-seconds: ${FIREBASE_PHONE_SESSION_TTL:120}

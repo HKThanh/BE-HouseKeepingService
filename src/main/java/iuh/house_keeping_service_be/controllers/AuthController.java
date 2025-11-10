@@ -16,6 +16,7 @@ import iuh.house_keeping_service_be.services.AdminService.AdminService;
 import iuh.house_keeping_service_be.services.AuthService.AuthService;
 import iuh.house_keeping_service_be.services.CustomerService.CustomerService;
 import iuh.house_keeping_service_be.services.EmployeeService.EmployeeService;
+import iuh.house_keeping_service_be.services.PhoneVerificationService.PhoneVerificationService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,6 +67,9 @@ public class AuthController {
 
     @Autowired
     private EmployeeService employeeService;
+
+    @Autowired
+    private PhoneVerificationService phoneVerificationService;
 
     @Autowired
     private RedisTemplate<Object, Object> redisTemplate;
@@ -410,6 +414,87 @@ public class AuthController {
                     "message", "Đã xảy ra lỗi khi đăng ký tài khoản"
             ));
         }
+    }
+
+    @PostMapping("/phone/send-otp")
+    public ResponseEntity<?> sendPhoneOtp(@Valid @RequestBody PhoneOtpRequest request) {
+        try {
+            PhoneOtpSendResponse response = phoneVerificationService.sendOtp(request);
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("sessionInfo", response.sessionInfo());
+            data.put("expiresIn", response.expiresInSeconds());
+
+            Map<String, Object> body = new HashMap<>();
+            body.put("success", true);
+            body.put("message", "OTP đã được gửi tới số điện thoại bạn cung cấp");
+            body.put("data", data);
+
+            return ResponseEntity.ok(body);
+        } catch (RuntimeException ex) {
+            return buildPhoneOtpErrorResponse(ex);
+        }
+    }
+
+    @PostMapping("/phone/verify-otp")
+    public ResponseEntity<?> verifyPhoneOtp(@Valid @RequestBody PhoneOtpVerifyRequest request) {
+        try {
+            PhoneOtpVerifyResponse response = phoneVerificationService.verifyOtp(request);
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("firebaseUid", response.firebaseUid());
+            data.put("phoneNumber", response.phoneNumber());
+            data.put("accountId", response.accountId());
+            data.put("phoneVerified", response.phoneVerified());
+            data.put("firebaseIdToken", response.firebaseIdToken());
+            data.put("firebaseRefreshToken", response.firebaseRefreshToken());
+            data.put("expiresIn", response.expiresInSeconds());
+            data.put("newFirebaseUser", response.newFirebaseUser());
+
+            Map<String, Object> body = new HashMap<>();
+            body.put("success", true);
+            body.put("message", "Xác thực OTP thành công");
+            body.put("data", data);
+
+            return ResponseEntity.ok(body);
+        } catch (RuntimeException ex) {
+            return buildPhoneOtpErrorResponse(ex);
+        }
+    }
+
+    private ResponseEntity<Map<String, Object>> buildPhoneOtpErrorResponse(RuntimeException ex) {
+        HttpStatus status = resolvePhoneOtpErrorStatus(ex);
+
+        if (status.is5xxServerError()) {
+            log.error("Phone OTP integration error: {}", ex.getMessage(), ex);
+        } else {
+            log.warn("Phone OTP request failed: {}", ex.getMessage());
+        }
+
+        Map<String, Object> error = new HashMap<>();
+        error.put("success", false);
+        error.put("message", ex.getMessage());
+
+        return ResponseEntity.status(status).body(error);
+    }
+
+    private HttpStatus resolvePhoneOtpErrorStatus(RuntimeException ex) {
+        if (ex instanceof IllegalArgumentException) {
+            return HttpStatus.BAD_REQUEST;
+        }
+
+        String message = ex.getMessage();
+        if (message != null) {
+            String lower = message.toLowerCase(Locale.ROOT);
+            if (lower.contains("chưa cấu hình") || lower.contains("chưa được bật")) {
+                return HttpStatus.SERVICE_UNAVAILABLE;
+            }
+            if (lower.contains("firebase otp error") || lower.contains("firebase error")) {
+                return HttpStatus.BAD_GATEWAY;
+            }
+        }
+
+        return HttpStatus.BAD_REQUEST;
     }
 
     private String extractFieldFromErrorMessage(String message) {
