@@ -4,6 +4,8 @@ import iuh.house_keeping_service_be.dtos.Notification.NotificationRequest;
 import iuh.house_keeping_service_be.dtos.Notification.NotificationResponse;
 import iuh.house_keeping_service_be.models.Notification;
 import iuh.house_keeping_service_be.repositories.NotificationRepository;
+import iuh.house_keeping_service_be.services.EmailService.EmailRecipientResolver;
+import iuh.house_keeping_service_be.services.EmailService.EmailService;
 import iuh.house_keeping_service_be.services.NotificationService.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +22,8 @@ import java.time.LocalDateTime;
 public class NotificationServiceImpl implements NotificationService {
     
     private final NotificationRepository notificationRepository;
+    private final EmailService emailService;
+    private final EmailRecipientResolver emailRecipientResolver;
     
     @Override
     @Transactional
@@ -40,6 +44,7 @@ public class NotificationServiceImpl implements NotificationService {
         
         Notification saved = notificationRepository.save(notification);
         log.info("Notification created successfully: {}", saved.getNotificationId());
+        dispatchEmailNotification(saved);
         
         return NotificationResponse.fromEntity(saved);
     }
@@ -277,5 +282,20 @@ public class NotificationServiceImpl implements NotificationService {
         );
         
         createNotification(request);
+    }
+
+    private void dispatchEmailNotification(Notification notification) {
+        if (notification == null) {
+            return;
+        }
+        emailRecipientResolver.resolveEmailByAccountId(notification.getAccountId())
+                .ifPresentOrElse(
+                        email -> emailService.sendNotificationEmail(email, notification),
+                        () -> log.debug(
+                                "Skip email for notification {} because account {} has no valid email",
+                                notification.getNotificationId(),
+                                notification.getAccountId()
+                        )
+                );
     }
 }
