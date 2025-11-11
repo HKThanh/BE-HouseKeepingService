@@ -44,12 +44,14 @@ public class Notification {
     @Column(name = "related_type", length = 50)
     private RelatedEntityType relatedType; // BOOKING, ASSIGNMENT, PAYMENT, etc.
     
+    @Builder.Default
     @Column(name = "is_read", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
     private Boolean isRead = false;
     
     @Column(name = "read_at")
     private LocalDateTime readAt;
     
+    @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "priority", nullable = false, length = 20)
     private NotificationPriority priority = NotificationPriority.NORMAL;

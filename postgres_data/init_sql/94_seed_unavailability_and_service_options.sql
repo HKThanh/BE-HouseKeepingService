@@ -78,6 +78,11 @@ INSERT INTO service_option_choices (option_id, label, display_order) VALUES
 -- Câu hỏi cho dịch vụ 'Nấu ăn gia đình'
 INSERT INTO service_options (service_id, label, option_type, display_order)
 VALUES (7, 'Số người ăn?', 'QUANTITY_INPUT', 1);
+INSERT INTO service_options (service_id, label, option_type, display_order)
+VALUES (7, 'Bạn có cần chúng tôi mua nguyên liệu?', 'SINGLE_CHOICE_RADIO', 2);
+INSERT INTO service_option_choices (option_id, label, display_order) VALUES
+((SELECT option_id FROM service_options WHERE service_id = 7 AND label = 'Bạn có cần chúng tôi mua nguyên liệu?' LIMIT 1), 'Có', 1),
+((SELECT option_id FROM service_options WHERE service_id = 7 AND label = 'Bạn có cần chúng tôi mua nguyên liệu?' LIMIT 1), 'Không', 2);
 
 INSERT INTO pricing_rules (service_id, rule_name, condition_logic, priority, price_adjustment, staff_adjustment, duration_adjustment_hours) VALUES
 (2, 'Phụ thu nhà phố lớn', 'ALL', 10, 250000, 1, 2.0),
@@ -87,7 +92,8 @@ INSERT INTO pricing_rules (service_id, rule_name, condition_logic, priority, pri
 (3, 'Vệ sinh nệm', 'ALL', 5, 150000, 0, 1.0),
 (3, 'Vệ sinh rèm', 'ALL', 5, 100000, 0, 1.0),
 (4, 'Máy lạnh âm trần', 'ALL', 5, 50000, 0, 0.5),
-(5, 'Gấp quần áo', 'ALL', 5, 10000, 0, 1.0);
+(5, 'Gấp quần áo', 'ALL', 5, 10000, 0, 1.0),
+(7, 'Mua nguyên liệu nấu ăn', 'ALL', 5, 40000, 0, 0.5);
 
 -- Gán điều kiện cho các quy tắc trên
 -- Phụ thu nhà phố lớn: yêu cầu nhà phố và diện tích trên 80m²
@@ -170,6 +176,15 @@ VALUES (
  AND label = 'Có' LIMIT 1)
 );
 
+-- Mua nguyên liệu nấu ăn
+INSERT INTO rule_conditions (rule_id, choice_id)
+VALUES (
+(SELECT rule_id FROM pricing_rules WHERE rule_name = 'Mua nguyên liệu nấu ăn'),
+(SELECT choice_id FROM service_option_choices 
+ WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 7 AND label = 'Bạn có cần chúng tôi mua nguyên liệu?' LIMIT 1) 
+ AND label = 'Có' LIMIT 1)
+);
+
 INSERT INTO payment_methods (method_code, method_name, is_active) VALUES
 ('CASH', 'Thanh toán tiền mặt', TRUE),
 ('MOMO', 'Ví điện tử Momo', TRUE),
@@ -179,7 +194,11 @@ INSERT INTO payment_methods (method_code, method_name, is_active) VALUES
 -- Add corresponding payments for the bookings
 INSERT INTO payments (payment_id, booking_id, amount, method_id, payment_status, transaction_code, paid_at) VALUES
 ('pay00001-0000-0000-0000-000000000001', 'b0000001-0000-0000-0000-000000000001', 80000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'VNPAY'), 'PAID', 'VNP123456789', '2025-08-20 13:05:00+07'),
-('pay00001-0000-0000-0000-000000000002', 'b0000001-0000-0000-0000-000000000002', 90000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'MOMO'), 'PENDING', NULL, NULL);
+('pay00001-0000-0000-0000-000000000002', 'b0000001-0000-0000-0000-000000000002', 90000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'MOMO'), 'PENDING', NULL, NULL),
+('pay00001-0000-0000-0000-000000000003', 'b0000001-0000-0000-0000-000000000004', 150000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'CASH'), 'PAID', NULL, '2025-09-01 08:30:00+07'),
+('pay00001-0000-0000-0000-000000000004', 'b0000001-0000-0000-0000-000000000003', 200000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'BANK_TRANSFER'), 'PENDING', 'BFT20250901001', NULL),
+('pay00001-0000-0000-0000-000000000005', 'b0000001-0000-0000-0000-000000000006', 50000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'CASH'), 'PENDING', NULL, NULL),
+('pay00001-0000-0000-0000-000000000006', 'b0000001-0000-0000-0000-000000000010', 630000.00, (SELECT method_id FROM payment_methods WHERE method_code = 'VNPAY'), 'PENDING', NULL, NULL);
 
 -- Update pricing rules to reflect realistic market adjustments
 UPDATE pricing_rules SET price_adjustment = 200000 WHERE rule_name = 'Phụ thu nhà phố lớn';

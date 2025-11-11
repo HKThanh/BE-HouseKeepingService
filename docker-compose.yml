@@ -14,13 +14,13 @@ services:
       redis:
         condition: service_started
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/house_keeping
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD}
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD}
       - SPRING_JPA_HIBERNATE_DDL_AUTO=validate
       - SPRING_JPA_SHOW_SQL=false
-      - SPRING_DATA_REDIS_HOST=redis
-      - SPRING_DATA_REDIS_PORT=6379
+      - SPRING_DATA_REDIS_HOST=${REDIS_HOST}
+      - SPRING_DATA_REDIS_PORT=${REDIS_PORT}
       - JWT_SECRET=${JWT_SECRET}
       - JWT_ACCESS_EXPIRATION=${JWT_ACCESS_EXPIRATION}
       - JWT_REFRESH_EXPIRATION=${JWT_REFRESH_EXPIRATION}
@@ -30,6 +30,8 @@ services:
       - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
       - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
       - CLOUDINARY_CUSTOMER_FOLDER=${CLOUDINARY_CUSTOMER_FOLDER:-customer_avatars}
+      - CLOUDINARY_EMPLOYEE_FOLDER=${CLOUDINARY_EMPLOYEE_FOLDER:-employee_avatars}
+      - CLOUDINARY_CHAT_FOLDER=${CLOUDINARY_CHAT_FOLDER:-chat_images}
       - MAIL_ENABLED=${MAIL_ENABLED:-true}
       - MAIL_HOST=${MAIL_HOST}
       - MAIL_PORT=${MAIL_PORT}
@@ -43,6 +45,21 @@ services:
       - MAIL_SMTP_CONNECTION_TIMEOUT=${MAIL_SMTP_CONNECTION_TIMEOUT:-5000}
       - MAIL_SMTP_TIMEOUT=${MAIL_SMTP_TIMEOUT:-5000}
       - MAIL_SMTP_WRITE_TIMEOUT=${MAIL_SMTP_WRITE_TIMEOUT:-5000}
+      - FIREBASE_ENABLED=${FIREBASE_ENABLED:-false}
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      - FIREBASE_API_KEY=${FIREBASE_API_KEY}
+      - FIREBASE_SERVICE_ACCOUNT_BASE64=${FIREBASE_SERVICE_ACCOUNT_BASE64}
+      - FIREBASE_PHONE_AUTH_ENABLED=${FIREBASE_PHONE_AUTH_ENABLED:-false}
+      - FIREBASE_PHONE_OTP_LENGTH=${FIREBASE_PHONE_OTP_LENGTH:-6}
+      - FIREBASE_PHONE_SESSION_TTL=${FIREBASE_PHONE_SESSION_TTL:-120}
+      - VNPAY_PAY_URL=${VNPAY_PAY_URL:-https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+      - VNPAY_RETURN_URL=${VNPAY_RETURN_URL:-http://localhost:8080/api/v1/payment/vnpay/callback}
+      - VNPAY_TMN_CODE=${VNPAY_TMN_CODE}
+      - VNPAY_SECRET_KEY=${VNPAY_SECRET_KEY}
+      - VNPAY_API_URL=${VNPAY_API_URL:-https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
+      - VNPAY_VERSION=${VNPAY_VERSION:-2.1.0}
+      - VNPAY_COMMAND=${VNPAY_COMMAND:-pay}
+      - VNPAY_ORDER_TYPE=${VNPAY_ORDER_TYPE:-other}
       - SPRING_APPLICATION_JSON={"logging":{"level":{"iuh.house_keeping_service_be":"DEBUG"}}}
     networks:
       - house_keeping_network
@@ -55,9 +72,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_DB=house_keeping
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
       - ./postgres_data/data:/var/lib/postgresql/data
       - ./postgres_data/init_sql:/docker-entrypoint-initdb.d

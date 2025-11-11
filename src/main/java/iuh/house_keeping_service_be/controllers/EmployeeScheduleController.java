@@ -159,7 +159,8 @@ public class EmployeeScheduleController {
                 serviceId, bookingTime, ward, city);
 
         try {
-            SuitableEmployeeRequest request = new SuitableEmployeeRequest(serviceId, bookingTime, ward, city);
+            // Admin endpoint không có customerId context, nên truyền null
+            SuitableEmployeeRequest request = new SuitableEmployeeRequest(serviceId, bookingTime, ward, city, null);
             ApiResponse<List<SuitableEmployeeResponse>> response = employeeScheduleService.findSuitableEmployees(request);
 
             return ResponseEntity.ok(response);
