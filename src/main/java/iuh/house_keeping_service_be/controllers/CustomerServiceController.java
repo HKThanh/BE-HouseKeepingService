@@ -5,6 +5,10 @@ import iuh.house_keeping_service_be.dtos.EmployeeSchedule.ApiResponse;
 import iuh.house_keeping_service_be.dtos.EmployeeSchedule.SuitableEmployeeRequest;
 import iuh.house_keeping_service_be.dtos.EmployeeSchedule.SuitableEmployeeResponse;
 import iuh.house_keeping_service_be.dtos.Service.*;
+import iuh.house_keeping_service_be.models.Account;
+import iuh.house_keeping_service_be.models.Customer;
+import iuh.house_keeping_service_be.repositories.AccountRepository;
+import iuh.house_keeping_service_be.repositories.CustomerRepository;
 import iuh.house_keeping_service_be.services.AdminService.PermissionService;
 import iuh.house_keeping_service_be.services.EmployeeScheduleService.EmployeeScheduleService;
 import iuh.house_keeping_service_be.services.RecommendationService.EmployeeRecommendationService;
@@ -15,6 +19,8 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -32,6 +38,8 @@ public class CustomerServiceController {
     private final EmployeeScheduleService employeeScheduleService;
     private final EmployeeRecommendationService employeeRecommendationService;
     private final JwtUtil jwtUtil;
+    private final AccountRepository accountRepository;
+    private final CustomerRepository customerRepository;
 
     @GetMapping
     public ResponseEntity<ServiceListResponse> getAllServices(@RequestHeader("Authorization") String authHeader) {
@@ -268,7 +276,26 @@ public class CustomerServiceController {
                 serviceId, bookingTime, ward, city);
 
         try {
-            SuitableEmployeeRequest request = new SuitableEmployeeRequest(serviceId, bookingTime, ward, city);
+            // Lấy customerId từ authentication context
+            String customerId = null;
+            try {
+                Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+                if (authentication != null && authentication.isAuthenticated()) {
+                    String username = authentication.getName();
+                    Account account = accountRepository.findByUsername(username).orElse(null);
+                    if (account != null) {
+                        Customer customer = customerRepository.findByAccount_AccountId(account.getAccountId()).orElse(null);
+                        if (customer != null) {
+                            customerId = customer.getCustomerId();
+                            log.info("Found customerId: {} for username: {}", customerId, username);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Could not extract customerId from authentication: {}", e.getMessage());
+            }
+
+            SuitableEmployeeRequest request = new SuitableEmployeeRequest(serviceId, bookingTime, ward, city, customerId);
             ApiResponse<List<SuitableEmployeeResponse>> response = employeeScheduleService.findSuitableEmployees(request);
 
             if (!response.success() || response.data() == null || response.data().isEmpty()) {

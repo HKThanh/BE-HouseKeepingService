@@ -188,4 +188,12 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
     boolean existsByEmployeeAndCustomerWithActiveBooking(
             @Param("employeeId") String employeeId,
             @Param("customerId") String customerId);
+
+    // Get list of employee IDs who have completed bookings for a specific customer
+    @Query("SELECT DISTINCT a.employee.employeeId FROM Assignment a " +
+            "JOIN a.bookingDetail bd " +
+            "JOIN bd.booking b " +
+            "WHERE b.customer.customerId = :customerId " +
+            "AND b.status = 'COMPLETED'")
+    List<String> findEmployeeIdsByCustomerWithCompletedBookings(@Param("customerId") String customerId);
 }

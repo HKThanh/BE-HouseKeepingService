@@ -12,6 +12,7 @@ public record SuitableEmployeeResponse(
         String[] workingWards,
         String workingCity,
         Integer completedJobs,
+        Boolean hasWorkedWithCustomer,  // true nếu nhân viên đã từng phục vụ customer này
         RecommendationMetadata recommendation
 ) {
 }

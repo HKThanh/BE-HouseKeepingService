@@ -100,6 +100,11 @@ public class BookingServiceImpl implements BookingService {
                 String ward = bookingAddress.getWard();
                 String city = bookingAddress.getCity();
                 
+                // Get customerId from validation context
+                String customerId = validationOutcome.addressContext().customer() != null 
+                    ? validationOutcome.addressContext().customer().getCustomerId() 
+                    : null;
+                
                 // Find suitable employees for each service in the booking
                 List<AssignmentRequest> autoAssignments = new ArrayList<>();
                 
@@ -109,7 +114,8 @@ public class BookingServiceImpl implements BookingService {
                             detailRequest.serviceId(),
                             request.bookingTime(),
                             ward,
-                            city
+                            city,
+                            customerId  // Truyền customerId để ưu tiên nhân viên đã từng phục vụ
                         );
                     
                     ApiResponse<List<SuitableEmployeeResponse>> 

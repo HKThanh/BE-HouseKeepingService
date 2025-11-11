@@ -120,6 +120,7 @@ public class MachineLearningEmployeeRecommendationService implements EmployeeRec
                 candidate.workingWards(),
                 candidate.workingCity(),
                 candidate.completedJobs(),
+                candidate.hasWorkedWithCustomer(),  // Giữ nguyên giá trị hasWorkedWithCustomer từ candidate
                 metadata
         );
     }

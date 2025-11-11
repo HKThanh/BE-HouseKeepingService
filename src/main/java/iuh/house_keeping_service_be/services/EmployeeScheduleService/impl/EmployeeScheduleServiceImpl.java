@@ -296,28 +296,79 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
 
             log.info("Found {} potential employees in working zone", potentialEmployees.size());
 
-            // 3. Kiểm tra tình trạng rảnh của từng nhân viên
-            List<SuitableEmployeeResponse> availableEmployees = new ArrayList<>();
+            // 3. Lấy danh sách nhân viên đã từng phục vụ customer (nếu có customerId)
+            Set<String> employeesWorkedWithCustomer = new HashSet<>();
+            if (request.customerId() != null && !request.customerId().isBlank()) {
+                try {
+                    List<String> workedEmployeeIds = assignmentRepository
+                            .findEmployeeIdsByCustomerWithCompletedBookings(request.customerId());
+                    employeesWorkedWithCustomer.addAll(workedEmployeeIds);
+                    log.info("Found {} employees who have worked with customer {}", 
+                            employeesWorkedWithCustomer.size(), request.customerId());
+                } catch (Exception e) {
+                    log.warn("Could not fetch employees worked with customer: {}", e.getMessage());
+                }
+            }
+
+            // 4. Kiểm tra tình trạng rảnh và phân loại nhân viên
+            List<SuitableEmployeeResponse> employeesWithHistory = new ArrayList<>();
+            List<SuitableEmployeeResponse> employeesWithoutHistory = new ArrayList<>();
 
             for (Employee employee : potentialEmployees) {
                 if (isEmployeeAvailable(employee.getEmployeeId(), startTime, endTime)) {
-                    SuitableEmployeeResponse employeeResponse = buildSuitableEmployeeResponse(employee);
-                    availableEmployees.add(employeeResponse);
-                    log.debug("Employee {} is available", employee.getFullName());
+                    boolean hasWorkedWithCustomer = employeesWorkedWithCustomer.contains(employee.getEmployeeId());
+                    SuitableEmployeeResponse employeeResponse = buildSuitableEmployeeResponse(employee, hasWorkedWithCustomer);
+                    
+                    if (hasWorkedWithCustomer) {
+                        employeesWithHistory.add(employeeResponse);
+                        log.debug("Employee {} is available and has worked with customer", employee.getFullName());
+                    } else {
+                        employeesWithoutHistory.add(employeeResponse);
+                        log.debug("Employee {} is available (new to customer)", employee.getFullName());
+                    }
                 } else {
                     log.debug("Employee {} is busy during requested time", employee.getFullName());
                 }
             }
 
-            // 4. Áp dụng recommendation engine (nếu được bật) để chấm điểm và sắp xếp
-            availableEmployees = recommendationService.recommend(request, availableEmployees);
+            // 5. Áp dụng machine learning cho từng nhóm riêng biệt
+            if (!employeesWithHistory.isEmpty()) {
+                employeesWithHistory = recommendationService.recommend(request, employeesWithHistory);
+                log.info("Ranked {} employees with customer history using ML", employeesWithHistory.size());
+            }
+            
+            if (!employeesWithoutHistory.isEmpty()) {
+                employeesWithoutHistory = recommendationService.recommend(request, employeesWithoutHistory);
+                log.info("Ranked {} new employees using ML", employeesWithoutHistory.size());
+            }
 
-            log.info("Found {} available employees after recommendation scoring", availableEmployees.size());
+            // 6. Kết hợp: Nhân viên đã từng phục vụ lên trước, sau đó đến nhân viên mới
+            List<SuitableEmployeeResponse> availableEmployees = new ArrayList<>();
+            availableEmployees.addAll(employeesWithHistory);
+            availableEmployees.addAll(employeesWithoutHistory);
 
-            String message = availableEmployees.isEmpty()
-                    ? "Không có nhân viên nào rảnh trong thời gian được yêu cầu"
-                    : String.format("Tìm thấy %d nhân viên phù hợp cho dịch vụ %s",
-                    availableEmployees.size(), service.getName());
+            log.info("Found {} available employees ({} with history, {} new) after ML ranking", 
+                    availableEmployees.size(), employeesWithHistory.size(), employeesWithoutHistory.size());
+
+            String message;
+            if (availableEmployees.isEmpty()) {
+                message = "Không có nhân viên nào rảnh trong thời gian được yêu cầu";
+            } else {
+                if (employeesWithHistory.isEmpty() && employeesWithoutHistory.isEmpty()) {
+                    message = String.format("Tìm thấy %d nhân viên phù hợp cho dịch vụ %s",
+                            availableEmployees.size(), service.getName());
+                } else if (employeesWithHistory.isEmpty()) {
+                    message = String.format("Tìm thấy %d nhân viên phù hợp cho dịch vụ %s (áp dụng machine learning)",
+                            employeesWithoutHistory.size(), service.getName());
+                } else if (employeesWithoutHistory.isEmpty()) {
+                    message = String.format("Tìm thấy %d nhân viên đã từng phục vụ bạn cho dịch vụ %s (áp dụng machine learning)",
+                            employeesWithHistory.size(), service.getName());
+                } else {
+                    message = String.format("Tìm thấy %d nhân viên phù hợp cho dịch vụ %s (%d đã từng phục vụ bạn, %d nhân viên khác - áp dụng machine learning)",
+                            availableEmployees.size(), service.getName(), 
+                            employeesWithHistory.size(), employeesWithoutHistory.size());
+                }
+            }
 
             return new ApiResponse<>(true, message, availableEmployees);
 
@@ -397,7 +448,7 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
     /**
      * Xây dựng response cho nhân viên phù hợp
      */
-    private SuitableEmployeeResponse buildSuitableEmployeeResponse(Employee employee) {
+    private SuitableEmployeeResponse buildSuitableEmployeeResponse(Employee employee, boolean hasWorkedWithCustomer) {
         // Lấy thông tin khu vực làm việc từ employee's working zones
         List<EmployeeWorkingZone> workingZones = employee.getWorkingZones();
 
@@ -431,6 +482,7 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
                 wards,
                 city,
                 completedJobs,
+                hasWorkedWithCustomer,
                 null
         );
     }
