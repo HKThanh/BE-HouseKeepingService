@@ -268,12 +268,18 @@ public class CustomerServiceController {
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_CUSTOMER')")
     public ResponseEntity<ApiResponse<List<SuitableEmployeeResponse>>> findSuitableEmployees(
             @RequestParam Integer serviceId,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime bookingTime,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime bookingTime,
             @RequestParam(required = false) String ward,
-            @RequestParam(required = false) String city) {
+            @RequestParam(required = false) String city,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) List<LocalDateTime> bookingTimes) {
 
-        log.info("Finding suitable employees for service: {}, booking time: {}, district: {}, city: {}",
-                serviceId, bookingTime, ward, city);
+        if (bookingTimes != null && !bookingTimes.isEmpty()) {
+            log.info("Finding suitable employees for service: {}, {} booking time slots, district: {}, city: {}",
+                    serviceId, bookingTimes.size(), ward, city);
+        } else {
+            log.info("Finding suitable employees for service: {}, booking time: {}, district: {}, city: {}",
+                    serviceId, bookingTime, ward, city);
+        }
 
         try {
             // Lấy customerId từ authentication context
@@ -295,7 +301,7 @@ public class CustomerServiceController {
                 log.warn("Could not extract customerId from authentication: {}", e.getMessage());
             }
 
-            SuitableEmployeeRequest request = new SuitableEmployeeRequest(serviceId, bookingTime, ward, city, customerId);
+            SuitableEmployeeRequest request = new SuitableEmployeeRequest(serviceId, bookingTime, ward, city, customerId, bookingTimes);
             ApiResponse<List<SuitableEmployeeResponse>> response = employeeScheduleService.findSuitableEmployees(request);
 
             if (!response.success() || response.data() == null || response.data().isEmpty()) {

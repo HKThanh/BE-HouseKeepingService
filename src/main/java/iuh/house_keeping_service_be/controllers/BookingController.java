@@ -4,11 +4,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import iuh.house_keeping_service_be.config.JwtUtil;
 import iuh.house_keeping_service_be.dtos.Booking.internal.BookingValidationResult;
 import iuh.house_keeping_service_be.dtos.Booking.request.BookingCreateRequest;
+import iuh.house_keeping_service_be.dtos.Booking.request.MultipleBookingCreateRequest;
 import iuh.house_keeping_service_be.dtos.Booking.request.BookingCancelRequest;
 import iuh.house_keeping_service_be.dtos.Booking.request.ConvertBookingToPostRequest;
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingHistoryResponse;
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingResponse;
 import iuh.house_keeping_service_be.dtos.Booking.summary.BookingCreationSummary;
+import iuh.house_keeping_service_be.dtos.Booking.summary.MultipleBookingCreationSummary;
 import iuh.house_keeping_service_be.dtos.Cloudinary.CloudinaryUploadResult;
 import iuh.house_keeping_service_be.dtos.Service.ServiceDetailResponse;
 import iuh.house_keeping_service_be.models.Address;
@@ -206,6 +208,122 @@ public class BookingController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                 "success", false,
                 "message", "Đã xảy ra lỗi khi tạo booking"
+            ));
+        }
+    }
+
+    @PostMapping(value = "/multiple", consumes = {"multipart/form-data"})
+    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_ADMIN')")
+    public ResponseEntity<?> createMultipleBookings(
+            @RequestPart(value = "booking", required = true) String bookingJson,
+            @RequestPart(value = "images", required = false) List<MultipartFile> images) {
+        
+        log.info("Received multiple booking creation request");
+        
+        try {
+            // Parse JSON string to MultipleBookingCreateRequest object
+            MultipleBookingCreateRequest request;
+            try {
+                request = objectMapper.readValue(bookingJson, MultipleBookingCreateRequest.class);
+                log.info("Creating {} bookings with {} services each", 
+                    request.bookingTimes().size(), 
+                    request.bookingDetails().size());
+            } catch (Exception e) {
+                log.error("Failed to parse booking JSON: {}", e.getMessage());
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Invalid booking data format: " + e.getMessage()
+                ));
+            }
+            
+            List<String> imageUrls = new ArrayList<>();
+            
+            // Upload images to Cloudinary if provided
+            if (images != null && !images.isEmpty()) {
+                log.info("Uploading {} booking images to Cloudinary", images.size());
+                
+                // Validate number of images (max 10)
+                if (images.size() > 10) {
+                    return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "Số lượng ảnh không được vượt quá 10"
+                    ));
+                }
+                
+                for (MultipartFile image : images) {
+                    if (image == null || image.isEmpty()) {
+                        continue;
+                    }
+                    
+                    // Validate file type
+                    String contentType = image.getContentType();
+                    if (contentType == null || !contentType.startsWith("image/")) {
+                        return ResponseEntity.badRequest().body(Map.of(
+                            "success", false,
+                            "message", "Tất cả file phải là định dạng ảnh"
+                        ));
+                    }
+                    
+                    // Validate file size (max 10MB)
+                    if (image.getSize() > 10 * 1024 * 1024) {
+                        return ResponseEntity.badRequest().body(Map.of(
+                            "success", false,
+                            "message", "Kích thước mỗi file không được vượt quá 10MB"
+                        ));
+                    }
+                    
+                    try {
+                        CloudinaryUploadResult uploadResult = cloudinaryService.uploadBookingImage(image);
+                        imageUrls.add(uploadResult.secureUrl());
+                        log.info("Image uploaded successfully: {}", uploadResult.secureUrl());
+                    } catch (Exception e) {
+                        log.error("Failed to upload image: {}", e.getMessage());
+                        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                            "success", false,
+                            "message", "Lỗi khi tải ảnh lên: " + e.getMessage()
+                        ));
+                    }
+                }
+            }
+            
+            // Create new request with image URLs if uploaded
+            MultipleBookingCreateRequest bookingRequest = request;
+            if (!imageUrls.isEmpty()) {
+                bookingRequest = new MultipleBookingCreateRequest(
+                    request.addressId(),
+                    request.newAddress(),
+                    request.bookingTimes(),
+                    request.note(),
+                    request.title(),
+                    imageUrls,
+                    request.promoCode(),
+                    request.bookingDetails(),
+                    request.assignments(),
+                    request.paymentMethodId()
+                );
+            }
+            
+            MultipleBookingCreationSummary summary = bookingService.createMultipleBookings(bookingRequest);
+            
+            log.info("Multiple bookings created: {}/{} successful", 
+                summary.getSuccessfulBookings(), 
+                summary.getTotalBookingsCreated());
+            
+            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                "success", true,
+                "data", summary
+            ));
+        } catch (IllegalArgumentException e) {
+            log.error("Validation error creating multiple bookings: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            log.error("Error creating multiple bookings: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "success", false,
+                "message", "Đã xảy ra lỗi khi tạo các booking"
             ));
         }
     }

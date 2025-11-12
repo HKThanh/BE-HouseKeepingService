@@ -8,6 +8,8 @@ public record NotificationRequest(
         @NotBlank(message = "Account ID không được để trống")
         String accountId,
         
+        String targetRole,  // CUSTOMER, EMPLOYEE, ADMIN - Optional, for routing to specific role
+        
         @NotNull(message = "Loại thông báo không được để trống")
         Notification.NotificationType type,
         

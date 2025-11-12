@@ -27,6 +27,9 @@ public class Notification {
     @JoinColumn(name = "account_id", insertable = false, updatable = false)
     private Account account;
     
+    @Column(name = "target_role", length = 20)
+    private String targetRole; // CUSTOMER, EMPLOYEE, ADMIN - Specific role to receive notification
+    
     @Enumerated(EnumType.STRING)
     @Column(name = "type", nullable = false, length = 50)
     private NotificationType type;

@@ -315,4 +315,12 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
     Page<Booking> findBookingsByEmployeeIdOrderByBookingTimeWithDate(@Param("employeeId") String employeeId, 
                                                                       @Param("fromDate") java.time.LocalDateTime fromDate, 
                                                                       Pageable pageable);
+    
+    // Find bookings by status list and booking time range (for urgent booking notifications)
+    @Query("SELECT b FROM Booking b WHERE b.status IN :statuses " +
+           "AND b.bookingTime BETWEEN :startTime AND :endTime " +
+           "ORDER BY b.bookingTime ASC")
+    List<Booking> findByStatusInAndBookingTimeBetween(@Param("statuses") List<BookingStatus> statuses,
+                                                       @Param("startTime") LocalDateTime startTime,
+                                                       @Param("endTime") LocalDateTime endTime);
 }

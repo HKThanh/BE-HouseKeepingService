@@ -44,8 +44,14 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // Register the WebSocket endpoint with CORS configuration - Allow all origins
+        // Register the WebSocket endpoint for chat with CORS configuration - Allow all origins
         registry.addEndpoint("/ws/chat")
+                .setAllowedOriginPatterns("*")
+                .withSockJS()
+                .setHeartbeatTime(25000); // 25s SockJS heartbeat
+
+        // Register the WebSocket endpoint for notifications
+        registry.addEndpoint("/ws/notifications")
                 .setAllowedOriginPatterns("*")
                 .withSockJS()
                 .setHeartbeatTime(25000); // 25s SockJS heartbeat

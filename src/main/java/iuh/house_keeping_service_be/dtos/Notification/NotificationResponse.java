@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 public record NotificationResponse(
         String notificationId,
         String accountId,
+        String targetRole,
         Notification.NotificationType type,
         String title,
         String message,
@@ -22,6 +23,7 @@ public record NotificationResponse(
         return new NotificationResponse(
                 notification.getNotificationId(),
                 notification.getAccountId(),
+                notification.getTargetRole(),
                 notification.getType(),
                 notification.getTitle(),
                 notification.getMessage(),

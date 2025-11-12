@@ -255,8 +255,13 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
     @Transactional(readOnly = true)
     public ApiResponse<List<SuitableEmployeeResponse>> findSuitableEmployees(SuitableEmployeeRequest request) {
         try {
-            log.info("Finding suitable employees for service: {}, booking time: {}",
-                    request.serviceId(), request.bookingTime());
+            if (request.bookingTimes() != null && !request.bookingTimes().isEmpty()) {
+                log.info("Finding suitable employees for service: {}, checking {} booking time slots",
+                        request.serviceId(), request.bookingTimes().size());
+            } else {
+                log.info("Finding suitable employees for service: {}, booking time: {}",
+                        request.serviceId(), request.bookingTime());
+            }
 
             // 1. Lấy thông tin service để tính thời gian kết thúc
             Optional<iuh.house_keeping_service_be.models.Service> serviceOpt = serviceRepository.findById(request.serviceId());
@@ -266,23 +271,37 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
 
             iuh.house_keeping_service_be.models.Service service = serviceOpt.get();
 
-            // Tính thời gian kết thúc dựa trên estimated_duration_hours
-            LocalDateTime startTime = request.bookingTime();
-
-            if (startTime == null) {
-                return new ApiResponse<>(false, "Thời gian đặt dịch vụ không hợp lệ", null);
-            }
-            if (startTime.isBefore(LocalDateTime.now())) {
-                return new ApiResponse<>(false, "Thời gian đặt dịch vụ phải ở tương lai", null);
-            }
-
             // Validate service duration
             BigDecimal estimatedDuration = service.getEstimatedDurationHours();
             if (estimatedDuration == null) {
                 return new ApiResponse<>(false, "Dịch vụ không có thời lượng dự kiến", null);
             }
 
-            LocalDateTime endTime = startTime.plusHours(estimatedDuration.longValue());
+            // Validate booking time(s)
+            boolean hasBookingTimes = request.bookingTimes() != null && !request.bookingTimes().isEmpty();
+            LocalDateTime startTime = request.bookingTime();
+            LocalDateTime endTime = null;
+
+            // Nếu không có bookingTimes, bắt buộc phải có bookingTime
+            if (!hasBookingTimes) {
+                if (startTime == null) {
+                    return new ApiResponse<>(false, "Thời gian đặt dịch vụ không hợp lệ (bookingTime hoặc bookingTimes phải được cung cấp)", null);
+                }
+                if (startTime.isBefore(LocalDateTime.now())) {
+                    return new ApiResponse<>(false, "Thời gian đặt dịch vụ phải ở tương lai", null);
+                }
+                endTime = startTime.plusHours(estimatedDuration.longValue());
+            } else {
+                // Nếu có bookingTimes, validate tất cả các time slots
+                for (LocalDateTime bookingTime : request.bookingTimes()) {
+                    if (bookingTime == null) {
+                        return new ApiResponse<>(false, "Danh sách bookingTimes chứa giá trị null", null);
+                    }
+                    if (bookingTime.isBefore(LocalDateTime.now())) {
+                        return new ApiResponse<>(false, "Tất cả thời gian trong bookingTimes phải ở tương lai", null);
+                    }
+                }
+            }
 
             log.info("Service duration: {} hours, calculated end time: {}",
                     estimatedDuration, endTime);
@@ -315,7 +334,25 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
             List<SuitableEmployeeResponse> employeesWithoutHistory = new ArrayList<>();
 
             for (Employee employee : potentialEmployees) {
-                if (isEmployeeAvailable(employee.getEmployeeId(), startTime, endTime)) {
+                boolean isAvailable = false;
+                
+                // Nếu có danh sách bookingTimes, kiểm tra tất cả các slot
+                if (request.bookingTimes() != null && !request.bookingTimes().isEmpty()) {
+                    isAvailable = true;
+                    for (LocalDateTime bookingTime : request.bookingTimes()) {
+                        LocalDateTime slotEndTime = bookingTime.plusHours(estimatedDuration.longValue());
+                        if (!isEmployeeAvailable(employee.getEmployeeId(), bookingTime, slotEndTime)) {
+                            isAvailable = false;
+                            log.debug("Employee {} is busy at time slot: {}", employee.getFullName(), bookingTime);
+                            break;
+                        }
+                    }
+                } else {
+                    // Nếu không có bookingTimes, kiểm tra theo bookingTime đơn lẻ (logic cũ)
+                    isAvailable = isEmployeeAvailable(employee.getEmployeeId(), startTime, endTime);
+                }
+                
+                if (isAvailable) {
                     boolean hasWorkedWithCustomer = employeesWorkedWithCustomer.contains(employee.getEmployeeId());
                     SuitableEmployeeResponse employeeResponse = buildSuitableEmployeeResponse(employee, hasWorkedWithCustomer);
                     
