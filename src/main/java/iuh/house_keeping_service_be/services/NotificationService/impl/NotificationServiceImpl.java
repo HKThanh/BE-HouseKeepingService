@@ -7,6 +7,7 @@ import iuh.house_keeping_service_be.repositories.NotificationRepository;
 import iuh.house_keeping_service_be.services.EmailService.EmailRecipientResolver;
 import iuh.house_keeping_service_be.services.EmailService.EmailService;
 import iuh.house_keeping_service_be.services.NotificationService.NotificationService;
+import iuh.house_keeping_service_be.services.WebSocketNotificationService.WebSocketNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -24,6 +25,7 @@ public class NotificationServiceImpl implements NotificationService {
     private final NotificationRepository notificationRepository;
     private final EmailService emailService;
     private final EmailRecipientResolver emailRecipientResolver;
+    private final WebSocketNotificationService webSocketNotificationService;
     
     @Override
     @Transactional
@@ -32,6 +34,7 @@ public class NotificationServiceImpl implements NotificationService {
         
         Notification notification = Notification.builder()
                 .accountId(request.accountId())
+                .targetRole(request.targetRole())
                 .type(request.type())
                 .title(request.title())
                 .message(request.message())
@@ -43,8 +46,18 @@ public class NotificationServiceImpl implements NotificationService {
                 .build();
         
         Notification saved = notificationRepository.save(notification);
-        log.info("Notification created successfully: {}", saved.getNotificationId());
+        log.info("Notification created successfully: {} for role: {}", 
+                saved.getNotificationId(), saved.getTargetRole());
+        
+        // Send via email (if email available, otherwise skip)
         dispatchEmailNotification(saved);
+        
+        // Send via WebSocket for real-time notification (with role-based routing)
+        webSocketNotificationService.sendNotificationToUser(
+                saved.getAccountId(), 
+                saved.getTargetRole(), 
+                saved
+        );
         
         return NotificationResponse.fromEntity(saved);
     }
@@ -146,6 +159,7 @@ public class NotificationServiceImpl implements NotificationService {
     public void sendBookingCreatedNotification(String accountId, String bookingId, String bookingCode) {
         NotificationRequest request = new NotificationRequest(
                 accountId,
+                "CUSTOMER", // Target role
                 Notification.NotificationType.BOOKING_CREATED,
                 "Đặt lịch thành công",
                 String.format("Booking %s của bạn đã được tạo thành công và đang chờ xác minh.", bookingCode),
@@ -163,6 +177,7 @@ public class NotificationServiceImpl implements NotificationService {
     public void sendBookingConfirmedNotification(String accountId, String bookingId, String bookingCode) {
         NotificationRequest request = new NotificationRequest(
                 accountId,
+                "CUSTOMER", // Target role
                 Notification.NotificationType.BOOKING_CONFIRMED,
                 "Booking đã được xác nhận",
                 String.format("Booking %s của bạn đã được xác nhận. Nhân viên sẽ đến đúng giờ đã hẹn.", bookingCode),
@@ -180,6 +195,7 @@ public class NotificationServiceImpl implements NotificationService {
     public void sendBookingCancelledNotification(String accountId, String bookingId, String bookingCode, String reason) {
         NotificationRequest request = new NotificationRequest(
                 accountId,
+                "CUSTOMER", // Target role
                 Notification.NotificationType.BOOKING_CANCELLED,
                 "Booking đã bị hủy",
                 String.format("Booking %s đã bị hủy. Lý do: %s", bookingCode, reason),
@@ -202,6 +218,7 @@ public class NotificationServiceImpl implements NotificationService {
         
         NotificationRequest request = new NotificationRequest(
                 accountId,
+                "CUSTOMER", // Target role
                 approved ? Notification.NotificationType.BOOKING_VERIFIED : Notification.NotificationType.BOOKING_REJECTED,
                 title,
                 message,
@@ -219,6 +236,7 @@ public class NotificationServiceImpl implements NotificationService {
     public void sendAssignmentCreatedNotification(String accountId, String assignmentId, String bookingCode) {
         NotificationRequest request = new NotificationRequest(
                 accountId,
+                "EMPLOYEE", // Target role
                 Notification.NotificationType.ASSIGNMENT_CREATED,
                 "Bạn có công việc mới",
                 String.format("Bạn đã được phân công làm việc cho booking %s. Vui lòng xem chi tiết.", bookingCode),
@@ -236,6 +254,7 @@ public class NotificationServiceImpl implements NotificationService {
     public void sendAssignmentCancelledNotification(String accountId, String bookingId, String bookingCode, String reason) {
         NotificationRequest request = new NotificationRequest(
                 accountId,
+                "CUSTOMER", // Target role - Customer cần biết nhân viên hủy
                 Notification.NotificationType.ASSIGNMENT_CRISIS,
                 "KHẨN CẤP: Nhân viên hủy công việc",
                 String.format("Nhân viên đã hủy công việc cho booking %s. Lý do: %s. Vui lòng liên hệ ngay để được hỗ trợ.", 
@@ -254,6 +273,7 @@ public class NotificationServiceImpl implements NotificationService {
     public void sendPaymentSuccessNotification(String accountId, String paymentId, double amount) {
         NotificationRequest request = new NotificationRequest(
                 accountId,
+                "CUSTOMER", // Target role
                 Notification.NotificationType.PAYMENT_SUCCESS,
                 "Thanh toán thành công",
                 String.format("Thanh toán của bạn đã được xử lý thành công. Số tiền: %,.0f VND", amount),
@@ -272,6 +292,7 @@ public class NotificationServiceImpl implements NotificationService {
         String stars = "⭐".repeat(rating);
         NotificationRequest request = new NotificationRequest(
                 accountId,
+                "EMPLOYEE", // Target role - Employee receives reviews
                 Notification.NotificationType.REVIEW_RECEIVED,
                 "Bạn nhận được đánh giá mới",
                 String.format("Bạn đã nhận được đánh giá %s. Cảm ơn bạn đã sử dụng dịch vụ!", stars),

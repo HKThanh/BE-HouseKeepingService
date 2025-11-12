@@ -11,7 +11,7 @@ import iuh.house_keeping_service_be.repositories.*;
 import iuh.house_keeping_service_be.repositories.projections.ZoneCoordinate;
 import iuh.house_keeping_service_be.services.AssignmentService.AssignmentService;
 import iuh.house_keeping_service_be.services.BookingMediaService.BookingMediaService;
-//import iuh.house_keeping_service_be.services.NotificationService.NotificationService;
+import iuh.house_keeping_service_be.services.NotificationService.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -41,7 +41,7 @@ public class AssignmentServiceImpl implements AssignmentService {
     private final EmployeeUnavailabilityRepository employeeUnavailabilityRepository;
     private final AddressRepository addressRepository;
     private final BookingMediaService bookingMediaService;
-//    private final NotificationService notificationService;
+    private final NotificationService notificationService;
 
     @Override
     public List<AssignmentDetailResponse> getEmployeeAssignments(String employeeId, String status, int page, int size) {
@@ -211,12 +211,40 @@ public class AssignmentServiceImpl implements AssignmentService {
 
         bookingDetail.getAssignments().add(assignment);
 
+        // Check if all booking details are fully assigned
         boolean allAssigned = booking.getBookingDetails().stream()
                 .allMatch(bd -> bd.getAssignments().size() >= bd.getQuantity());
+        
+        boolean wasAwaitingEmployee = booking.getStatus() == BookingStatus.AWAITING_EMPLOYEE;
+        
         if (allAssigned && (booking.getStatus() == BookingStatus.PENDING || booking.getStatus() == BookingStatus.AWAITING_EMPLOYEE)) {
             booking.setStatus(BookingStatus.CONFIRMED);
             booking.setUpdatedAt(LocalDateTime.now());
             bookingRepository.save(booking);
+            
+            // Send notification to customer when booking is confirmed
+            notificationService.sendBookingConfirmedNotification(
+                booking.getCustomer().getAccount().getAccountId(),
+                booking.getBookingId(),
+                booking.getBookingCode()
+            );
+        } else if (wasAwaitingEmployee) {
+            // Notification when employee joins AWAITING_EMPLOYEE booking (not yet fully assigned)
+            String customerAccountId = booking.getCustomer().getAccount().getAccountId();
+            notificationService.createNotification(
+                new iuh.house_keeping_service_be.dtos.Notification.NotificationRequest(
+                    customerAccountId,
+                    "CUSTOMER", // Target role - notification for customer only
+                    Notification.NotificationType.ASSIGNMENT_CREATED,
+                    "Nhân viên đã tham gia",
+                    String.format("Nhân viên %s đã tham gia vào booking %s của bạn", 
+                        employee.getFullName(), booking.getBookingCode()),
+                    booking.getBookingId(),
+                    Notification.RelatedEntityType.BOOKING,
+                    Notification.NotificationPriority.NORMAL,
+                    "/bookings/" + booking.getBookingId()
+                )
+            );
         }
 
         return mapToAssignmentDetailResponse(assignment);

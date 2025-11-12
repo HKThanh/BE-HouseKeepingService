@@ -2,8 +2,10 @@ package iuh.house_keeping_service_be;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
+@EnableScheduling
 public class HouseKeepingServiceBeApplication {
 
     public static void main(String[] args) {

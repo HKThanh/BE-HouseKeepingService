@@ -5,6 +5,7 @@
 CREATE TABLE IF NOT EXISTS notifications (
     notification_id VARCHAR(36) PRIMARY KEY,
     account_id VARCHAR(36) NOT NULL,
+    target_role VARCHAR(20),
     type VARCHAR(50) NOT NULL,
     title VARCHAR(200) NOT NULL,
     message TEXT NOT NULL,
@@ -62,3 +63,5 @@ CREATE INDEX IF NOT EXISTS idx_notifications_account_unread ON notifications(acc
 CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
 CREATE INDEX IF NOT EXISTS idx_notifications_priority ON notifications(priority);
 CREATE INDEX IF NOT EXISTS idx_notifications_related ON notifications(related_id, related_type);
+CREATE INDEX IF NOT EXISTS idx_notifications_target_role ON notifications(target_role);
+CREATE INDEX IF NOT EXISTS idx_notifications_account_role ON notifications(account_id, target_role);

@@ -115,7 +115,8 @@ public class BookingServiceImpl implements BookingService {
                             request.bookingTime(),
                             ward,
                             city,
-                            customerId  // Truyền customerId để ưu tiên nhân viên đã từng phục vụ
+                            customerId,  // Truyền customerId để ưu tiên nhân viên đã từng phục vụ
+                            null  // bookingTimes - không cần kiểm tra nhiều slot cho auto-assign
                         );
                     
                     ApiResponse<List<SuitableEmployeeResponse>> 
@@ -356,6 +357,11 @@ public class BookingServiceImpl implements BookingService {
     }
 
     private void validateBookingTime(LocalDateTime bookingTime, List<String> errors) {
+        if (bookingTime == null) {
+            errors.add("Booking time is required");
+            return;
+        }
+        
         LocalDateTime now = LocalDateTime.now();
 
         // Check if booking time is in the future
@@ -1540,5 +1546,102 @@ public class BookingServiceImpl implements BookingService {
         Booking savedBooking = bookingRepository.save(booking);
 
         return bookingMapper.toBookingResponse(savedBooking);
+    }
+
+    @Override
+    @Transactional
+    public MultipleBookingCreationSummary createMultipleBookings(MultipleBookingCreateRequest request) {
+        log.info("Creating multiple bookings for {} time slots", request.bookingTimes().size());
+
+        List<BookingCreationSummary> successfulBookings = new ArrayList<>();
+        List<MultipleBookingCreationSummary.BookingCreationError> errors = new ArrayList<>();
+        BigDecimal totalAmount = BigDecimal.ZERO;
+
+        // Process each booking time
+        for (int i = 0; i < request.bookingTimes().size(); i++) {
+            LocalDateTime bookingTime = request.bookingTimes().get(i);
+            
+            try {
+                log.info("Creating booking {}/{} for time: {}", 
+                    i + 1, request.bookingTimes().size(), bookingTime);
+                log.debug("Booking details - addressId: {}, bookingTime: {}, serviceCount: {}", 
+                    request.addressId(), bookingTime, 
+                    request.bookingDetails() != null ? request.bookingDetails().size() : 0);
+
+                // Create individual booking request for this time slot
+                BookingCreateRequest singleBookingRequest = new BookingCreateRequest(
+                    request.addressId(),
+                    request.newAddress(),
+                    bookingTime,
+                    request.note(),
+                    request.title(),
+                    request.imageUrls() != null ? request.imageUrls() : new ArrayList<>(),
+                    request.promoCode(),
+                    request.bookingDetails(),
+                    request.assignments() != null ? request.assignments() : new ArrayList<>(),
+                    request.paymentMethodId()
+                );
+
+                // Create the booking
+                BookingCreationSummary summary = createBooking(singleBookingRequest);
+                successfulBookings.add(summary);
+                totalAmount = totalAmount.add(summary.getTotalAmount());
+
+                log.info("Successfully created booking {} at index {}", summary.getBookingCode(), i);
+
+            } catch (BookingValidationException e) {
+                log.error("Validation error creating booking at index {}: {}", i, e.getMessage());
+                errors.add(MultipleBookingCreationSummary.BookingCreationError.builder()
+                    .index(i)
+                    .bookingTime(bookingTime.toString())
+                    .errorMessage("Lỗi xác thực booking")
+                    .details(e.getErrors())
+                    .build());
+            } catch (EmployeeConflictException e) {
+                log.error("Employee conflict creating booking at index {}: {}", i, e.getMessage());
+                List<String> conflictDetails = e.getConflicts().stream()
+                    .map(conflict -> String.format("%s - %s từ %s đến %s (ID: %s)",
+                        conflict.conflictType(),
+                        conflict.description(),
+                        conflict.startTime(),
+                        conflict.endTime(),
+                        conflict.conflictId()))
+                    .collect(Collectors.toList());
+                
+                errors.add(MultipleBookingCreationSummary.BookingCreationError.builder()
+                    .index(i)
+                    .bookingTime(bookingTime.toString())
+                    .errorMessage("Xung đột lịch nhân viên")
+                    .details(conflictDetails)
+                    .build());
+            } catch (Exception e) {
+                log.error("Unexpected error creating booking at index {}: {}", i, e.getMessage(), e);
+                errors.add(MultipleBookingCreationSummary.BookingCreationError.builder()
+                    .index(i)
+                    .bookingTime(bookingTime.toString())
+                    .errorMessage("Lỗi không xác định: " + e.getMessage())
+                    .details(List.of(e.getClass().getSimpleName()))
+                    .build());
+            }
+        }
+
+        // Format total amount
+        String formattedTotalAmount = String.format("%,.0f VND", totalAmount);
+
+        MultipleBookingCreationSummary summary = MultipleBookingCreationSummary.builder()
+            .totalBookingsCreated(request.bookingTimes().size())
+            .successfulBookings(successfulBookings.size())
+            .failedBookings(errors.size())
+            .totalAmount(totalAmount)
+            .formattedTotalAmount(formattedTotalAmount)
+            .bookings(successfulBookings)
+            .errors(errors)
+            .build();
+
+        log.info("Multiple booking creation completed: {}/{} successful, {}/{} failed",
+            successfulBookings.size(), request.bookingTimes().size(),
+            errors.size(), request.bookingTimes().size());
+
+        return summary;
     }
 }
