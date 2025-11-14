@@ -105,9 +105,7 @@ public class MachineLearningEmployeeRecommendationService implements EmployeeRec
 
         double normalizedScore = roundToThreeDecimals(sigmoid(rawScore));
         RecommendationMetadata metadata = new RecommendationMetadata(
-                normalizedScore,
-                model.version(),
-                Collections.unmodifiableMap(new LinkedHashMap<>(featureVector))
+                normalizedScore
         );
 
         return new SuitableEmployeeResponse(

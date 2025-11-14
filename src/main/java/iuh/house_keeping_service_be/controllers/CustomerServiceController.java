@@ -329,15 +329,9 @@ public class CustomerServiceController {
             return originalMessage;
         }
 
-        String safeMessage = (originalMessage == null || originalMessage.isBlank())
-                ? "Đã áp dụng máy học để xếp hạng nhân viên phù hợp"
+        // Simply return the original message without ML model info
+        return (originalMessage == null || originalMessage.isBlank())
+                ? "Tìm thấy nhân viên phù hợp"
                 : originalMessage;
-
-        String modelVersion = employeeRecommendationService.getModelVersion();
-        if ("disabled".equalsIgnoreCase(modelVersion)) {
-            return safeMessage;
-        }
-
-        return String.format("%s | Sắp xếp theo mô hình ML %s", safeMessage, modelVersion);
     }
 }
