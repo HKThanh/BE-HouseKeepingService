@@ -46,7 +46,7 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            cd /opt/housekeeping
+            cd /opt/housekeeping/BE-HouseKeepingService
             git pull
             docker compose pull
             docker compose up -d
