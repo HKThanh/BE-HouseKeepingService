@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <title>WebSocket Real-Time Notification Tester</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+    <style>
+        :root {
+            color-scheme: light dark;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            line-height: 1.5;
+        }
+
+        body {
+            margin: 0;
+            padding: 24px;
+            background: #f5f6fa;
+            color: #1f2933;
+        }
+
+        main {
+            max-width: 1080px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 32px;
+            border-radius: 16px;
+            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.05);
+        }
+
+        h1 {
+            margin-top: 0;
+        }
+
+        section {
+            margin-bottom: 32px;
+        }
+
+        fieldset {
+            border: 1px solid #d8dde6;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+        }
+
+        legend {
+            font-weight: 600;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 12px;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid #cad1d8;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        textarea {
+            min-height: 100px;
+        }
+
+        button {
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 18px;
+            font-weight: 600;
+            color: #fff;
+            background: #2563eb;
+            margin-right: 10px;
+        }
+
+        button[aria-pressed="true"] {
+            background: #0ea5e9;
+        }
+
+        button.secondary {
+            background: #64748b;
+        }
+
+        button.warning {
+            background: #e11d48;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .pending {
+            background: #fef08a;
+            color: #92400e;
+        }
+
+        .connected {
+            background: #bbf7d0;
+            color: #14532d;
+        }
+
+        .disconnected {
+            background: #fecaca;
+            color: #7f1d1d;
+        }
+
+        .log-area,
+        .notification-list {
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 12px;
+            min-height: 160px;
+            max-height: 320px;
+            overflow-y: auto;
+            font-family: "Fira Code", Consolas, monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+        }
+
+        .notification-card {
+            background: #f8fafc;
+            border-radius: 12px;
+            border-left: 4px solid #2563eb;
+            padding: 12px 16px;
+            margin-bottom: 12px;
+        }
+
+        .notification-card[data-priority="URGENT"] {
+            border-left-color: #e11d48;
+            background: #fff1f2;
+        }
+
+        .inline-inputs {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+        }
+
+        .actions {
+            margin-top: 12px;
+        }
+
+        .small-text {
+            font-size: 12px;
+            color: #475569;
+        }
+
+        .row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <h1>WebSocket Notification Tester</h1>
+    <p>Trang đơn giản giúp kiểm thử tài liệu <code>API-WebSocket-Real-Time-Notifications.md</code>. Điền thông tin tài khoản/role, kết nối WebSocket (SockJS + STOMP) rồi quan sát payload trả về theo từng kênh.</p>
+
+    <section id="connection-panel">
+        <fieldset>
+            <legend>1. Thiết lập kết nối</legend>
+            <div class="inline-inputs">
+                <label>
+                    SockJS URL
+                    <input id="ws-url" type="text" value="http://localhost:8080/ws/notifications" />
+                </label>
+                <label>
+                    Account ID
+                    <input id="account-id" type="text" placeholder="account-123" />
+                </label>
+                <label>
+                    Role
+                    <select id="role">
+                        <option value="CUSTOMER">CUSTOMER</option>
+                        <option value="EMPLOYEE">EMPLOYEE</option>
+                        <option value="ADMIN">ADMIN</option>
+                    </select>
+                </label>
+                <label>
+                    Heartbeat (ms) <span class="small-text">(incoming,outgoing)</span>
+                    <input id="heartbeat" type="text" value="10000,10000" />
+                </label>
+                <label>
+                    Reconnect delay (ms)
+                    <input id="reconnect-delay" type="number" min="0" step="1000" value="5000" />
+                </label>
+                <label>
+                    Authorization header <span class="small-text">(tùy chọn)</span>
+                    <input id="auth-header" type="text" placeholder="Bearer &lt;token&gt;" />
+                </label>
+            </div>
+            <div class="actions row">
+                <button id="connect-btn">Kết nối</button>
+                <button id="disconnect-btn" class="secondary" disabled>Ngắt kết nối</button>
+                <span class="status-badge pending" id="connection-status">Đang chờ</span>
+            </div>
+        </fieldset>
+    </section>
+
+    <section id="subscription-panel">
+        <fieldset>
+            <legend>2. Đăng ký kênh nhận thông báo</legend>
+            <div class="row">
+                <button id="subscribe-role-btn" aria-pressed="false">/user/{account}/{ROLE}/queue/notifications</button>
+                <button id="subscribe-general-btn" aria-pressed="false">/user/{account}/queue/notifications</button>
+                <button id="subscribe-topic-btn" aria-pressed="false">/topic/notifications</button>
+                <button id="unsubscribe-all-btn" class="secondary">Hủy tất cả</button>
+            </div>
+            <form id="custom-sub-form">
+                <label>
+                    Kênh tùy chỉnh (ví dụ: <code>/user/account-123/EMPLOYEE/queue/notifications</code>)
+                    <input id="custom-destination" type="text" placeholder="/user/account-123/EMPLOYEE/queue/notifications" />
+                </label>
+                <div class="actions">
+                    <button type="submit">Đăng ký kênh tùy chỉnh</button>
+                </div>
+            </form>
+            <div class="small-text" id="active-subscriptions">Chưa có subscription nào.</div>
+        </fieldset>
+    </section>
+
+    <section id="api-trigger-panel">
+        <fieldset>
+            <legend>3. Gửi API để kích hoạt thông báo (tùy chọn)</legend>
+            <p class="small-text">Dùng REST API đã có sẵn trong backend (ví dụ: POST <code>/api/notifications/test</code>). Phải bật CORS phù hợp.</p>
+            <form id="api-form">
+                <div class="inline-inputs">
+                    <label>
+                        HTTP Method
+                        <select id="api-method">
+                            <option>POST</option>
+                            <option>PUT</option>
+                            <option>PATCH</option>
+                            <option>GET</option>
+                        </select>
+                    </label>
+                    <label>
+                        URL
+                        <input id="api-url" type="text" placeholder="http://localhost:8080/api/notifications/test" />
+                    </label>
+                </div>
+                <label>
+                    Payload (JSON)
+                    <textarea id="api-body" placeholder='{"accountId":"account-123","targetRole":"CUSTOMER","title":"Test"}'></textarea>
+                </label>
+                <div class="actions">
+                    <button type="submit">Gửi request</button>
+                    <button type="button" class="secondary" id="clear-api-response">Xóa phản hồi</button>
+                </div>
+            </form>
+            <label>
+                Phản hồi API
+                <textarea id="api-response" readonly></textarea>
+            </label>
+        </fieldset>
+    </section>
+
+    <section id="logs">
+        <fieldset>
+            <legend>Log STOMP</legend>
+            <div class="actions">
+                <button id="clear-log" class="secondary">Xóa log</button>
+            </div>
+            <div class="log-area" id="log-area"></div>
+        </fieldset>
+    </section>
+
+    <section id="notifications">
+        <fieldset>
+            <legend>Thông báo nhận được</legend>
+            <div class="actions">
+                <button id="clear-notifications" class="secondary">Xóa danh sách</button>
+            </div>
+            <div class="notification-list" id="notification-list"></div>
+        </fieldset>
+    </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7/dist/stomp.umd.min.js"></script>
+<script>
+    const logArea = document.getElementById("log-area");
+    const notificationsEl = document.getElementById("notification-list");
+    const connectionStatus = document.getElementById("connection-status");
+    const activeSubsEl = document.getElementById("active-subscriptions");
+    const connectBtn = document.getElementById("connect-btn");
+    const disconnectBtn = document.getElementById("disconnect-btn");
+    const subscribeRoleBtn = document.getElementById("subscribe-role-btn");
+    const subscribeGeneralBtn = document.getElementById("subscribe-general-btn");
+    const subscribeTopicBtn = document.getElementById("subscribe-topic-btn");
+    const unsubscribeAllBtn = document.getElementById("unsubscribe-all-btn");
+
+    let stompClient = null;
+    const subscriptions = new Map();
+
+    const setStatus = (label, statusClass) => {
+        connectionStatus.textContent = label;
+        connectionStatus.className = `status-badge ${statusClass}`;
+    };
+
+    const log = (message, type = "info") => {
+        const timestamp = new Date().toLocaleTimeString();
+        logArea.textContent += `[${timestamp}] [${type.toUpperCase()}] ${message}\n`;
+        logArea.scrollTop = logArea.scrollHeight;
+    };
+
+    const renderSubscriptions = () => {
+        if (!subscriptions.size) {
+            activeSubsEl.textContent = "Chưa có subscription nào.";
+            return;
+        }
+
+        const items = Array.from(subscriptions.values())
+            .map(({ destination }) => destination)
+            .join(", ");
+        activeSubsEl.textContent = `Đang nghe: ${items}`;
+    };
+
+    const handleMessage = (destination, frame) => {
+        let payload = frame.body;
+        try {
+            payload = JSON.stringify(JSON.parse(frame.body), null, 2);
+        } catch (_) {
+            // giữ nguyên nội dung nếu không phải JSON
+        }
+        log(`Message @${destination}: ${payload}`);
+
+        let parsed;
+        try {
+            parsed = JSON.parse(frame.body);
+        } catch (_) {
+            parsed = null;
+        }
+
+        const card = document.createElement("div");
+        card.className = "notification-card";
+        if (parsed?.priority) {
+            card.dataset.priority = parsed.priority;
+        }
+
+        const getValue = (key) => parsed && parsed[key] !== undefined ? parsed[key] : "—";
+
+        card.innerHTML = `
+            <strong>${getValue("title")} (${getValue("type")})</strong>
+            <div><span class="small-text">Destination:</span> ${destination}</div>
+            <div><span class="small-text">Message:</span> ${parsed ? parsed.message : frame.body}</div>
+            <div class="small-text">Raw: ${payload}</div>
+        `;
+        notificationsEl.prepend(card);
+    };
+
+    const subscribeDestination = (destination, key) => {
+        if (!stompClient || !stompClient.active) {
+            log("Chưa kết nối WebSocket", "warn");
+            return;
+        }
+        if (subscriptions.has(key)) {
+            log(`Đã đăng ký ${destination} trước đó`, "warn");
+            return;
+        }
+        const sub = stompClient.subscribe(destination, (message) => handleMessage(destination, message));
+        subscriptions.set(key, { destination, sub });
+        renderSubscriptions();
+        log(`Subscribed ${destination}`);
+    };
+
+    const unsubscribeAll = () => {
+        subscriptions.forEach(({ sub }) => sub.unsubscribe());
+        subscriptions.clear();
+        renderSubscriptions();
+        [subscribeRoleBtn, subscribeGeneralBtn, subscribeTopicBtn].forEach((btn) => btn.setAttribute("aria-pressed", "false"));
+        log("Đã hủy tất cả subscriptions");
+    };
+
+    const connect = () => {
+        if (stompClient && stompClient.active) {
+            log("Đã kết nối rồi", "warn");
+            return;
+        }
+
+        const wsUrl = document.getElementById("ws-url").value.trim();
+        const accountId = document.getElementById("account-id").value.trim();
+        const heartbeatText = document.getElementById("heartbeat").value.trim();
+        const reconnectDelay = Number(document.getElementById("reconnect-delay").value) || 0;
+        const authHeader = document.getElementById("auth-header").value.trim();
+
+        if (!wsUrl) {
+            alert("Vui lòng nhập SockJS URL");
+            return;
+        }
+
+        if (!accountId) {
+            alert("Vui lòng nhập Account ID");
+            return;
+        }
+
+        const [incomingHeartbeat, outgoingHeartbeat] = heartbeatText.split(",").map((value) => Number(value.trim()) || 0);
+
+        stompClient = new window.StompJs.Client({
+            webSocketFactory: () => new SockJS(wsUrl),
+            reconnectDelay,
+            heartbeatIncoming: incomingHeartbeat,
+            heartbeatOutgoing: outgoingHeartbeat,
+            connectHeaders: authHeader ? { Authorization: authHeader } : {},
+        });
+
+        stompClient.onConnect = (frame) => {
+            setStatus("Đã kết nối", "connected");
+            connectBtn.disabled = true;
+            disconnectBtn.disabled = false;
+            log(`Connected: ${JSON.stringify(frame.headers)}`);
+        };
+
+        stompClient.onStompError = (frame) => {
+            setStatus("Lỗi STOMP", "disconnected");
+            log(`Broker reported error: ${frame.headers["message"]}`, "error");
+            if (frame.body) {
+                log(`Additional details: ${frame.body}`, "error");
+            }
+        };
+
+        stompClient.onWebSocketClose = (evt) => {
+            setStatus("Đã ngắt", "disconnected");
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            log(`WebSocket closed (${evt.code})`, "warn");
+            unsubscribeAll();
+        };
+
+        stompClient.onDisconnect = () => {
+            setStatus("Đã ngắt", "disconnected");
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            log("STOMP disconnected");
+        };
+
+        setStatus("Đang kết nối...", "pending");
+        connectBtn.disabled = true;
+        disconnectBtn.disabled = false;
+        stompClient.activate();
+    };
+
+    const disconnect = () => {
+        if (!stompClient || !stompClient.active) {
+            log("Chưa kết nối", "warn");
+            return;
+        }
+        unsubscribeAll();
+        stompClient.deactivate();
+    };
+
+    const subscribeRole = () => {
+        const accountId = document.getElementById("account-id").value.trim();
+        const role = document.getElementById("role").value;
+        const destination = `/user/${accountId}/${role}/queue/notifications`;
+        subscribeDestination(destination, `role-${role}`);
+        subscribeRoleBtn.setAttribute("aria-pressed", "true");
+    };
+
+    const subscribeGeneral = () => {
+        const accountId = document.getElementById("account-id").value.trim();
+        const destination = `/user/${accountId}/queue/notifications`;
+        subscribeDestination(destination, "general");
+        subscribeGeneralBtn.setAttribute("aria-pressed", "true");
+    };
+
+    const subscribeTopic = () => {
+        subscribeDestination("/topic/notifications", "topic");
+        subscribeTopicBtn.setAttribute("aria-pressed", "true");
+    };
+
+    const subscribeCustom = (event) => {
+        event.preventDefault();
+        const destination = document.getElementById("custom-destination").value.trim();
+        if (!destination) {
+            alert("Nhập destination trước khi đăng ký.");
+            return;
+        }
+        subscribeDestination(destination, destination);
+        document.getElementById("custom-destination").value = "";
+    };
+
+    const clearLog = () => {
+        logArea.textContent = "";
+    };
+
+    const clearNotifications = () => {
+        notificationsEl.innerHTML = "";
+    };
+
+    const triggerApi = async (event) => {
+        event.preventDefault();
+        const method = document.getElementById("api-method").value;
+        const url = document.getElementById("api-url").value.trim();
+        const body = document.getElementById("api-body").value.trim();
+        const authHeader = document.getElementById("auth-header").value.trim();
+
+        if (!url) {
+            alert("Nhập URL API để gửi request.");
+            return;
+        }
+
+        const headers = {};
+        let payload = undefined;
+
+        if (body) {
+            headers["Content-Type"] = "application/json";
+            payload = body;
+        }
+        if (authHeader) {
+            headers["Authorization"] = authHeader;
+        }
+
+        try {
+            const response = await fetch(url, {
+                method,
+                headers,
+                body: method === "GET" ? undefined : payload,
+            });
+            const text = await response.text();
+            document.getElementById("api-response").value = `HTTP ${response.status}\n${text}`;
+            log(`API ${method} ${url} -> ${response.status}`, response.ok ? "info" : "error");
+        } catch (error) {
+            document.getElementById("api-response").value = error.message;
+            log(`API request failed: ${error.message}`, "error");
+        }
+    };
+
+    document.getElementById("custom-sub-form").addEventListener("submit", subscribeCustom);
+    document.getElementById("api-form").addEventListener("submit", triggerApi);
+    document.getElementById("clear-api-response").addEventListener("click", () => {
+        document.getElementById("api-response").value = "";
+    });
+    document.getElementById("clear-log").addEventListener("click", clearLog);
+    document.getElementById("clear-notifications").addEventListener("click", clearNotifications);
+    connectBtn.addEventListener("click", connect);
+    disconnectBtn.addEventListener("click", disconnect);
+    subscribeRoleBtn.addEventListener("click", subscribeRole);
+    subscribeGeneralBtn.addEventListener("click", subscribeGeneral);
+    subscribeTopicBtn.addEventListener("click", subscribeTopic);
+    unsubscribeAllBtn.addEventListener("click", unsubscribeAll);
+</script>
+</body>
+</html>
