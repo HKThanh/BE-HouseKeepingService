@@ -1,37 +1,30 @@
-# Build stage
+# ====== Build stage ======
 FROM gradle:7.6.1-jdk17 AS build
 WORKDIR /app
 
-# Copy gradle configuration files first for better caching
+# Copy các file Gradle trước để cache dependency
 COPY build.gradle settings.gradle gradlew ./
 COPY gradle ./gradle
 
-# Download dependencies (this layer gets cached if build files don't change)
+# CẤP QUYỀN EXECUTE CHO gradlew (fix lỗi Permission denied)
+RUN chmod +x gradlew
+
+# Download dependencies (layer này được cache nếu build file không đổi)
 RUN ./gradlew dependencies --no-daemon
 
 # Copy source code
 COPY src ./src
 
-# Build the application
-RUN ./gradlew build --no-daemon -x test
+# Build ứng dụng
+RUN ./gradlew bootJar --no-daemon -x test
+# hoặc: RUN ./gradlew build --no-daemon -x test (tuỳ bạn dùng task nào)
 
-# Runtime stage
-FROM eclipse-temurin:17-jre-alpine
+# ====== Runtime stage ======
+FROM eclipse-temurin:17-jdk-alpine AS runtime
 WORKDIR /app
 
-# Copy the JAR file from build stage
 COPY --from=build /app/build/libs/*.jar app.jar
 
-# Environment variables for database and Redis
-# ENV SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/house_keeping_v3
-# ENV SPRING_DATASOURCE_USERNAME=postgres
-# ENV SPRING_DATASOURCE_PASSWORD=123456
-# ENV SPRING_DATA_REDIS_HOST=redis
-# ENV SPRING_DATA_REDIS_PORT=6379
-# ENV JWT_SECRET=81474ce734be3de9043102e50fa88519a6f3bc67d75e7efded4602f33062fb40
-
-# Expose the Spring Boot port
 EXPOSE 8080
 
-# Run the application
 ENTRYPOINT ["java", "-jar", "app.jar"]
