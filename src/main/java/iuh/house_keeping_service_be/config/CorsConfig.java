@@ -1,25 +1,25 @@
 package iuh.house_keeping_service_be.config;
 
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
-import java.util.Arrays;
 
 /**
  * CORS Configuration
  * 
- * NOTE: When deployed behind Nginx reverse proxy, CORS is handled by Nginx.
- * This configuration is disabled to prevent duplicate CORS headers.
+ * NOTE: When deployed behind Nginx reverse proxy:
+ * - REST API CORS: Handled by Nginx (prevents duplicate headers)
+ * - WebSocket CORS: Handled by WebSocketConfig.registerStompEndpoints()
+ * 
+ * This class is kept for documentation purposes.
  * For local development without Nginx, uncomment the bean below.
  */
 @Configuration
 public class CorsConfig {
 
-    // Disabled when using Nginx - Nginx handles CORS to prevent duplicate headers
-    // Uncomment for local development without Nginx
+    // DISABLED: CORS is handled by:
+    // 1. Nginx for REST API endpoints
+    // 2. WebSocketConfig for WebSocket endpoints
+    
+    // Uncomment ONLY for local development without Nginx
     /*
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
