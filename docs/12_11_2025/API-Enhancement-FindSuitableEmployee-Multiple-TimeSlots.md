@@ -7,7 +7,7 @@
 ```json
 {
     "success": true,
-    "message": "Tìm thấy 2 nhân viên phù hợp cho dịch vụ Dọn dẹp theo giờ (1 đã từng phục vụ bạn, 1 nhân viên khác - áp dụng machine learning) | Sắp xếp theo mô hình ML employee-rec-v1",
+    "message": "Tìm thấy 2 nhân viên phù hợp cho dịch vụ Dọn dẹp theo giờ (1 đã từng phục vụ bạn, 1 nhân viên khác)",
     "data": [
         {
             "employeeId": "e1000001-0000-0000-0000-000000000033",
@@ -17,7 +17,7 @@
                 "Nấu ăn",
                 "Đi chợ"
             ],
-            "rating": "4.10/5 · Tốt",
+            "rating": "4.10",
             "status": "AVAILABLE",
             "workingWards": [
                 "Phường Thủ Dầu Một"
@@ -26,15 +26,7 @@
             "completedJobs": 20,
             "hasWorkedWithCustomer": true,
             "recommendation": {
-                "score": 0.706,
-                "modelVersion": "employee-rec-v1",
-                "featureSignals": {
-                    "rating": 0.4,
-                    "completedJobs": 0.46211715726000974,
-                    "locationAffinity": 1.0,
-                    "skillVersatility": 0.25,
-                    "bookingTimeFit": 0.6
-                }
+                "score": 0.706
             }
         },
         {
@@ -45,7 +37,7 @@
                 "Vệ sinh nhà cửa",
                 "Lau dọn"
             ],
-            "rating": "4.10/5 · Tốt",
+            "rating": "4.10",
             "status": "AVAILABLE",
             "workingWards": [
                 "Phường Thủ Dầu Một"
@@ -54,15 +46,7 @@
             "completedJobs": 15,
             "hasWorkedWithCustomer": false,
             "recommendation": {
-                "score": 0.702,
-                "modelVersion": "employee-rec-v1",
-                "featureSignals": {
-                    "rating": 0.4,
-                    "completedJobs": 0.35835739835078595,
-                    "locationAffinity": 1.0,
-                    "skillVersatility": 0.25,
-                    "bookingTimeFit": 0.6
-                }
+                "score": 0.702
             }
         }
     ]

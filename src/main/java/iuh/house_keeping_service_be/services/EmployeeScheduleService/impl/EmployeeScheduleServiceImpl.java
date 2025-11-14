@@ -395,13 +395,13 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
                     message = String.format("Tìm thấy %d nhân viên phù hợp cho dịch vụ %s",
                             availableEmployees.size(), service.getName());
                 } else if (employeesWithHistory.isEmpty()) {
-                    message = String.format("Tìm thấy %d nhân viên phù hợp cho dịch vụ %s (áp dụng machine learning)",
+                    message = String.format("Tìm thấy %d nhân viên phù hợp cho dịch vụ %s",
                             employeesWithoutHistory.size(), service.getName());
                 } else if (employeesWithoutHistory.isEmpty()) {
-                    message = String.format("Tìm thấy %d nhân viên đã từng phục vụ bạn cho dịch vụ %s (áp dụng machine learning)",
+                    message = String.format("Tìm thấy %d nhân viên đã từng phục vụ bạn cho dịch vụ %s",
                             employeesWithHistory.size(), service.getName());
                 } else {
-                    message = String.format("Tìm thấy %d nhân viên phù hợp cho dịch vụ %s (%d đã từng phục vụ bạn, %d nhân viên khác - áp dụng machine learning)",
+                    message = String.format("Tìm thấy %d nhân viên phù hợp cho dịch vụ %s (%d đã từng phục vụ bạn, %d nhân viên khác)",
                             availableEmployees.size(), service.getName(), 
                             employeesWithHistory.size(), employeesWithoutHistory.size());
                 }
@@ -526,15 +526,10 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
 
     private String formatRatingString(Double averageRating, Rating tier) {
         if (averageRating != null && averageRating > 0) {
-            String tierLabel = tier != null ? translateRatingTier(tier) : "Đang cập nhật";
-            return String.format(Locale.US, "%.2f/5 · %s", averageRating, tierLabel);
+            return String.format(Locale.US, "%.2f", averageRating);
         }
 
-        if (tier != null) {
-            return translateRatingTier(tier);
-        }
-
-        return "Chưa có đánh giá";
+        return "0.00";
     }
 
     private Double fetchAverageEmployeeRating(String employeeId) {
