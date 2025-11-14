@@ -8,9 +8,19 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
 
+/**
+ * CORS Configuration
+ * 
+ * NOTE: When deployed behind Nginx reverse proxy, CORS is handled by Nginx.
+ * This configuration is disabled to prevent duplicate CORS headers.
+ * For local development without Nginx, uncomment the bean below.
+ */
 @Configuration
 public class CorsConfig {
 
+    // Disabled when using Nginx - Nginx handles CORS to prevent duplicate headers
+    // Uncomment for local development without Nginx
+    /*
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
@@ -52,4 +62,5 @@ public class CorsConfig {
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
+    */
 }
