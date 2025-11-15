@@ -74,6 +74,11 @@ services:
       - VNPAY_COMMAND=${VNPAY_COMMAND:-pay}
       - VNPAY_ORDER_TYPE=${VNPAY_ORDER_TYPE:-other}
       - SPRING_APPLICATION_JSON={"logging":{"level":{"iuh.house_keeping_service_be":"DEBUG"}}}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4}
+      - ASSEMBLYAI_API_KEY=${ASSEMBLYAI_API_KEY}
+      - VOICE_TEMP_DIR=${VOICE_TEMP_DIR:-/tmp/voice-assistant}
+      - VOICE_ASSISTANT_ENABLED=${VOICE_ASSISTANT_ENABLED:-true}
     networks:
       - house_keeping_network
 

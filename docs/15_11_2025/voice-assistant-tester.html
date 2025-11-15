@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Assistant Tester - House Keeping Service</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #667eea;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        
+        .config-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .config-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .input-group {
+            margin-bottom: 15px;
+        }
+        
+        .input-group label {
+            display: block;
+            color: #555;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .recording-section {
+            text-align: center;
+            padding: 30px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+        
+        #recordBtn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        #recordBtn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 7px 20px rgba(102, 126, 234, 0.6);
+        }
+        
+        #recordBtn:active {
+            transform: translateY(0);
+        }
+        
+        #recordBtn.recording {
+            background: #e74c3c;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+        }
+        
+        .status {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .status.recording {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        
+        .file-upload {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px dashed #667eea;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .file-upload:hover {
+            background: #f8f9fa;
+            border-color: #5568d3;
+        }
+        
+        .file-upload input[type="file"] {
+            display: none;
+        }
+        
+        .btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+            transition: all 0.3s;
+        }
+        
+        .btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .response-section {
+            margin-top: 30px;
+        }
+        
+        .response-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 15px;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .success {
+            border-left-color: #28a745;
+            background: #f1f9f4;
+        }
+        
+        .error {
+            border-left-color: #e74c3c;
+            background: #fdf2f2;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .example-commands {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .example-commands h4 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+        
+        .example-commands ul {
+            list-style-position: inside;
+            color: #856404;
+        }
+        
+        .example-commands li {
+            margin: 5px 0;
+        }
+        
+        audio {
+            width: 100%;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎤 Voice Assistant Tester</h1>
+        <p class="subtitle">House Keeping Service - Voice Booking System</p>
+        
+        <div class="config-section">
+            <h3>⚙️ Cấu hình</h3>
+            <div class="input-group">
+                <label for="apiUrl">API URL:</label>
+                <input type="text" id="apiUrl" value="http://localhost:8080/api/v1/voice-assistant" placeholder="http://localhost:8080/api/v1/voice-assistant">
+            </div>
+            <div class="input-group">
+                <label for="jwtToken">JWT Token:</label>
+                <input type="text" id="jwtToken" placeholder="Nhập JWT token từ login...">
+            </div>
+            <div class="input-group">
+                <label for="customerId">Customer ID:</label>
+                <input type="text" id="customerId" placeholder="CUST001">
+            </div>
+        </div>
+        
+        <div class="example-commands">
+            <h4>📝 Ví dụ câu lệnh:</h4>
+            <ul>
+                <li>"Tôi muốn đặt dịch vụ vệ sinh nhà cửa vào ngày mai lúc 9 giờ sáng"</li>
+                <li>"Đặt lịch giặt là vào thứ 7 tuần sau"</li>
+                <li>"Tôi cần người giúp việc dọn dẹp nhà vào chiều mai"</li>
+                <li>"Đặt dịch vụ nấu ăn vào tối thứ 6"</li>
+            </ul>
+        </div>
+        
+        <div class="recording-section">
+            <h3>🎙️ Ghi âm giọng nói</h3>
+            <button id="recordBtn" onclick="toggleRecording()">Bắt đầu ghi âm</button>
+            <div class="status" id="recordStatus">Nhấn nút để bắt đầu ghi âm</div>
+            <audio id="audioPlayback" controls style="display:none;"></audio>
+        </div>
+        
+        <div class="file-upload" onclick="document.getElementById('audioFile').click()">
+            <input type="file" id="audioFile" accept="audio/*" onchange="handleFileSelect(event)">
+            <p>📁 Hoặc click để chọn file âm thanh từ máy tính</p>
+            <p style="font-size: 12px; color: #666;">Hỗ trợ: MP3, WAV, M4A, OGG, WebM</p>
+        </div>
+        
+        <div style="text-align: center; margin: 20px 0;">
+            <button class="btn" onclick="testTranscribe()" id="transcribeBtn">
+                🔤 Test Transcribe Only
+            </button>
+            <button class="btn" onclick="testFullBooking()" id="bookingBtn">
+                📅 Complete Voice Booking
+            </button>
+            <button class="btn btn-secondary" onclick="testHealth()">
+                ❤️ Health Check
+            </button>
+        </div>
+        
+        <div class="response-section">
+            <h3>📊 Kết quả</h3>
+            <div id="loading" class="loading" style="display:none;">
+                <div class="spinner"></div>
+                <p>Đang xử lý...</p>
+            </div>
+            <div id="response" class="response-box" style="display:none;"></div>
+        </div>
+    </div>
+    
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let recordedBlob = null;
+        let isRecording = false;
+        
+        async function toggleRecording() {
+            if (!isRecording) {
+                await startRecording();
+            } else {
+                stopRecording();
+            }
+        }
+        
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = () => {
+                    recordedBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const audioUrl = URL.createObjectURL(recordedBlob);
+                    const audioPlayback = document.getElementById('audioPlayback');
+                    audioPlayback.src = audioUrl;
+                    audioPlayback.style.display = 'block';
+                    
+                    document.getElementById('recordStatus').textContent = 'Ghi âm hoàn tất! Có thể nghe lại hoặc test.';
+                    document.getElementById('recordStatus').classList.remove('recording');
+                };
+                
+                mediaRecorder.start();
+                isRecording = true;
+                
+                const recordBtn = document.getElementById('recordBtn');
+                recordBtn.textContent = 'Dừng ghi âm';
+                recordBtn.classList.add('recording');
+                
+                document.getElementById('recordStatus').textContent = 'Đang ghi âm... Hãy nói câu lệnh của bạn';
+                document.getElementById('recordStatus').classList.add('recording');
+                
+            } catch (error) {
+                showResponse({
+                    success: false,
+                    message: 'Không thể truy cập microphone: ' + error.message
+                }, false);
+            }
+        }
+        
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                isRecording = false;
+                
+                const recordBtn = document.getElementById('recordBtn');
+                recordBtn.textContent = 'Bắt đầu ghi âm';
+                recordBtn.classList.remove('recording');
+            }
+        }
+        
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                recordedBlob = file;
+                const audioUrl = URL.createObjectURL(file);
+                const audioPlayback = document.getElementById('audioPlayback');
+                audioPlayback.src = audioUrl;
+                audioPlayback.style.display = 'block';
+                
+                document.getElementById('recordStatus').textContent = 
+                    'File đã chọn: ' + file.name + ' (' + (file.size / 1024).toFixed(2) + ' KB)';
+            }
+        }
+        
+        async function testTranscribe() {
+            if (!recordedBlob) {
+                alert('Vui lòng ghi âm hoặc chọn file audio trước!');
+                return;
+            }
+            
+            const apiUrl = document.getElementById('apiUrl').value;
+            const jwtToken = document.getElementById('jwtToken').value;
+            
+            if (!jwtToken) {
+                alert('Vui lòng nhập JWT Token!');
+                return;
+            }
+            
+            showLoading(true);
+            
+            const formData = new FormData();
+            formData.append('audio', recordedBlob, 'recording.wav');
+            
+            try {
+                const response = await fetch(`${apiUrl}/transcribe`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${jwtToken}`
+                    },
+                    body: formData
+                });
+                
+                const result = await response.json();
+                showResponse(result, response.ok);
+                
+            } catch (error) {
+                showResponse({
+                    success: false,
+                    message: 'Lỗi kết nối: ' + error.message
+                }, false);
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        async function testFullBooking() {
+            if (!recordedBlob) {
+                alert('Vui lòng ghi âm hoặc chọn file audio trước!');
+                return;
+            }
+            
+            const apiUrl = document.getElementById('apiUrl').value;
+            const jwtToken = document.getElementById('jwtToken').value;
+            const customerId = document.getElementById('customerId').value;
+            
+            if (!jwtToken) {
+                alert('Vui lòng nhập JWT Token!');
+                return;
+            }
+            
+            if (!customerId) {
+                alert('Vui lòng nhập Customer ID!');
+                return;
+            }
+            
+            showLoading(true);
+            
+            const formData = new FormData();
+            formData.append('audio', recordedBlob, 'recording.wav');
+            formData.append('customerId', customerId);
+            
+            try {
+                const response = await fetch(`${apiUrl}/book`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${jwtToken}`
+                    },
+                    body: formData
+                });
+                
+                const result = await response.json();
+                showResponse(result, response.ok);
+                
+            } catch (error) {
+                showResponse({
+                    success: false,
+                    message: 'Lỗi kết nối: ' + error.message
+                }, false);
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        async function testHealth() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            
+            showLoading(true);
+            
+            try {
+                const response = await fetch(`${apiUrl}/health`);
+                const result = await response.json();
+                showResponse(result, response.ok);
+                
+            } catch (error) {
+                showResponse({
+                    success: false,
+                    message: 'Không thể kết nối tới server: ' + error.message
+                }, false);
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+            document.getElementById('transcribeBtn').disabled = show;
+            document.getElementById('bookingBtn').disabled = show;
+        }
+        
+        function showResponse(data, success) {
+            const responseDiv = document.getElementById('response');
+            responseDiv.style.display = 'block';
+            responseDiv.className = 'response-box ' + (success ? 'success' : 'error');
+            responseDiv.textContent = JSON.stringify(data, null, 2);
+        }
+        
+        // Auto-load saved config
+        window.onload = () => {
+            const savedToken = localStorage.getItem('jwtToken');
+            const savedCustomerId = localStorage.getItem('customerId');
+            
+            if (savedToken) document.getElementById('jwtToken').value = savedToken;
+            if (savedCustomerId) document.getElementById('customerId').value = savedCustomerId;
+        };
+        
+        // Auto-save config
+        document.getElementById('jwtToken').addEventListener('change', (e) => {
+            localStorage.setItem('jwtToken', e.target.value);
+        });
+        
+        document.getElementById('customerId').addEventListener('change', (e) => {
+            localStorage.setItem('customerId', e.target.value);
+        });
+    </script>
+</body>
+</html>

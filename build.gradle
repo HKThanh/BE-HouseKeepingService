@@ -21,6 +21,7 @@ configurations {
 
 repositories {
     mavenCentral()
+    maven { url 'https://repo.spring.io/milestone' }
 }
 
 dependencies {
@@ -44,6 +45,13 @@ dependencies {
     implementation 'com.google.zxing:core:3.5.3'
     // https://mvnrepository.com/artifact/com.google.zxing/javase (QR Code decoder for Java SE)
     implementation 'com.google.zxing:javase:3.5.3'
+    // AI Voice Assistant dependencies
+    // https://mvnrepository.com/artifact/org.springframework.ai/spring-ai-openai-spring-boot-starter
+    implementation 'org.springframework.ai:spring-ai-openai-spring-boot-starter:1.0.0-M3'
+    // https://mvnrepository.com/artifact/com.assemblyai/assemblyai-java
+    implementation 'com.assemblyai:assemblyai-java:1.2.0'
+    // https://mvnrepository.com/artifact/com.squareup.okhttp3/okhttp
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     // https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt-impl
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
     // https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt-jackson

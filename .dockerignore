@@ -1,0 +1,65 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.idea
+.vscode
+*.iml
+*.ipr
+*.iws
+.settings
+.project
+.classpath
+
+# Build
+build/
+target/
+out/
+.gradle/
+bin/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Database
+postgres_data/
+
+# Nginx
+nginx/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*~
+
+# Test
+test-results/
+coverage/
+
+# Voice Assistant temporary files (sẽ được tạo trong container)
+/tmp/voice-assistant/
