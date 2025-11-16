@@ -24,10 +24,10 @@ CREATE TABLE IF NOT EXISTS voice_booking_request (
     CONSTRAINT fk_voice_booking_customer FOREIGN KEY (customer_id) 
         REFERENCES customer(customer_id) ON DELETE CASCADE,
     CONSTRAINT fk_voice_booking_booking FOREIGN KEY (booking_id) 
-        REFERENCES booking(booking_id) ON DELETE SET NULL,
+        REFERENCES bookings(booking_id) ON DELETE SET NULL,
     CONSTRAINT chk_confidence_range CHECK (confidence_score >= 0 AND confidence_score <= 1),
-    CONSTRAINT chk_audio_duration CHECK (audio_duration_seconds > 0 AND audio_duration_seconds <= 120),
-    CONSTRAINT chk_audio_size CHECK (audio_size_bytes > 0 AND audio_size_bytes <= 5242880) -- 5MB max
+    CONSTRAINT chk_audio_duration CHECK (audio_duration_seconds IS NULL OR (audio_duration_seconds > 0 AND audio_duration_seconds <= 120)),
+    CONSTRAINT chk_audio_size CHECK (audio_size_bytes IS NULL OR (audio_size_bytes > 0 AND audio_size_bytes <= 5242880)) -- 5MB max
 );
 
 -- Index for customer queries

@@ -44,14 +44,14 @@ public class VoiceBookingService {
     @Transactional
     public VoiceBookingResponse processVoiceBooking(
             MultipartFile audioFile,
-            String customerId,
+            String username,
             Map<String, Object> hints
     ) {
-        log.info("Processing voice booking for customer: {}", customerId);
+        log.info("Processing voice booking for customer: {}", username);
 
-        // Find customer
-        Customer customer = customerRepository.findById(customerId)
-                .orElseThrow(() -> new IllegalArgumentException("Customer not found: " + customerId));
+        // Find customer by username
+        Customer customer = customerRepository.findByAccount_Username(username)
+                .orElseThrow(() -> new IllegalArgumentException("Customer not found: " + username));
 
         // Create initial voice booking request record
         VoiceBookingRequest voiceRequest = createInitialVoiceRequest(customer, audioFile, hints);
@@ -80,7 +80,7 @@ public class VoiceBookingService {
             log.info("Parsing transcript for request: {}", voiceRequest.getId());
             ParsedBookingInfo parsedInfo = parserService.parseTranscript(
                     voiceResult.transcript(),
-                    customerId,
+                    customer.getCustomerId(),
                     hints
             );
 
@@ -121,11 +121,15 @@ public class VoiceBookingService {
                 voiceRequest.markAsPartial(parsedInfo.missingFields());
                 voiceBookingRequestRepository.save(voiceRequest);
 
+                // Convert extractedFields to Map<String, Object> for better FE handling
+                Map<String, Object> extractedInfo = new java.util.HashMap<>(parsedInfo.extractedFields());
+
                 return VoiceBookingResponse.partial(
                         voiceRequest.getId(),
                         voiceResult.transcript(),
                         parsedInfo.missingFields(),
                         parsedInfo.clarificationMessage(),
+                        extractedInfo,
                         voiceResult.confidenceScore(),
                         (int) voiceResult.processingTimeMs()
                 );
@@ -141,6 +145,20 @@ public class VoiceBookingService {
                 );
             }
 
+        } catch (iuh.house_keeping_service_be.exceptions.BookingValidationException e) {
+            // Handle booking validation errors specifically
+            String errorDetails = e.getErrors() != null && !e.getErrors().isEmpty() 
+                    ? String.join("; ", e.getErrors())
+                    : e.getMessage();
+            log.error("Booking validation failed for voice request {}: {}", voiceRequest.getId(), errorDetails);
+            voiceRequest.markAsFailed(errorDetails);
+            voiceBookingRequestRepository.save(voiceRequest);
+
+            return VoiceBookingResponse.failed(
+                    voiceRequest.getId(),
+                    "Không thể tạo booking: " + errorDetails,
+                    errorDetails
+            );
         } catch (Exception e) {
             log.error("Error processing voice booking: {}", e.getMessage(), e);
             voiceRequest.markAsFailed(e.getMessage());
@@ -161,12 +179,164 @@ public class VoiceBookingService {
     @Transactional
     public CompletableFuture<VoiceBookingResponse> processVoiceBookingAsync(
             MultipartFile audioFile,
-            String customerId,
+            String username,
             Map<String, Object> hints
     ) {
-        log.info("Processing voice booking asynchronously for customer: {}", customerId);
-        VoiceBookingResponse response = processVoiceBooking(audioFile, customerId, hints);
+        log.info("Processing voice booking asynchronously for customer: {}", username);
+        VoiceBookingResponse response = processVoiceBooking(audioFile, username, hints);
         return CompletableFuture.completedFuture(response);
+    }
+
+    /**
+     * Continue a partial voice booking with additional information
+     */
+    @Transactional
+    public VoiceBookingResponse continueVoiceBooking(
+            String requestId,
+            MultipartFile audioFile,
+            String additionalText,
+            Map<String, String> explicitFields,
+            String username
+    ) {
+        log.info("Continuing voice booking request: {}", requestId);
+
+        // Find original voice request
+        VoiceBookingRequest voiceRequest = voiceBookingRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Voice booking request not found: " + requestId));
+
+        // Validate status
+        if (!"PARTIAL".equals(voiceRequest.getStatus())) {
+            return VoiceBookingResponse.failed(
+                    requestId,
+                    "Không thể tiếp tục yêu cầu này",
+                    "Request status is not PARTIAL, current status: " + voiceRequest.getStatus()
+            );
+        }
+
+        // Verify customer ownership
+        Customer customer = customerRepository.findByAccount_Username(username)
+                .orElseThrow(() -> new IllegalArgumentException("Customer not found: " + username));
+        
+        if (!voiceRequest.getCustomer().getCustomerId().equals(customer.getCustomerId())) {
+            return VoiceBookingResponse.failed(
+                    requestId,
+                    "Không có quyền truy cập yêu cầu này",
+                    "Customer mismatch"
+            );
+        }
+
+        try {
+            String originalTranscript = voiceRequest.getTranscript();
+            String combinedTranscript = originalTranscript;
+            
+            // Process additional information sources
+            if (audioFile != null && !audioFile.isEmpty()) {
+                // Transcribe additional audio
+                log.info("Transcribing additional audio for request: {}", requestId);
+                VoiceToTextResult additionalVoice = voiceToTextService.transcribe(audioFile, "vi");
+                
+                if (additionalVoice.hasTranscript()) {
+                    combinedTranscript = originalTranscript + " " + additionalVoice.transcript();
+                    log.info("Combined transcript with audio: {}", combinedTranscript);
+                }
+            } else if (additionalText != null && !additionalText.isBlank()) {
+                // Use provided text
+                combinedTranscript = originalTranscript + " " + additionalText;
+                log.info("Combined transcript with text: {}", combinedTranscript);
+            }
+            
+            // Prepare enhanced hints with explicit fields
+            Map<String, Object> enhancedHints = new java.util.HashMap<>(voiceRequest.getHints() != null 
+                    ? voiceRequest.getHints() 
+                    : new java.util.HashMap<>());
+            
+            if (explicitFields != null && !explicitFields.isEmpty()) {
+                enhancedHints.put("explicitFields", explicitFields);
+                log.info("Added explicit fields to hints: {}", explicitFields);
+            }
+            
+            // Re-parse with combined information
+            voiceRequest.markAsProcessing();
+            voiceRequest.setTranscript(combinedTranscript);
+            voiceBookingRequestRepository.save(voiceRequest);
+            
+            ParsedBookingInfo parsedInfo = parserService.parseTranscript(
+                    combinedTranscript,
+                    customer.getCustomerId(),
+                    enhancedHints
+            );
+            
+            // Check if now complete
+            if (parsedInfo.isComplete()) {
+                log.info("Creating booking after continue for request: {}", requestId);
+                BookingCreationSummary bookingSummary = bookingService.createBooking(parsedInfo.bookingRequest());
+                
+                if (bookingSummary.getBookingId() != null) {
+                    Booking booking = new Booking();
+                    booking.setBookingId(bookingSummary.getBookingId());
+                    voiceRequest.markAsCompleted(booking);
+                    voiceBookingRequestRepository.save(voiceRequest);
+                    
+                    return VoiceBookingResponse.completed(
+                            requestId,
+                            bookingSummary.getBookingId(),
+                            combinedTranscript,
+                            voiceRequest.getConfidenceScore() != null ? voiceRequest.getConfidenceScore().doubleValue() : null,
+                            voiceRequest.getProcessingTimeMs()
+                    );
+                } else {
+                    String errorMsg = "Booking creation failed after continue";
+                    voiceRequest.markAsFailed(errorMsg);
+                    voiceBookingRequestRepository.save(voiceRequest);
+                    
+                    return VoiceBookingResponse.failed(
+                            requestId,
+                            "Không thể tạo booking",
+                            errorMsg
+                    );
+                }
+            } else {
+                // Still missing information
+                voiceRequest.markAsPartial(parsedInfo.missingFields());
+                voiceBookingRequestRepository.save(voiceRequest);
+                
+                Map<String, Object> extractedInfo = new java.util.HashMap<>(parsedInfo.extractedFields());
+                
+                return VoiceBookingResponse.partial(
+                        requestId,
+                        combinedTranscript,
+                        parsedInfo.missingFields(),
+                        parsedInfo.clarificationMessage(),
+                        extractedInfo,
+                        voiceRequest.getConfidenceScore() != null ? voiceRequest.getConfidenceScore().doubleValue() : null,
+                        voiceRequest.getProcessingTimeMs()
+                );
+            }
+            
+        } catch (iuh.house_keeping_service_be.exceptions.BookingValidationException e) {
+            String errorDetails = e.getErrors() != null && !e.getErrors().isEmpty() 
+                    ? String.join("; ", e.getErrors())
+                    : e.getMessage();
+            log.error("Booking validation failed for continued request {}: {}", requestId, errorDetails);
+            voiceRequest.markAsFailed(errorDetails);
+            voiceBookingRequestRepository.save(voiceRequest);
+            
+            return VoiceBookingResponse.failed(
+                    requestId,
+                    "Không thể tạo booking: " + errorDetails,
+                    errorDetails
+            );
+        } catch (Exception e) {
+            log.error("Error continuing voice booking: {}", e.getMessage(), e);
+            voiceRequest.markAsFailed(e.getMessage());
+            voiceBookingRequestRepository.save(voiceRequest);
+            
+            return VoiceBookingResponse.failed(
+                    requestId,
+                    "Đã xảy ra lỗi khi tiếp tục xử lý yêu cầu",
+                    e.getMessage()
+            );
+        }
     }
 
     /**
@@ -199,14 +369,8 @@ public class VoiceBookingService {
         voiceRequest.setHints(hints);
         voiceRequest.setStatus("PENDING");
         voiceRequest.setTranscript(""); // Will be updated after transcription
-
-        // Try to get audio duration
-        try {
-            // This is a placeholder - actual duration calculation would need audio processing
-            voiceRequest.setAudioDurationSeconds(BigDecimal.ZERO);
-        } catch (Exception e) {
-            log.warn("Could not calculate audio duration: {}", e.getMessage());
-        }
+        voiceRequest.setProcessingTimeMs(0); // Initialize to 0, will be updated after transcription
+        voiceRequest.setAudioDurationSeconds(null); // Set null to pass constraint, will be updated after audio processing
 
         return voiceRequest;
     }

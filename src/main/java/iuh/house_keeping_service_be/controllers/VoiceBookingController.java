@@ -164,21 +164,24 @@ public class VoiceBookingController {
             // Check authorization (customer can only see their own requests)
             // TODO: Add proper authorization check
 
+            // Build response data map
+            Map<String, Object> data = new java.util.HashMap<>();
+            data.put("id", voiceRequest.getId());
+            data.put("status", voiceRequest.getStatus());
+            data.put("transcript", voiceRequest.getTranscript());
+            data.put("confidenceScore", voiceRequest.getConfidenceScore() != null ? 
+                    voiceRequest.getConfidenceScore() : null);
+            data.put("processingTimeMs", voiceRequest.getProcessingTimeMs());
+            data.put("bookingId", voiceRequest.getBooking() != null ? 
+                    voiceRequest.getBooking().getBookingId() : null);
+            data.put("missingFields", voiceRequest.getMissingFields());
+            data.put("errorMessage", voiceRequest.getErrorMessage());
+            data.put("createdAt", voiceRequest.getCreatedAt());
+
             return ResponseEntity.ok(
                     Map.of(
                             "success", true,
-                            "data", Map.of(
-                                    "id", voiceRequest.getId(),
-                                    "status", voiceRequest.getStatus(),
-                                    "transcript", voiceRequest.getTranscript(),
-                                    "confidenceScore", voiceRequest.getConfidenceScore(),
-                                    "processingTimeMs", voiceRequest.getProcessingTimeMs(),
-                                    "bookingId", voiceRequest.getBooking() != null ? 
-                                            voiceRequest.getBooking().getBookingId() : null,
-                                    "missingFields", voiceRequest.getMissingFields(),
-                                    "errorMessage", voiceRequest.getErrorMessage(),
-                                    "createdAt", voiceRequest.getCreatedAt()
-                            )
+                            "data", data
                     )
             );
 
@@ -191,6 +194,112 @@ public class VoiceBookingController {
             );
         } catch (Exception e) {
             log.error("Error getting voice booking request: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    Map.of(
+                            "success", false,
+                            "message", "Internal server error: " + e.getMessage()
+                    )
+            );
+        }
+    }
+
+    /**
+     * Continue a partial voice booking with additional information
+     * POST /api/v1/customer/bookings/voice/continue
+     * 
+     * @param requestId Original voice booking request ID
+     * @param audio Optional additional audio file
+     * @param additionalText Optional text with missing information
+     * @param explicitFields Optional JSON with explicit field values
+     * @param authHeader JWT authorization header
+     * @return VoiceBookingResponse with updated result
+     */
+    @PostMapping(value = "/continue", consumes = {"multipart/form-data"})
+    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_ADMIN')")
+    public ResponseEntity<?> continueVoiceBooking(
+            @RequestPart(value = "requestId", required = true) String requestId,
+            @RequestPart(value = "audio", required = false) MultipartFile audio,
+            @RequestPart(value = "additionalText", required = false) String additionalText,
+            @RequestPart(value = "explicitFields", required = false) String explicitFields,
+            @RequestHeader("Authorization") String authHeader
+    ) {
+        log.info("Received continue voice booking request for: {}", requestId);
+
+        try {
+            // Validate JWT token
+            String token = authHeader.substring(7);
+            String username = jwtUtil.extractUsername(token);
+
+            if (username == null || !jwtUtil.validateToken(token, username)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                        Map.of(
+                                "success", false,
+                                "message", "Invalid or expired token"
+                        )
+                );
+            }
+
+            // Validate that at least one source is provided
+            boolean hasAudio = audio != null && !audio.isEmpty();
+            boolean hasText = additionalText != null && !additionalText.isBlank();
+            boolean hasExplicit = explicitFields != null && !explicitFields.isBlank();
+
+            if (!hasAudio && !hasText && !hasExplicit) {
+                return ResponseEntity.badRequest().body(
+                        Map.of(
+                                "success", false,
+                                "message", "At least one of audio, additionalText, or explicitFields must be provided"
+                        )
+                );
+            }
+
+            // Parse explicit fields if provided
+            Map<String, String> explicitFieldsMap = null;
+            if (hasExplicit) {
+                try {
+                    explicitFieldsMap = objectMapper.readValue(
+                            explicitFields,
+                            new com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() {}
+                    );
+                } catch (Exception e) {
+                    return ResponseEntity.badRequest().body(
+                            Map.of(
+                                    "success", false,
+                                    "message", "Invalid JSON format for explicitFields: " + e.getMessage()
+                            )
+                    );
+                }
+            }
+
+            // Process continue request
+            log.info("Continuing voice booking for user: {}", username);
+            VoiceBookingResponse response = voiceBookingService.continueVoiceBooking(
+                    requestId,
+                    audio,
+                    additionalText,
+                    explicitFieldsMap,
+                    username
+            );
+
+            // Return appropriate status code based on result
+            if (response.success()) {
+                return ResponseEntity.ok(response);
+            } else if ("PARTIAL".equals(response.status())) {
+                return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT).body(response);
+            } else {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid continue request: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(
+                    Map.of(
+                            "success", false,
+                            "message", e.getMessage()
+                    )
+            );
+        } catch (Exception e) {
+            log.error("Error continuing voice booking: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                     Map.of(
                             "success", false,

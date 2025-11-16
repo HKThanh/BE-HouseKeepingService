@@ -53,7 +53,7 @@ public class VoiceBookingRequest {
     private BigDecimal confidenceScore;
 
     @Column(name = "processing_time_ms", nullable = false)
-    private Integer processingTimeMs;
+    private Integer processingTimeMs = 0; // Default value, will be updated after processing
 
     @Type(JsonBinaryType.class)
     @Column(name = "hints", columnDefinition = "jsonb")

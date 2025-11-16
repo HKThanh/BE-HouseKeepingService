@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Builder;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Response DTO for voice booking processing
@@ -27,6 +28,9 @@ public record VoiceBookingResponse(
         // Missing fields (if partial)
         List<String> missingFields,
         String clarificationMessage,
+        
+        // Extracted/Understood information (for FE to display)
+        Map<String, Object> extractedInfo,
         
         // Error details (if failed)
         String errorDetails
@@ -73,6 +77,7 @@ public record VoiceBookingResponse(
             String transcript,
             List<String> missingFields,
             String clarificationMessage,
+            Map<String, Object> extractedInfo,
             Double confidenceScore,
             Integer processingTimeMs
     ) {
@@ -84,6 +89,7 @@ public record VoiceBookingResponse(
                 .transcript(transcript)
                 .missingFields(missingFields)
                 .clarificationMessage(clarificationMessage)
+                .extractedInfo(extractedInfo)
                 .confidenceScore(confidenceScore)
                 .processingTimeMs(processingTimeMs)
                 .build();

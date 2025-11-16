@@ -28,8 +28,9 @@ public class VoiceBookingParserService {
     private final ServiceRepository serviceRepository;
 
     // Pattern for extracting time information
+    // Captures: hour, optional minute, optional period (sáng/chiều/tối)
     private static final Pattern TIME_PATTERN = Pattern.compile(
-            "(\\d{1,2})\\s*(giờ|h)\\s*(\\d{1,2})?\\s*(phút|p)?",
+            "(\\d{1,2})\\s*(giờ|h)\\s*(\\d{1,2})?\\s*(phút|p)?\\s*(sáng|chiều|tối|trưa)?",
             Pattern.CASE_INSENSITIVE
     );
 
@@ -39,14 +40,8 @@ public class VoiceBookingParserService {
             Pattern.CASE_INSENSITIVE
     );
 
-    // Service name keywords mapping
-    private static final Map<String, List<String>> SERVICE_KEYWORDS = Map.of(
-            "vệ sinh", List.of("vệ sinh", "dọn dẹp", "lau nhà", "quét nhà"),
-            "giặt", List.of("giặt", "giặt ủi", "giặt là", "ủi đồ"),
-            "nấu", List.of("nấu ăn", "nấu cơm", "nấu nướng", "làm cơm"),
-            "chăm sóc", List.of("chăm sóc", "trông trẻ", "chăm trẻ", "giữ trẻ"),
-            "sửa chữa", List.of("sửa chữa", "sửa", "bảo trì", "thay thế")
-    );
+    // Similarity threshold for fuzzy matching (0.0 - 1.0)
+    private static final double SIMILARITY_THRESHOLD = 0.7;
 
     /**
      * Parse transcript into booking information
@@ -63,18 +58,49 @@ public class VoiceBookingParserService {
         double parseConfidence = 1.0;
 
         try {
-            // Extract service information
+            // Extract service information FIRST - this is most critical
             List<Service> services = extractServices(transcript, hints);
+            List<Service> allAvailableServices = serviceRepository.findAll().stream()
+                    .filter(Service::getIsActive)
+                    .toList();
+            
+            // PRIORITY CHECK: If no service found, stop here and only report service missing
             if (services.isEmpty()) {
                 missingFields.add("service");
-                parseConfidence -= 0.3;
-                log.warn("No service found in transcript");
-            } else {
-                extractedFields.put("services", services.stream()
-                        .map(Service::getName)
-                        .reduce((a, b) -> a + ", " + b)
-                        .orElse(""));
+                parseConfidence = 0.3; // Low confidence without service
+                log.warn("No service found in transcript - this is critical, stopping other checks");
+                
+                // Add available services list to extracted fields for clarification
+                if (!allAvailableServices.isEmpty()) {
+                    String availableServicesList = allAvailableServices.stream()
+                            .map(s -> "• " + s.getName())
+                            .reduce((a, b) -> a + "\n" + b)
+                            .orElse("");
+                    extractedFields.put("availableServices", availableServicesList);
+                }
+                
+                // Extract note if available (just for context)
+                String note = extractNote(transcript);
+                if (note != null && !note.isBlank()) {
+                    extractedFields.put("note", note);
+                }
+                
+                // Build clarification message and return immediately
+                String clarificationMessage = buildClarificationMessage(missingFields, extractedFields);
+                return ParsedBookingInfo.builder()
+                        .bookingRequest(null)
+                        .missingFields(missingFields)
+                        .extractedFields(extractedFields)
+                        .parseConfidence(parseConfidence)
+                        .clarificationMessage(clarificationMessage)
+                        .build();
             }
+            
+            // Service found - record it
+            extractedFields.put("services", services.stream()
+                    .map(Service::getName)
+                    .reduce((a, b) -> a + ", " + b)
+                    .orElse(""));
 
             // Extract booking time
             LocalDateTime bookingTime = extractBookingTime(transcript, hints);
@@ -84,6 +110,7 @@ public class VoiceBookingParserService {
                 log.warn("No booking time found in transcript");
             } else {
                 extractedFields.put("bookingTime", bookingTime.toString());
+                log.info("Extracted booking time: {}", bookingTime);
             }
 
             // Extract address information
@@ -162,38 +189,212 @@ public class VoiceBookingParserService {
             }
         }
 
-        // Get all available services
-        List<Service> allServices = serviceRepository.findAll();
+        // Get all active services from database
+        List<Service> allServices = serviceRepository.findAll().stream()
+                .filter(Service::getIsActive)
+                .toList();
 
-        // Try exact name match first
+        if (allServices.isEmpty()) {
+            log.warn("No active services found in database");
+            return matchedServices;
+        }
+
+        // Remove common Vietnamese filler words and generic terms before matching
+        String cleanedTranscript = removeGenericServiceWords(lowerTranscript);
+        
+        // Try exact name match first (case-insensitive)
         for (Service service : allServices) {
             String serviceName = service.getName().toLowerCase();
-            if (lowerTranscript.contains(serviceName)) {
+            // Check if the service name is present and is not just part of a generic phrase
+            if (cleanedTranscript.contains(serviceName)) {
                 matchedServices.add(service);
-                log.info("Service matched by name: {}", service.getName());
+                log.info("Service matched exactly by name: {}", service.getName());
             }
         }
 
-        // If no exact match, try keyword matching
-        if (matchedServices.isEmpty()) {
-            for (Map.Entry<String, List<String>> entry : SERVICE_KEYWORDS.entrySet()) {
-                for (String keyword : entry.getValue()) {
-                    if (lowerTranscript.contains(keyword)) {
-                        // Find services containing this keyword
-                        for (Service service : allServices) {
-                            String serviceName = service.getName().toLowerCase();
-                            if (serviceName.contains(entry.getKey()) && !matchedServices.contains(service)) {
-                                matchedServices.add(service);
-                                log.info("Service matched by keyword '{}': {}", keyword, service.getName());
-                            }
-                        }
-                    }
-                }
+        // If exact match found, return immediately
+        if (!matchedServices.isEmpty()) {
+            return matchedServices;
+        }
+
+        // If no exact match, try fuzzy matching with similarity threshold
+        // BUT only match against specific service keywords, not the whole transcript
+        List<ServiceMatch> potentialMatches = new ArrayList<>();
+        for (Service service : allServices) {
+            String serviceName = service.getName().toLowerCase();
+            
+            // Extract potential service keywords from cleaned transcript
+            // Only check if there are meaningful words that could be a service name
+            String[] words = cleanedTranscript.split("\\s+");
+            
+            // Skip fuzzy matching if transcript is too generic (less than 3 meaningful words)
+            if (words.length < 3 || isTranscriptTooGeneric(cleanedTranscript)) {
+                log.info("Transcript too generic for fuzzy matching, skipping service: {}", service.getName());
+                continue;
             }
+            
+            double similarity = calculateSimilarity(cleanedTranscript, serviceName);
+            if (similarity >= SIMILARITY_THRESHOLD) {
+                potentialMatches.add(new ServiceMatch(service, similarity));
+                log.info("Service '{}' has similarity score: {}", service.getName(), similarity);
+            }
+        }
+
+        // Sort by similarity score (highest first)
+        potentialMatches.sort((a, b) -> Double.compare(b.similarity(), a.similarity()));
+
+        // Only return if we have high confidence matches (> 0.8)
+        for (ServiceMatch match : potentialMatches) {
+            if (match.similarity() > 0.8) {
+                matchedServices.add(match.service());
+                log.info("Service matched by fuzzy matching: {} (score: {})", 
+                        match.service().getName(), match.similarity());
+            }
+        }
+
+        // If no high-confidence match found, log all available services
+        if (matchedServices.isEmpty()) {
+            log.warn("No matching service found. Available services: {}",
+                    allServices.stream()
+                            .map(Service::getName)
+                            .reduce((a, b) -> a + ", " + b)
+                            .orElse("None"));
         }
 
         return matchedServices;
     }
+    
+    /**
+     * Remove generic service words that don't indicate a specific service
+     */
+    private String removeGenericServiceWords(String transcript) {
+        // List of generic words that should be removed before service matching
+        String[] genericWords = {
+            "dịch vụ", "service", "đặt", "booking", "muốn", "cần", "yêu cầu",
+            "tôi", "mình", "em", "anh", "chị", "xin", "làm ơn", "giúp",
+            "vui lòng", "được không", "có thể", "giúp tôi", "cho tôi",
+            // Time-related words that could cause false matches
+            "giờ", "phút", "sáng", "chiều", "tối", "trưa", "đêm", "khuya",
+            "hôm nay", "ngày mai", "ngày kia", "tuần sau", "tháng sau",
+            "lúc", "vào", "trong", "ngoài", "khoảng", "tầm", "độ",
+            // Location-related words
+            "tại", "ở", "đến", "về", "từ", "đi",
+            // Numbers that might cause confusion
+            "một", "hai", "ba", "bốn", "năm", "sáu", "bảy", "tám", "chín", "mười"
+        };
+        
+        String cleaned = transcript;
+        for (String word : genericWords) {
+            cleaned = cleaned.replaceAll("\\b" + word + "\\b", " ");
+        }
+        
+        // Normalize multiple spaces
+        cleaned = cleaned.replaceAll("\\s+", " ").trim();
+        
+        log.debug("Cleaned transcript for service matching: '{}' -> '{}'", transcript, cleaned);
+        return cleaned;
+    }
+    
+    /**
+     * Check if transcript is too generic to perform fuzzy matching
+     */
+    private boolean isTranscriptTooGeneric(String transcript) {
+        // If transcript is empty or too short after cleaning, it's too generic
+        if (transcript == null || transcript.trim().isEmpty() || transcript.length() < 5) {
+            return true;
+        }
+        
+        // List of time/date related words that indicate no service mentioned
+        String[] timeRelatedWords = {
+            "mai", "hôm", "nay", "kia", "tuần", "tháng", "năm",
+            "thứ", "chủ nhật"
+        };
+        
+        int meaningfulWordCount = 0;
+        int timeWordCount = 0;
+        String[] words = transcript.split("\\s+");
+        
+        for (String word : words) {
+            if (word.length() <= 2) {
+                continue; // Skip very short words
+            }
+            
+            boolean isTimeRelated = false;
+            for (String timeWord : timeRelatedWords) {
+                if (word.contains(timeWord)) {
+                    isTimeRelated = true;
+                    timeWordCount++;
+                    break;
+                }
+            }
+            
+            if (!isTimeRelated) {
+                meaningfulWordCount++;
+            }
+        }
+        
+        // If transcript is mostly time-related words, it's too generic for service matching
+        // Or if there are less than 2 meaningful words
+        return meaningfulWordCount < 2 || (timeWordCount > meaningfulWordCount);
+    }
+
+    /**
+     * Calculate similarity between transcript and service name using Levenshtein distance
+     */
+    private double calculateSimilarity(String transcript, String serviceName) {
+        // Check if service name is contained in transcript
+        if (transcript.contains(serviceName)) {
+            return 1.0;
+        }
+
+        // Extract relevant words from transcript (remove common words)
+        String[] transcriptWords = transcript.split("\\s+");
+        String[] serviceWords = serviceName.split("\\s+");
+
+        double maxSimilarity = 0.0;
+
+        // Check each word combination
+        for (String serviceWord : serviceWords) {
+            for (String transcriptWord : transcriptWords) {
+                double wordSimilarity = 1.0 - ((double) levenshteinDistance(transcriptWord, serviceWord) 
+                        / Math.max(transcriptWord.length(), serviceWord.length()));
+                maxSimilarity = Math.max(maxSimilarity, wordSimilarity);
+            }
+        }
+
+        return maxSimilarity;
+    }
+
+    /**
+     * Calculate Levenshtein distance between two strings
+     */
+    private int levenshteinDistance(String s1, String s2) {
+        int[][] dp = new int[s1.length() + 1][s2.length() + 1];
+
+        for (int i = 0; i <= s1.length(); i++) {
+            dp[i][0] = i;
+        }
+        for (int j = 0; j <= s2.length(); j++) {
+            dp[0][j] = j;
+        }
+
+        for (int i = 1; i <= s1.length(); i++) {
+            for (int j = 1; j <= s2.length(); j++) {
+                int cost = s1.charAt(i - 1) == s2.charAt(j - 1) ? 0 : 1;
+                dp[i][j] = Math.min(Math.min(
+                        dp[i - 1][j] + 1,      // deletion
+                        dp[i][j - 1] + 1),     // insertion
+                        dp[i - 1][j - 1] + cost); // substitution
+            }
+        }
+
+        return dp[s1.length()][s2.length()];
+    }
+
+    /**
+     * Record to hold service match with similarity score
+     */
+    private record ServiceMatch(Service service, double similarity) {}
 
     /**
      * Extract booking time from transcript
@@ -279,6 +480,25 @@ public class VoiceBookingParserService {
                     minute = Integer.parseInt(matcher.group(3));
                 }
                 
+                // Check for time period indicator (sáng/chiều/tối/trưa)
+                String period = matcher.group(5);
+                if (period != null) {
+                    period = period.toLowerCase();
+                    // Convert to 24-hour format
+                    if (period.equals("chiều") || period.equals("tối")) {
+                        // Afternoon/Evening: 1-11 chiều/tối -> 13-23
+                        if (hour >= 1 && hour <= 11) {
+                            hour += 12;
+                        }
+                    } else if (period.equals("trưa")) {
+                        // Noon: 12 trưa -> 12:00
+                        if (hour != 12) {
+                            hour = 12;
+                        }
+                    }
+                    // sáng (morning) keeps the hour as-is (1-11 AM)
+                }
+                
                 return LocalTime.of(hour, minute);
             } catch (Exception e) {
                 log.warn("Failed to parse time from: {}", matcher.group(0));
@@ -304,17 +524,79 @@ public class VoiceBookingParserService {
         for (String keyword : addressKeywords) {
             int index = lowerTranscript.indexOf(keyword);
             if (index != -1) {
-                // Extract text after keyword until punctuation or end
+                // Extract text after keyword until end of sentence
                 String afterKeyword = transcript.substring(index + keyword.length()).trim();
-                String[] parts = afterKeyword.split("[.,;]");
+                // Only split by semicolon or end of text, preserve periods for TP. abbreviation
+                String[] parts = afterKeyword.split("[;]");
                 if (parts.length > 0 && !parts[0].isBlank()) {
-                    return parts[0].trim();
+                    // Remove trailing period if it's at the very end
+                    String address = parts[0].trim();
+                    if (address.endsWith(".")) {
+                        address = address.substring(0, address.length() - 1).trim();
+                    }
+                    return address;
                 }
             }
         }
         
         return null;
     }
+
+    /**
+     * Parse Vietnamese address into components
+     */
+    private AddressComponents parseVietnameseAddress(String fullAddress) {
+        if (fullAddress == null || fullAddress.isBlank()) {
+            return new AddressComponents(null, null, null);
+        }
+
+        String ward = null;
+        String city = null;
+        String streetAddress = fullAddress;
+
+        // Extract city (Thành phố / TP. / Tỉnh)
+        // Match "TP. Hồ Chí Minh" or "Thành phố Hồ Chí Minh"
+        Pattern cityPattern = Pattern.compile(
+            "(?:thành phố|tp\\.?|tỉnh)\\s*([^,;]+?)\\s*$",
+            Pattern.CASE_INSENSITIVE
+        );
+        Matcher cityMatcher = cityPattern.matcher(fullAddress);
+        if (cityMatcher.find()) {
+            city = cityMatcher.group(1).trim();
+            // Remove trailing period if present
+            if (city.endsWith(".")) {
+                city = city.substring(0, city.length() - 1).trim();
+            }
+            // Handle common abbreviations and normalize
+            if (city.equalsIgnoreCase("HCM") || city.equalsIgnoreCase("Hồ Chí Minh")) {
+                city = "Hồ Chí Minh";
+            } else if (city.equalsIgnoreCase("HN") || city.equalsIgnoreCase("Hà Nội")) {
+                city = "Hà Nội";
+            } else if (city.equalsIgnoreCase("Đà Nẵng") || city.equalsIgnoreCase("Da Nang")) {
+                city = "Đà Nẵng";
+            } else if (city.equalsIgnoreCase("Cần Thơ") || city.equalsIgnoreCase("Can Tho")) {
+                city = "Cần Thơ";
+            }
+        }
+
+        // Extract ward (Phường / Xã / Thị trấn / Quận)
+        // Match patterns like "phường Thủ Dậu 1"
+        Pattern wardPattern = Pattern.compile(
+            "(?:phường|xã|thị trấn|quận)\\s+([^,]+?)(?:,|(?=\\s*(?:tp\\.|thành phố|tỉnh|quận)))",
+            Pattern.CASE_INSENSITIVE
+        );
+        Matcher wardMatcher = wardPattern.matcher(fullAddress);
+        if (wardMatcher.find()) {
+            ward = wardMatcher.group(1).trim();
+        }
+
+        return new AddressComponents(streetAddress, ward, city);
+    }
+
+    /**
+     * Record to hold parsed address components
+     */
+    private record AddressComponents(String fullAddress, String ward, String city) {}
 
     /**
      * Extract note from transcript
@@ -363,12 +645,23 @@ public class VoiceBookingParserService {
             bookingDetails.add(detail);
         }
 
+        // Parse Vietnamese address into components
+        AddressComponents addressComponents = parseVietnameseAddress(address);
+        
+        // Use parsed components or defaults
+        String ward = addressComponents.ward() != null ? addressComponents.ward() : "Unknown";
+        String city = addressComponents.city() != null ? addressComponents.city() : "Unknown";
+        
+        // Log the parsed address for debugging
+        log.info("Parsed address - Full: {}, Ward: {}, City: {}", 
+                addressComponents.fullAddress(), ward, city);
+
         // Build address request
         NewAddressRequest addressRequest = new NewAddressRequest(
                 customerId,
-                address,
-                "Unknown", // Will need clarification
-                "Unknown", // Will need clarification
+                addressComponents.fullAddress(),
+                ward,
+                city,
                 null,
                 null
         );
@@ -391,22 +684,52 @@ public class VoiceBookingParserService {
      * Build clarification message for missing fields
      */
     private String buildClarificationMessage(List<String> missingFields, Map<String, String> extractedFields) {
-        StringBuilder message = new StringBuilder("Tôi đã hiểu được một phần yêu cầu của bạn:\n\n");
+        StringBuilder message = new StringBuilder();
 
-        if (!extractedFields.isEmpty()) {
-            for (Map.Entry<String, String> entry : extractedFields.entrySet()) {
-                message.append("- ").append(formatFieldName(entry.getKey()))
-                       .append(": ").append(entry.getValue()).append("\n");
+        // Check if service is missing (highest priority)
+        boolean serviceMissing = missingFields.contains("service");
+        
+        if (serviceMissing && extractedFields.containsKey("availableServices")) {
+            // CRITICAL: Service is missing - this is the most important field
+            message.append("Xin lỗi, tôi không thể xác định được dịch vụ bạn muốn đặt.\n\n");
+            message.append("📋 Các dịch vụ hiện có:\n");
+            message.append(extractedFields.get("availableServices"));
+            message.append("\n\n💡 Vui lòng nói lại và chỉ rõ dịch vụ bạn cần.");
+            
+            // Show what was understood (if any)
+            Map<String, String> otherFields = new HashMap<>(extractedFields);
+            otherFields.remove("availableServices");
+            
+            if (!otherFields.isEmpty()) {
+                message.append("\n\n✓ Thông tin tôi đã hiểu:\n");
+                for (Map.Entry<String, String> entry : otherFields.entrySet()) {
+                    message.append("  • ").append(formatFieldName(entry.getKey()))
+                           .append(": ").append(entry.getValue()).append("\n");
+                }
             }
-            message.append("\n");
-        }
+        } else {
+            // Standard handling for other missing fields (when service is already identified)
+            if (!extractedFields.isEmpty()) {
+                message.append("✓ Tôi đã hiểu được:\n");
+                
+                Map<String, String> displayFields = new HashMap<>(extractedFields);
+                displayFields.remove("availableServices"); // Don't show in standard format
+                
+                for (Map.Entry<String, String> entry : displayFields.entrySet()) {
+                    message.append("  • ").append(formatFieldName(entry.getKey()))
+                           .append(": ").append(entry.getValue()).append("\n");
+                }
+                message.append("\n");
+            }
 
-        message.append("Tuy nhiên, tôi cần thêm thông tin về:\n");
-        for (String field : missingFields) {
-            message.append("- ").append(formatFieldName(field)).append("\n");
+            if (!missingFields.isEmpty()) {
+                message.append("⚠️ Tôi cần thêm thông tin về:\n");
+                for (String field : missingFields) {
+                    message.append("  • ").append(formatFieldName(field)).append("\n");
+                }
+                message.append("\n💡 Vui lòng cung cấp thêm thông tin để hoàn tất đặt lịch.");
+            }
         }
-
-        message.append("\nVui lòng cung cấp thêm thông tin hoặc đặt lịch thủ công.");
 
         return message.toString();
     }
