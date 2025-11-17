@@ -455,6 +455,85 @@ Tôi cần dịch vụ nấu ăn vào buổi trưa.
 
 ---
 
+## WebSocket Voice Booking Channel
+
+### Endpoint & Auth
+- **Endpoint**: `ws://<host>/ws/voice-booking`
+- **Protocol**: STOMP + SockJS fallback, heartbeat 10s.
+- **JWT**: header `Authorization: Bearer <token>` ngay trên handshake + trong `connectHeaders`.
+- **Role**: chỉ `ROLE_CUSTOMER` được phép kết nối (ChannelInterceptor re-check).
+
+### Topics
+| Destination | Mô tả |
+|-------------|-------|
+| `/topic/voice-booking/{requestId}` | Push trạng thái xử lý theo request |
+| `/user/queue/voice-booking/errors` | Push lỗi xác thực/kết nối cho user hiện tại |
+
+### Event reference
+| eventType | status | Khi nào | Fields chính |
+|-----------|--------|---------|--------------|
+| `RECEIVED` | `PROCESSING` | Server lưu audio/new chunk | `timestamp` |
+| `TRANSCRIBING` | `PROCESSING` | Đang gọi Whisper | `progress` 0→1 |
+| `PARTIAL` | `PARTIAL` | Thiếu dữ liệu | `missingFields`, `clarificationMessage`, `transcript` |
+| `COMPLETED` | `COMPLETED` | Booking tạo thành công | `bookingId`, `processingTimeMs`, `transcript` |
+| `FAILED` | `FAILED` | Lỗi bất kỳ (JWT timeout, audio fail) | `errorMessage`, `transcript` nếu có |
+
+```json
+{
+  "eventType": "FAILED",
+  "requestId": "b3f1-4a21",
+  "status": "FAILED",
+  "transcript": null,
+  "missingFields": null,
+  "clarificationMessage": null,
+  "bookingId": null,
+  "processingTimeMs": null,
+  "errorMessage": "Không thể chuyển đổi giọng nói thành văn bản",
+  "timestamp": "2025-11-16T09:05:33.120Z",
+  "progress": null
+}
+```
+
+**Error queue**:
+```json
+{
+  "errorCode": "VOICE_BOOKING_FORBIDDEN",
+  "errorMessage": "Bạn không có quyền theo dõi trạng thái voice booking này.",
+  "requestId": "b3f1-4a21",
+  "timestamp": "2025-11-16T09:06:02.511Z"
+}
+```
+
+### Client sample
+```javascript
+const sock = new SockJS('https://api.example.com/ws/voice-booking', null, {
+  transports: ['xhr-streaming', 'xhr-polling'],
+  transportOptions: {
+    'xhr-streaming': { headers: { Authorization: `Bearer ${token}` } },
+    'xhr-polling': { headers: { Authorization: `Bearer ${token}` } }
+  }
+});
+
+const stomp = Stomp.over(sock);
+stomp.connect(
+  { Authorization: `Bearer ${token}` },
+  () => {
+    stomp.subscribe(`/topic/voice-booking/${requestId}`, (msg) => handleVoiceEvent(JSON.parse(msg.body)));
+    stomp.subscribe('/user/queue/voice-booking/errors', (msg) => console.error(JSON.parse(msg.body)));
+  },
+  (err) => console.error('Voice WS error', err)
+);
+```
+
+### Test checklist
+1. Handshake 401 khi thiếu JWT / sai role, 200 khi hợp lệ.
+2. User A subscribe request của user B → server deny + push lỗi.
+3. Luồng thành công: `RECEIVED → TRANSCRIBING → COMPLETED`.
+4. Luồng partial + `/voice/continue`: `RECEIVED → PARTIAL → COMPLETED`.
+5. Reconnect sau khi mất kết nối → `SUBSCRIBE` lại và tiếp tục nhận event.
+
+---
+
 ## Future Enhancements
 
 ### Planned Features

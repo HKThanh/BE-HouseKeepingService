@@ -1,0 +1,359 @@
+package iuh.house_keeping_service_be.services.VoiceBookingService;
+
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * Service for normalizing Vietnamese addresses using external API
+ * Converts city and ward names to standardized format
+ */
+@Service
+@Slf4j
+@RequiredArgsConstructor
+public class AddressNormalizationService {
+
+    private static final String PROVINCES_API_URL = "https://production.cas.so/address-kit/2025-07-01/provinces";
+    private static final String COMMUNES_API_URL_TEMPLATE = "https://production.cas.so/address-kit/2025-07-01/provinces/%s/communes";
+    private static final double SIMILARITY_THRESHOLD = 0.6; // Lower threshold for address matching
+
+    private final RestTemplate restTemplate;
+
+    /**
+     * Normalize city and ward names
+     */
+    public NormalizedAddress normalizeAddress(String city, String ward) {
+        log.info("Normalizing address - City: {}, Ward: {}", city, ward);
+
+        try {
+            // Step 1: Normalize city
+            ProvinceData normalizedProvince = normalizeCity(city);
+            if (normalizedProvince == null) {
+                log.warn("Could not normalize city: {}", city);
+                return new NormalizedAddress(city, ward, null, null);
+            }
+
+            log.info("City normalized: {} -> {} (code: {})", city, normalizedProvince.getName(), normalizedProvince.getCode());
+
+            // Step 2: Normalize ward using the province code
+            String normalizedWard = null;
+            String wardCode = null;
+            if (ward != null && !ward.isBlank()) {
+                CommuneData normalizedCommune = normalizeWard(normalizedProvince.getCode(), ward);
+                if (normalizedCommune != null) {
+                    normalizedWard = normalizedCommune.getName();
+                    wardCode = normalizedCommune.getCode();
+                    log.info("Ward normalized: {} -> {} (code: {})", ward, normalizedWard, wardCode);
+                } else {
+                    log.warn("Could not normalize ward: {} for province: {}", ward, normalizedProvince.getName());
+                    normalizedWard = ward; // Keep original if can't normalize
+                }
+            }
+
+            return new NormalizedAddress(
+                    normalizedProvince.getName(),
+                    normalizedWard != null ? normalizedWard : ward,
+                    normalizedProvince.getCode(),
+                    wardCode
+            );
+
+        } catch (Exception e) {
+            log.error("Error normalizing address: {}", e.getMessage(), e);
+            return new NormalizedAddress(city, ward, null, null);
+        }
+    }
+
+    /**
+     * Normalize city name by matching against provinces API
+     */
+    private ProvinceData normalizeCity(String city) {
+        if (city == null || city.isBlank()) {
+            return null;
+        }
+
+        try {
+            // Fetch provinces from API
+            log.debug("Fetching provinces from API: {}", PROVINCES_API_URL);
+            
+            // Try to get as String first to debug response format
+            String rawResponse = null;
+            try {
+                rawResponse = restTemplate.getForObject(PROVINCES_API_URL, String.class);
+                log.debug("Raw API response (first 500 chars): {}", 
+                    rawResponse != null && rawResponse.length() > 500 ? rawResponse.substring(0, 500) : rawResponse);
+            } catch (Exception e) {
+                log.warn("Could not fetch raw response for debugging: {}", e.getMessage());
+            }
+            
+            ProvinceResponse provinceResponse = restTemplate.getForObject(PROVINCES_API_URL, ProvinceResponse.class);
+
+            if (provinceResponse == null) {
+                log.error("Provinces API returned null response. Raw response available: {}", rawResponse != null);
+                return null;
+            }
+            
+            if (provinceResponse.getProvinces() == null) {
+                log.error("Provinces API response has null provinces field. Response object: {}", provinceResponse);
+                return null;
+            }
+            
+            if (provinceResponse.getProvinces().isEmpty()) {
+                log.error("Provinces API returned empty provinces list");
+                return null;
+            }
+            
+            log.debug("Successfully fetched {} provinces from API", provinceResponse.getProvinces().size());
+
+            // Clean input city name
+            String cleanedCity = cleanCityName(city);
+            log.debug("Cleaned city name: '{}' -> '{}'", city, cleanedCity);
+
+            // Try exact match first
+            Optional<ProvinceData> exactMatch = provinceResponse.getProvinces().stream()
+                    .filter(p -> cleanCityName(p.getName()).equalsIgnoreCase(cleanedCity))
+                    .findFirst();
+
+            if (exactMatch.isPresent()) {
+                log.info("City exact match found: {} -> {}", city, exactMatch.get().getName());
+                return exactMatch.get();
+            }
+
+            // Try fuzzy matching
+            ProvinceData bestMatch = null;
+            double bestSimilarity = 0.0;
+
+            for (ProvinceData province : provinceResponse.getProvinces()) {
+                String cleanedProvinceName = cleanCityName(province.getName());
+                double similarity = calculateSimilarity(cleanedCity, cleanedProvinceName);
+
+                if (similarity > bestSimilarity && similarity >= SIMILARITY_THRESHOLD) {
+                    bestSimilarity = similarity;
+                    bestMatch = province;
+                }
+            }
+
+            if (bestMatch != null) {
+                log.info("City matched with similarity {}: {} -> {}", bestSimilarity, city, bestMatch.getName());
+            } else {
+                log.warn("No city match found for: {} (cleaned: {})", city, cleanedCity);
+            }
+
+            return bestMatch;
+
+        } catch (Exception e) {
+            log.error("Error normalizing city: {}", e.getMessage(), e);
+            return null;
+        }
+    }
+
+    /**
+     * Normalize ward name by matching against communes API
+     */
+    private CommuneData normalizeWard(String provinceCode, String ward) {
+        if (provinceCode == null || ward == null || ward.isBlank()) {
+            return null;
+        }
+
+        try {
+            // Fetch communes for the province
+            String url = String.format(COMMUNES_API_URL_TEMPLATE, provinceCode);
+            log.debug("Fetching communes from API: {}", url);
+            CommuneResponse communeResponse = restTemplate.getForObject(url, CommuneResponse.class);
+
+            if (communeResponse == null) {
+                log.error("Communes API returned null response for province: {}", provinceCode);
+                return null;
+            }
+            
+            if (communeResponse.getCommunes() == null) {
+                log.error("Communes API response has null communes field for province: {}", provinceCode);
+                return null;
+            }
+            
+            if (communeResponse.getCommunes().isEmpty()) {
+                log.error("Communes API returned empty communes list for province: {}", provinceCode);
+                return null;
+            }
+            
+            log.debug("Successfully fetched {} communes for province {}", communeResponse.getCommunes().size(), provinceCode);
+
+            // Clean input ward name
+            String cleanedWard = cleanWardName(ward);
+            log.debug("Cleaned ward name: '{}' -> '{}'", ward, cleanedWard);
+
+            // Try exact match first
+            Optional<CommuneData> exactMatch = communeResponse.getCommunes().stream()
+                    .filter(c -> cleanWardName(c.getName()).equalsIgnoreCase(cleanedWard))
+                    .findFirst();
+
+            if (exactMatch.isPresent()) {
+                log.info("Ward exact match found: {} -> {}", ward, exactMatch.get().getName());
+                return exactMatch.get();
+            }
+
+            // Try fuzzy matching
+            CommuneData bestMatch = null;
+            double bestSimilarity = 0.0;
+
+            for (CommuneData commune : communeResponse.getCommunes()) {
+                String cleanedCommuneName = cleanWardName(commune.getName());
+                double similarity = calculateSimilarity(cleanedWard, cleanedCommuneName);
+
+                if (similarity > bestSimilarity && similarity >= SIMILARITY_THRESHOLD) {
+                    bestSimilarity = similarity;
+                    bestMatch = commune;
+                }
+            }
+
+            if (bestMatch != null) {
+                log.info("Ward matched with similarity {}: {} -> {}", bestSimilarity, ward, bestMatch.getName());
+            } else {
+                log.warn("No ward match found for: {} (cleaned: {}) in province: {}", ward, cleanedWard, provinceCode);
+            }
+
+            return bestMatch;
+
+        } catch (Exception e) {
+            log.error("Error normalizing ward: {}", e.getMessage(), e);
+            return null;
+        }
+    }
+
+    /**
+     * Clean city name by removing common prefixes and normalizing
+     */
+    private String cleanCityName(String city) {
+        if (city == null) {
+            return "";
+        }
+
+        String cleaned = city.toLowerCase().trim();
+
+        // Remove common prefixes
+        cleaned = cleaned.replaceAll("^(thành phố|tp\\.?|tỉnh)\\s*", "");
+        
+        // Normalize special characters
+        cleaned = cleaned.replaceAll("[.]+", "");
+        cleaned = cleaned.replaceAll("\\s+", " ").trim();
+
+        return cleaned;
+    }
+
+    /**
+     * Clean ward name by removing common prefixes and normalizing
+     */
+    private String cleanWardName(String ward) {
+        if (ward == null) {
+            return "";
+        }
+
+        String cleaned = ward.toLowerCase().trim();
+
+        // Remove common prefixes
+        cleaned = cleaned.replaceAll("^(phường|xã|thị trấn|quận)\\s*", "");
+        
+        // Normalize special characters
+        cleaned = cleaned.replaceAll("[.]+", "");
+        cleaned = cleaned.replaceAll("\\s+", " ").trim();
+
+        return cleaned;
+    }
+
+    /**
+     * Calculate similarity between two strings using Levenshtein distance
+     */
+    private double calculateSimilarity(String s1, String s2) {
+        if (s1 == null || s2 == null) {
+            return 0.0;
+        }
+
+        if (s1.equals(s2)) {
+            return 1.0;
+        }
+
+        // Check if one string contains the other
+        if (s1.contains(s2) || s2.contains(s1)) {
+            return 0.9;
+        }
+
+        int distance = levenshteinDistance(s1, s2);
+        int maxLength = Math.max(s1.length(), s2.length());
+
+        if (maxLength == 0) {
+            return 1.0;
+        }
+
+        return 1.0 - ((double) distance / maxLength);
+    }
+
+    /**
+     * Calculate Levenshtein distance between two strings
+     */
+    private int levenshteinDistance(String s1, String s2) {
+        int[][] dp = new int[s1.length() + 1][s2.length() + 1];
+
+        for (int i = 0; i <= s1.length(); i++) {
+            dp[i][0] = i;
+        }
+
+        for (int j = 0; j <= s2.length(); j++) {
+            dp[0][j] = j;
+        }
+
+        for (int i = 1; i <= s1.length(); i++) {
+            for (int j = 1; j <= s2.length(); j++) {
+                int cost = (s1.charAt(i - 1) == s2.charAt(j - 1)) ? 0 : 1;
+
+                dp[i][j] = Math.min(
+                        Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1),
+                        dp[i - 1][j - 1] + cost
+                );
+            }
+        }
+
+        return dp[s1.length()][s2.length()];
+    }
+
+    // DTOs for API responses
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class ProvinceResponse {
+        private List<ProvinceData> provinces;
+    }
+
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class ProvinceData {
+        private String code;
+        private String name;
+    }
+
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class CommuneResponse {
+        private List<CommuneData> communes;
+    }
+
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class CommuneData {
+        private String code;
+        private String name;
+    }
+
+    /**
+     * Record to hold normalized address data
+     */
+    public record NormalizedAddress(
+            String normalizedCity,
+            String normalizedWard,
+            String cityCode,
+            String wardCode
+    ) {}
+}

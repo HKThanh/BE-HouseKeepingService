@@ -57,4 +57,9 @@ public interface VoiceBookingRequestRepository extends JpaRepository<VoiceBookin
      * Find by booking ID
      */
     Optional<VoiceBookingRequest> findByBooking_BookingId(String bookingId);
+
+    /**
+     * Verify whether the voice booking request belongs to a customer (by username).
+     */
+    boolean existsByIdAndCustomer_Account_Username(String id, String username);
 }

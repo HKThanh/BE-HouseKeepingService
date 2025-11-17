@@ -26,6 +26,7 @@ import java.util.regex.Pattern;
 public class VoiceBookingParserService {
 
     private final ServiceRepository serviceRepository;
+    private final AddressNormalizationService addressNormalizationService;
 
     // Pattern for extracting time information
     // Captures: hour, optional minute, optional period (sáng/chiều/tối)
@@ -233,10 +234,17 @@ public class VoiceBookingParserService {
                 continue;
             }
             
-            double similarity = calculateSimilarity(cleanedTranscript, serviceName);
+            // Check if service name (or most of it) appears in ORIGINAL transcript first
+            double originalSimilarity = calculateSimilarity(lowerTranscript, serviceName);
+            double cleanedSimilarity = calculateSimilarity(cleanedTranscript, serviceName);
+            
+            // Use the better score but prefer original transcript match
+            double similarity = Math.max(originalSimilarity, cleanedSimilarity * 0.9); // Slight penalty for cleaned
+            
             if (similarity >= SIMILARITY_THRESHOLD) {
                 potentialMatches.add(new ServiceMatch(service, similarity));
-                log.info("Service '{}' has similarity score: {}", service.getName(), similarity);
+                log.info("Service '{}' has similarity score: {} (original: {}, cleaned: {})", 
+                        service.getName(), similarity, originalSimilarity, cleanedSimilarity);
             }
         }
 
@@ -351,18 +359,41 @@ public class VoiceBookingParserService {
         String[] transcriptWords = transcript.split("\\s+");
         String[] serviceWords = serviceName.split("\\s+");
 
-        double maxSimilarity = 0.0;
+        // Count how many service words are found in transcript
+        int matchedWords = 0;
+        double totalSimilarity = 0.0;
 
-        // Check each word combination
+        // Check each service word against transcript words
         for (String serviceWord : serviceWords) {
+            if (serviceWord.length() < 2) continue; // Skip very short words
+            
+            double bestWordMatch = 0.0;
             for (String transcriptWord : transcriptWords) {
+                if (transcriptWord.length() < 2) continue;
+                
                 double wordSimilarity = 1.0 - ((double) levenshteinDistance(transcriptWord, serviceWord) 
                         / Math.max(transcriptWord.length(), serviceWord.length()));
-                maxSimilarity = Math.max(maxSimilarity, wordSimilarity);
+                bestWordMatch = Math.max(bestWordMatch, wordSimilarity);
+            }
+            
+            // Consider word matched if similarity > 0.7
+            if (bestWordMatch > 0.7) {
+                matchedWords++;
+                totalSimilarity += bestWordMatch;
             }
         }
 
-        return maxSimilarity;
+        // Calculate average similarity weighted by word coverage
+        // Require at least 60% of service words to be matched
+        if (serviceWords.length == 0) return 0.0;
+        
+        double wordCoverage = (double) matchedWords / serviceWords.length;
+        if (wordCoverage < 0.6) return 0.0; // Not enough words matched
+        
+        double avgSimilarity = totalSimilarity / matchedWords;
+        
+        // Final score combines coverage and average similarity
+        return (wordCoverage * 0.5) + (avgSimilarity * 0.5);
     }
 
     /**
@@ -656,12 +687,44 @@ public class VoiceBookingParserService {
         log.info("Parsed address - Full: {}, Ward: {}, City: {}", 
                 addressComponents.fullAddress(), ward, city);
 
-        // Build address request
+        // Normalize city and ward if they are not "Unknown"
+        String normalizedCity = city;
+        String normalizedWard = ward;
+        
+        if (!city.equals("Unknown") || !ward.equals("Unknown")) {
+            try {
+                AddressNormalizationService.NormalizedAddress normalizedAddress = 
+                        addressNormalizationService.normalizeAddress(city, ward);
+                
+                if (normalizedAddress != null) {
+                    if (normalizedAddress.normalizedCity() != null && !normalizedAddress.normalizedCity().isBlank()) {
+                        normalizedCity = normalizedAddress.normalizedCity();
+                        log.info("City normalized: {} -> {} (code: {})", city, normalizedCity, normalizedAddress.cityCode());
+                    } else {
+                        log.warn("City normalization returned null or blank for: {}", city);
+                    }
+                    
+                    if (normalizedAddress.normalizedWard() != null && !normalizedAddress.normalizedWard().isBlank()) {
+                        normalizedWard = normalizedAddress.normalizedWard();
+                        log.info("Ward normalized: {} -> {} (code: {})", ward, normalizedWard, normalizedAddress.wardCode());
+                    } else {
+                        log.warn("Ward normalization returned null or blank for: {}", ward);
+                    }
+                } else {
+                    log.warn("Address normalization returned null");
+                }
+            } catch (Exception e) {
+                log.error("Error normalizing address, using original values: {}", e.getMessage());
+                // Keep original values if normalization fails
+            }
+        }
+
+        // Build address request with normalized values
         NewAddressRequest addressRequest = new NewAddressRequest(
                 customerId,
                 addressComponents.fullAddress(),
-                ward,
-                city,
+                normalizedWard,
+                normalizedCity,
                 null,
                 null
         );

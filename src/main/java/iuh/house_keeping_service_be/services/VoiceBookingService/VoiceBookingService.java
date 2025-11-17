@@ -8,6 +8,7 @@ import iuh.house_keeping_service_be.models.VoiceBookingRequest;
 import iuh.house_keeping_service_be.repositories.CustomerRepository;
 import iuh.house_keeping_service_be.repositories.VoiceBookingRequestRepository;
 import iuh.house_keeping_service_be.services.BookingService.BookingService;
+import iuh.house_keeping_service_be.services.VoiceBookingService.VoiceBookingEventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,6 +35,7 @@ public class VoiceBookingService {
     private final BookingService bookingService;
     private final VoiceBookingRequestRepository voiceBookingRequestRepository;
     private final CustomerRepository customerRepository;
+    private final VoiceBookingEventPublisher voiceBookingEventPublisher;
 
     @Value("${whisper.processing.async-enabled:true}")
     private boolean asyncEnabled;
@@ -57,15 +59,25 @@ public class VoiceBookingService {
         VoiceBookingRequest voiceRequest = createInitialVoiceRequest(customer, audioFile, hints);
         voiceRequest.markAsProcessing();
         voiceRequest = voiceBookingRequestRepository.save(voiceRequest);
+        voiceBookingEventPublisher.emitReceived(voiceRequest.getId(), username);
 
         try {
             // Step 1: Voice to text conversion
             log.info("Starting voice-to-text conversion for request: {}", voiceRequest.getId());
+            voiceBookingEventPublisher.emitTranscribing(voiceRequest.getId(), username, 0.1);
             VoiceToTextResult voiceResult = voiceToTextService.transcribe(audioFile, "vi");
+            voiceBookingEventPublisher.emitTranscribing(voiceRequest.getId(), username, 1.0);
 
             if (!voiceResult.hasTranscript()) {
                 voiceRequest.markAsFailed("Failed to transcribe audio");
                 voiceBookingRequestRepository.save(voiceRequest);
+                voiceBookingEventPublisher.emitFailed(
+                        voiceRequest.getId(),
+                        username,
+                        "Không thể chuyển đổi giọng nói thành văn bản",
+                        null,
+                        null
+                );
                 return VoiceBookingResponse.failed(
                         voiceRequest.getId(),
                         "Không thể chuyển đổi giọng nói thành văn bản",
@@ -96,6 +108,13 @@ public class VoiceBookingService {
                     booking.setBookingId(bookingSummary.getBookingId());
                     voiceRequest.markAsCompleted(booking);
                     voiceBookingRequestRepository.save(voiceRequest);
+                    voiceBookingEventPublisher.emitCompleted(
+                            voiceRequest.getId(),
+                            username,
+                            bookingSummary.getBookingId(),
+                            voiceResult.transcript(),
+                            (int) voiceResult.processingTimeMs()
+                    );
 
                     return VoiceBookingResponse.completed(
                             voiceRequest.getId(),
@@ -108,6 +127,13 @@ public class VoiceBookingService {
                     String errorMsg = "Booking creation failed";
                     voiceRequest.markAsFailed(errorMsg);
                     voiceBookingRequestRepository.save(voiceRequest);
+                    voiceBookingEventPublisher.emitFailed(
+                            voiceRequest.getId(),
+                            username,
+                            errorMsg,
+                            voiceResult.transcript(),
+                            (int) voiceResult.processingTimeMs()
+                    );
 
                     return VoiceBookingResponse.failed(
                             voiceRequest.getId(),
@@ -123,6 +149,14 @@ public class VoiceBookingService {
 
                 // Convert extractedFields to Map<String, Object> for better FE handling
                 Map<String, Object> extractedInfo = new java.util.HashMap<>(parsedInfo.extractedFields());
+                voiceBookingEventPublisher.emitPartial(
+                        voiceRequest.getId(),
+                        username,
+                        voiceResult.transcript(),
+                        parsedInfo.missingFields(),
+                        parsedInfo.clarificationMessage(),
+                        (int) voiceResult.processingTimeMs()
+                );
 
                 return VoiceBookingResponse.partial(
                         voiceRequest.getId(),
@@ -137,6 +171,13 @@ public class VoiceBookingService {
             } else {
                 voiceRequest.markAsFailed("Failed to parse transcript");
                 voiceBookingRequestRepository.save(voiceRequest);
+                voiceBookingEventPublisher.emitFailed(
+                        voiceRequest.getId(),
+                        username,
+                        "Failed to parse transcript",
+                        voiceResult.transcript(),
+                        (int) voiceResult.processingTimeMs()
+                );
 
                 return VoiceBookingResponse.failed(
                         voiceRequest.getId(),
@@ -153,6 +194,13 @@ public class VoiceBookingService {
             log.error("Booking validation failed for voice request {}: {}", voiceRequest.getId(), errorDetails);
             voiceRequest.markAsFailed(errorDetails);
             voiceBookingRequestRepository.save(voiceRequest);
+            voiceBookingEventPublisher.emitFailed(
+                    voiceRequest.getId(),
+                    username,
+                    errorDetails,
+                    voiceRequest.getTranscript(),
+                    voiceRequest.getProcessingTimeMs()
+            );
 
             return VoiceBookingResponse.failed(
                     voiceRequest.getId(),
@@ -163,6 +211,13 @@ public class VoiceBookingService {
             log.error("Error processing voice booking: {}", e.getMessage(), e);
             voiceRequest.markAsFailed(e.getMessage());
             voiceBookingRequestRepository.save(voiceRequest);
+            voiceBookingEventPublisher.emitFailed(
+                    voiceRequest.getId(),
+                    username,
+                    e.getMessage(),
+                    voiceRequest.getTranscript(),
+                    voiceRequest.getProcessingTimeMs()
+            );
 
             return VoiceBookingResponse.failed(
                     voiceRequest.getId(),
@@ -206,11 +261,19 @@ public class VoiceBookingService {
 
         // Validate status
         if (!"PARTIAL".equals(voiceRequest.getStatus())) {
-            return VoiceBookingResponse.failed(
+            VoiceBookingResponse failedResponse = VoiceBookingResponse.failed(
                     requestId,
                     "Không thể tiếp tục yêu cầu này",
                     "Request status is not PARTIAL, current status: " + voiceRequest.getStatus()
             );
+            voiceBookingEventPublisher.emitFailed(
+                    requestId,
+                    username,
+                    "Request status is not PARTIAL, current status: " + voiceRequest.getStatus(),
+                    voiceRequest.getTranscript(),
+                    voiceRequest.getProcessingTimeMs()
+            );
+            return failedResponse;
         }
 
         // Verify customer ownership
@@ -218,11 +281,19 @@ public class VoiceBookingService {
                 .orElseThrow(() -> new IllegalArgumentException("Customer not found: " + username));
         
         if (!voiceRequest.getCustomer().getCustomerId().equals(customer.getCustomerId())) {
-            return VoiceBookingResponse.failed(
+            VoiceBookingResponse failedResponse = VoiceBookingResponse.failed(
                     requestId,
                     "Không có quyền truy cập yêu cầu này",
                     "Customer mismatch"
             );
+            voiceBookingEventPublisher.emitFailed(
+                    requestId,
+                    username,
+                    "Customer mismatch",
+                    voiceRequest.getTranscript(),
+                    voiceRequest.getProcessingTimeMs()
+            );
+            return failedResponse;
         }
 
         try {
@@ -233,7 +304,9 @@ public class VoiceBookingService {
             if (audioFile != null && !audioFile.isEmpty()) {
                 // Transcribe additional audio
                 log.info("Transcribing additional audio for request: {}", requestId);
+                voiceBookingEventPublisher.emitTranscribing(requestId, username, 0.2);
                 VoiceToTextResult additionalVoice = voiceToTextService.transcribe(audioFile, "vi");
+                voiceBookingEventPublisher.emitTranscribing(requestId, username, 1.0);
                 
                 if (additionalVoice.hasTranscript()) {
                     combinedTranscript = originalTranscript + " " + additionalVoice.transcript();
@@ -259,6 +332,7 @@ public class VoiceBookingService {
             voiceRequest.markAsProcessing();
             voiceRequest.setTranscript(combinedTranscript);
             voiceBookingRequestRepository.save(voiceRequest);
+            voiceBookingEventPublisher.emitReceived(requestId, username);
             
             ParsedBookingInfo parsedInfo = parserService.parseTranscript(
                     combinedTranscript,
@@ -276,6 +350,13 @@ public class VoiceBookingService {
                     booking.setBookingId(bookingSummary.getBookingId());
                     voiceRequest.markAsCompleted(booking);
                     voiceBookingRequestRepository.save(voiceRequest);
+                    voiceBookingEventPublisher.emitCompleted(
+                            requestId,
+                            username,
+                            bookingSummary.getBookingId(),
+                            combinedTranscript,
+                            voiceRequest.getProcessingTimeMs()
+                    );
                     
                     return VoiceBookingResponse.completed(
                             requestId,
@@ -288,6 +369,13 @@ public class VoiceBookingService {
                     String errorMsg = "Booking creation failed after continue";
                     voiceRequest.markAsFailed(errorMsg);
                     voiceBookingRequestRepository.save(voiceRequest);
+                    voiceBookingEventPublisher.emitFailed(
+                            requestId,
+                            username,
+                            errorMsg,
+                            combinedTranscript,
+                            voiceRequest.getProcessingTimeMs()
+                    );
                     
                     return VoiceBookingResponse.failed(
                             requestId,
@@ -301,6 +389,14 @@ public class VoiceBookingService {
                 voiceBookingRequestRepository.save(voiceRequest);
                 
                 Map<String, Object> extractedInfo = new java.util.HashMap<>(parsedInfo.extractedFields());
+                voiceBookingEventPublisher.emitPartial(
+                        requestId,
+                        username,
+                        combinedTranscript,
+                        parsedInfo.missingFields(),
+                        parsedInfo.clarificationMessage(),
+                        voiceRequest.getProcessingTimeMs()
+                );
                 
                 return VoiceBookingResponse.partial(
                         requestId,
@@ -320,6 +416,13 @@ public class VoiceBookingService {
             log.error("Booking validation failed for continued request {}: {}", requestId, errorDetails);
             voiceRequest.markAsFailed(errorDetails);
             voiceBookingRequestRepository.save(voiceRequest);
+            voiceBookingEventPublisher.emitFailed(
+                    requestId,
+                    username,
+                    errorDetails,
+                    voiceRequest.getTranscript(),
+                    voiceRequest.getProcessingTimeMs()
+            );
             
             return VoiceBookingResponse.failed(
                     requestId,
@@ -330,6 +433,13 @@ public class VoiceBookingService {
             log.error("Error continuing voice booking: {}", e.getMessage(), e);
             voiceRequest.markAsFailed(e.getMessage());
             voiceBookingRequestRepository.save(voiceRequest);
+            voiceBookingEventPublisher.emitFailed(
+                    requestId,
+                    username,
+                    e.getMessage(),
+                    voiceRequest.getTranscript(),
+                    voiceRequest.getProcessingTimeMs()
+            );
             
             return VoiceBookingResponse.failed(
                     requestId,
