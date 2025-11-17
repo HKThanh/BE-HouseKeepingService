@@ -24,6 +24,7 @@ public record VoiceBookingResponse(
         
         // Booking result (if completed)
         String bookingId,
+        VoiceBookingPreview preview,
         
         // Missing fields (if partial)
         List<String> missingFields,
@@ -66,6 +67,40 @@ public record VoiceBookingResponse(
                 .transcript(transcript)
                 .confidenceScore(confidenceScore)
                 .processingTimeMs(processingTimeMs)
+                .build();
+    }
+
+    /**
+     * Factory for review state where we require user confirmation
+     */
+    public static VoiceBookingResponse awaitingConfirmation(
+            String requestId,
+            String transcript,
+            VoiceBookingPreview preview,
+            Double confidenceScore,
+            Integer processingTimeMs
+    ) {
+        return VoiceBookingResponse.builder()
+                .success(true)
+                .message("Đã dựng đơn nháp, vui lòng xác nhận để hoàn tất đặt lịch")
+                .requestId(requestId)
+                .status("AWAITING_CONFIRMATION")
+                .transcript(transcript)
+                .preview(preview)
+                .confidenceScore(confidenceScore)
+                .processingTimeMs(processingTimeMs)
+                .build();
+    }
+
+    /**
+     * Factory for cancelled draft information
+     */
+    public static VoiceBookingResponse cancelled(String requestId) {
+        return VoiceBookingResponse.builder()
+                .success(true)
+                .message("Đã huỷ yêu cầu đặt lịch bằng giọng nói")
+                .requestId(requestId)
+                .status("CANCELLED")
                 .build();
     }
 

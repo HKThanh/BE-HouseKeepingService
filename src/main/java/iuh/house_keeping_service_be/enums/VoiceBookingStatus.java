@@ -6,6 +6,8 @@ package iuh.house_keeping_service_be.enums;
 public enum VoiceBookingStatus {
     PENDING("Đang chờ xử lý"),
     PROCESSING("Đang xử lý"),
+    AWAITING_CONFIRMATION("Chờ xác nhận"),
+    CANCELLED("Đã huỷ"),
     COMPLETED("Hoàn thành"),
     PARTIAL("Thiếu thông tin"),
     FAILED("Thất bại");

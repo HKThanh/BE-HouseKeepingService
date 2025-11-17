@@ -1,8 +1,6 @@
 package iuh.house_keeping_service_be.services.VoiceBookingService;
 
-import iuh.house_keeping_service_be.dtos.VoiceBooking.VoiceBookingErrorPayload;
-import iuh.house_keeping_service_be.dtos.VoiceBooking.VoiceBookingEventPayload;
-import iuh.house_keeping_service_be.dtos.VoiceBooking.VoiceBookingEventType;
+import iuh.house_keeping_service_be.dtos.VoiceBooking.*;
 import iuh.house_keeping_service_be.enums.VoiceBookingStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +41,23 @@ public class VoiceBookingEventPublisher {
                 VoiceBookingEventType.TRANSCRIBING,
                 VoiceBookingStatus.PROCESSING,
                 builder -> builder.progress(sanitizeProgress(progress))
+        );
+        sendToTopic(username, payload);
+    }
+
+    public void emitAwaitingConfirmation(
+            String requestId,
+            String username,
+            VoiceBookingPreview preview,
+            Integer processingTimeMs
+    ) {
+        VoiceBookingEventPayload payload = buildPayload(
+                requestId,
+                VoiceBookingEventType.AWAITING_CONFIRMATION,
+                VoiceBookingStatus.AWAITING_CONFIRMATION,
+                builder -> builder
+                        .preview(preview)
+                        .processingTimeMs(processingTimeMs)
         );
         sendToTopic(username, payload);
     }
@@ -102,6 +117,19 @@ public class VoiceBookingEventPublisher {
                         .errorMessage(errorMessage)
                         .transcript(transcript)
                         .processingTimeMs(processingTimeMs)
+        );
+        sendToTopic(username, payload);
+    }
+
+    public void emitCancelled(
+            String requestId,
+            String username
+    ) {
+        VoiceBookingEventPayload payload = buildPayload(
+                requestId,
+                VoiceBookingEventType.CANCELLED,
+                VoiceBookingStatus.CANCELLED,
+                builder -> {}
         );
         sendToTopic(username, payload);
     }

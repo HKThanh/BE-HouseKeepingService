@@ -1,13 +1,21 @@
 package iuh.house_keeping_service_be.services.VoiceBookingService;
 
+import iuh.house_keeping_service_be.dtos.Booking.internal.BookingValidationResult;
+import iuh.house_keeping_service_be.dtos.Booking.internal.ServiceValidationInfo;
+import iuh.house_keeping_service_be.dtos.Booking.request.AssignmentRequest;
+import iuh.house_keeping_service_be.dtos.Booking.request.BookingCreateRequest;
+import iuh.house_keeping_service_be.dtos.Booking.request.BookingDetailRequest;
 import iuh.house_keeping_service_be.dtos.Booking.summary.BookingCreationSummary;
+import iuh.house_keeping_service_be.dtos.EmployeeSchedule.ApiResponse;
+import iuh.house_keeping_service_be.dtos.EmployeeSchedule.SuitableEmployeeRequest;
+import iuh.house_keeping_service_be.dtos.EmployeeSchedule.SuitableEmployeeResponse;
 import iuh.house_keeping_service_be.dtos.VoiceBooking.*;
-import iuh.house_keeping_service_be.models.Booking;
-import iuh.house_keeping_service_be.models.Customer;
-import iuh.house_keeping_service_be.models.VoiceBookingRequest;
+import iuh.house_keeping_service_be.models.*;
 import iuh.house_keeping_service_be.repositories.CustomerRepository;
+import iuh.house_keeping_service_be.repositories.EmployeeRepository;
 import iuh.house_keeping_service_be.repositories.VoiceBookingRequestRepository;
 import iuh.house_keeping_service_be.services.BookingService.BookingService;
+import iuh.house_keeping_service_be.services.EmployeeScheduleService.EmployeeScheduleService;
 import iuh.house_keeping_service_be.services.VoiceBookingService.VoiceBookingEventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,8 +25,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import iuh.house_keeping_service_be.utils.BookingDTOFormatter;
+
 import java.math.BigDecimal;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -36,6 +46,8 @@ public class VoiceBookingService {
     private final VoiceBookingRequestRepository voiceBookingRequestRepository;
     private final CustomerRepository customerRepository;
     private final VoiceBookingEventPublisher voiceBookingEventPublisher;
+    private final EmployeeScheduleService employeeScheduleService;
+    private final EmployeeRepository employeeRepository;
 
     @Value("${whisper.processing.async-enabled:true}")
     private boolean asyncEnabled;
@@ -56,7 +68,7 @@ public class VoiceBookingService {
                 .orElseThrow(() -> new IllegalArgumentException("Customer not found: " + username));
 
         // Create initial voice booking request record
-        VoiceBookingRequest voiceRequest = createInitialVoiceRequest(customer, audioFile, hints);
+        iuh.house_keeping_service_be.models.VoiceBookingRequest voiceRequest = createInitialVoiceRequest(customer, audioFile, hints);
         voiceRequest.markAsProcessing();
         voiceRequest = voiceBookingRequestRepository.save(voiceRequest);
         voiceBookingEventPublisher.emitReceived(voiceRequest.getId(), username);
@@ -98,50 +110,24 @@ public class VoiceBookingService {
 
             // Step 3: Handle parsing result
             if (parsedInfo.isComplete()) {
-                // Create booking
-                log.info("Creating booking from voice request: {}", voiceRequest.getId());
-                BookingCreationSummary bookingSummary = bookingService.createBooking(parsedInfo.bookingRequest());
+                log.info("Voice booking request {} parsed successfully, preparing preview", voiceRequest.getId());
+                VoiceBookingDraftResult draftResult = prepareDraft(customer, parsedInfo.bookingRequest());
+                voiceRequest.markAsAwaitingConfirmation(draftResult.bookingRequest(), draftResult.preview());
+                voiceRequest = voiceBookingRequestRepository.save(voiceRequest);
+                voiceBookingEventPublisher.emitAwaitingConfirmation(
+                        voiceRequest.getId(),
+                        username,
+                        draftResult.preview(),
+                        (int) voiceResult.processingTimeMs()
+                );
 
-                if (bookingSummary.getBookingId() != null) {
-                    // Mark as completed
-                    Booking booking = new Booking();
-                    booking.setBookingId(bookingSummary.getBookingId());
-                    voiceRequest.markAsCompleted(booking);
-                    voiceBookingRequestRepository.save(voiceRequest);
-                    voiceBookingEventPublisher.emitCompleted(
-                            voiceRequest.getId(),
-                            username,
-                            bookingSummary.getBookingId(),
-                            voiceResult.transcript(),
-                            (int) voiceResult.processingTimeMs()
-                    );
-
-                    return VoiceBookingResponse.completed(
-                            voiceRequest.getId(),
-                            bookingSummary.getBookingId(),
-                            voiceResult.transcript(),
-                            voiceResult.confidenceScore(),
-                            (int) voiceResult.processingTimeMs()
-                    );
-                } else {
-                    String errorMsg = "Booking creation failed";
-                    voiceRequest.markAsFailed(errorMsg);
-                    voiceBookingRequestRepository.save(voiceRequest);
-                    voiceBookingEventPublisher.emitFailed(
-                            voiceRequest.getId(),
-                            username,
-                            errorMsg,
-                            voiceResult.transcript(),
-                            (int) voiceResult.processingTimeMs()
-                    );
-
-                    return VoiceBookingResponse.failed(
-                            voiceRequest.getId(),
-                            "Không thể tạo booking",
-                            errorMsg
-                    );
-                }
-
+                return VoiceBookingResponse.awaitingConfirmation(
+                        voiceRequest.getId(),
+                        voiceResult.transcript(),
+                        draftResult.preview(),
+                        voiceResult.confidenceScore(),
+                        (int) voiceResult.processingTimeMs()
+                );
             } else if (parsedInfo.requiresClarification()) {
                 // Mark as partial
                 voiceRequest.markAsPartial(parsedInfo.missingFields());
@@ -256,11 +242,11 @@ public class VoiceBookingService {
         log.info("Continuing voice booking request: {}", requestId);
 
         // Find original voice request
-        VoiceBookingRequest voiceRequest = voiceBookingRequestRepository.findById(requestId)
+        iuh.house_keeping_service_be.models.VoiceBookingRequest voiceRequest = voiceBookingRequestRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Voice booking request not found: " + requestId));
 
         // Validate status
-        if (!"PARTIAL".equals(voiceRequest.getStatus())) {
+        if (!"PARTIAL".equals(voiceRequest.getStatus()) && !"AWAITING_CONFIRMATION".equals(voiceRequest.getStatus())) {
             VoiceBookingResponse failedResponse = VoiceBookingResponse.failed(
                     requestId,
                     "Không thể tiếp tục yêu cầu này",
@@ -342,47 +328,24 @@ public class VoiceBookingService {
             
             // Check if now complete
             if (parsedInfo.isComplete()) {
-                log.info("Creating booking after continue for request: {}", requestId);
-                BookingCreationSummary bookingSummary = bookingService.createBooking(parsedInfo.bookingRequest());
-                
-                if (bookingSummary.getBookingId() != null) {
-                    Booking booking = new Booking();
-                    booking.setBookingId(bookingSummary.getBookingId());
-                    voiceRequest.markAsCompleted(booking);
-                    voiceBookingRequestRepository.save(voiceRequest);
-                    voiceBookingEventPublisher.emitCompleted(
-                            requestId,
-                            username,
-                            bookingSummary.getBookingId(),
-                            combinedTranscript,
-                            voiceRequest.getProcessingTimeMs()
-                    );
-                    
-                    return VoiceBookingResponse.completed(
-                            requestId,
-                            bookingSummary.getBookingId(),
-                            combinedTranscript,
-                            voiceRequest.getConfidenceScore() != null ? voiceRequest.getConfidenceScore().doubleValue() : null,
-                            voiceRequest.getProcessingTimeMs()
-                    );
-                } else {
-                    String errorMsg = "Booking creation failed after continue";
-                    voiceRequest.markAsFailed(errorMsg);
-                    voiceBookingRequestRepository.save(voiceRequest);
-                    voiceBookingEventPublisher.emitFailed(
-                            requestId,
-                            username,
-                            errorMsg,
-                            combinedTranscript,
-                            voiceRequest.getProcessingTimeMs()
-                    );
-                    
-                    return VoiceBookingResponse.failed(
-                            requestId,
-                            "Không thể tạo booking",
-                            errorMsg
-                    );
-                }
+                log.info("Parsed update successfully for request {}, refreshing preview", requestId);
+                VoiceBookingDraftResult draftResult = prepareDraft(customer, parsedInfo.bookingRequest());
+                voiceRequest.markAsAwaitingConfirmation(draftResult.bookingRequest(), draftResult.preview());
+                voiceRequest = voiceBookingRequestRepository.save(voiceRequest);
+                voiceBookingEventPublisher.emitAwaitingConfirmation(
+                        requestId,
+                        username,
+                        draftResult.preview(),
+                        voiceRequest.getProcessingTimeMs()
+                );
+
+                return VoiceBookingResponse.awaitingConfirmation(
+                        requestId,
+                        combinedTranscript,
+                        draftResult.preview(),
+                        voiceRequest.getConfidenceScore() != null ? voiceRequest.getConfidenceScore().doubleValue() : null,
+                        voiceRequest.getProcessingTimeMs()
+                );
             } else {
                 // Still missing information
                 voiceRequest.markAsPartial(parsedInfo.missingFields());
@@ -450,11 +413,142 @@ public class VoiceBookingService {
     }
 
     /**
-     * Get voice booking request by ID
+     * Persist the pending draft into an actual booking once the customer confirms.
      */
-    public VoiceBookingRequest getVoiceBookingRequest(String requestId) {
-        return voiceBookingRequestRepository.findById(requestId)
+    @Transactional
+    public VoiceBookingResponse confirmVoiceBooking(String requestId, String username) {
+        log.info("Confirming voice booking draft {}", requestId);
+
+        iuh.house_keeping_service_be.models.VoiceBookingRequest voiceRequest = voiceBookingRequestRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Voice booking request not found: " + requestId));
+
+        if (!"AWAITING_CONFIRMATION".equals(voiceRequest.getStatus())) {
+            throw new IllegalStateException("Voice booking request is not awaiting confirmation");
+        }
+
+        Customer customer = customerRepository.findByAccount_Username(username)
+                .orElseThrow(() -> new IllegalArgumentException("Customer not found: " + username));
+
+        if (!voiceRequest.getCustomer().getCustomerId().equals(customer.getCustomerId())) {
+            throw new IllegalArgumentException("Customer mismatch");
+        }
+
+        if (voiceRequest.getDraftBookingRequest() == null) {
+            throw new IllegalStateException("Draft booking request is missing");
+        }
+
+        try {
+            BookingCreationSummary bookingSummary = bookingService.createBooking(voiceRequest.getDraftBookingRequest());
+
+            if (bookingSummary.getBookingId() == null) {
+                throw new IllegalStateException("Booking creation failed");
+            }
+
+            Booking booking = new Booking();
+            booking.setBookingId(bookingSummary.getBookingId());
+            voiceRequest.markAsCompleted(booking);
+            voiceRequest = voiceBookingRequestRepository.save(voiceRequest);
+            voiceBookingEventPublisher.emitCompleted(
+                    requestId,
+                    username,
+                    bookingSummary.getBookingId(),
+                    voiceRequest.getTranscript(),
+                    voiceRequest.getProcessingTimeMs()
+            );
+
+            return VoiceBookingResponse.completed(
+                    requestId,
+                    bookingSummary.getBookingId(),
+                    voiceRequest.getTranscript(),
+                    voiceRequest.getConfidenceScore() != null ? voiceRequest.getConfidenceScore().doubleValue() : null,
+                    voiceRequest.getProcessingTimeMs()
+            );
+        } catch (iuh.house_keeping_service_be.exceptions.BookingValidationException e) {
+            log.error("Booking validation failed during confirmation {}: {}", requestId, e.getMessage());
+            voiceRequest.markAsFailed(e.getMessage());
+            voiceBookingRequestRepository.save(voiceRequest);
+            voiceBookingEventPublisher.emitFailed(
+                    requestId,
+                    username,
+                    e.getMessage(),
+                    voiceRequest.getTranscript(),
+                    voiceRequest.getProcessingTimeMs()
+            );
+
+            return VoiceBookingResponse.failed(
+                    requestId,
+                    "Không thể tạo booking: " + e.getMessage(),
+                    e.getMessage()
+            );
+        } catch (Exception e) {
+            log.error("Unexpected error confirming booking {}: {}", requestId, e.getMessage(), e);
+            voiceRequest.markAsFailed(e.getMessage());
+            voiceBookingRequestRepository.save(voiceRequest);
+            voiceBookingEventPublisher.emitFailed(
+                    requestId,
+                    username,
+                    e.getMessage(),
+                    voiceRequest.getTranscript(),
+                    voiceRequest.getProcessingTimeMs()
+            );
+
+            return VoiceBookingResponse.failed(
+                    requestId,
+                    "Đã xảy ra lỗi khi xác nhận đơn",
+                    e.getMessage()
+            );
+        }
+    }
+
+    /**
+     * Cancel a voice booking draft and remove temporary data.
+     */
+    @Transactional
+    public VoiceBookingResponse cancelVoiceBooking(String requestId, String username) {
+        log.info("Cancelling voice booking draft {}", requestId);
+
+        iuh.house_keeping_service_be.models.VoiceBookingRequest voiceRequest = voiceBookingRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Voice booking request not found: " + requestId));
+
+        if (!"AWAITING_CONFIRMATION".equals(voiceRequest.getStatus()) && !"PARTIAL".equals(voiceRequest.getStatus())) {
+            throw new IllegalStateException("Only draft or partial voice booking requests can be cancelled");
+        }
+
+        Customer customer = customerRepository.findByAccount_Username(username)
+                .orElseThrow(() -> new IllegalArgumentException("Customer not found: " + username));
+
+        if (!voiceRequest.getCustomer().getCustomerId().equals(customer.getCustomerId())) {
+            throw new IllegalArgumentException("Customer mismatch");
+        }
+
+        voiceRequest.markAsCancelled();
+        voiceBookingEventPublisher.emitCancelled(requestId, username);
+        voiceBookingRequestRepository.delete(voiceRequest);
+
+        return VoiceBookingResponse.cancelled(requestId);
+    }
+
+    /**
+     * Get voice booking request by ID ensuring ownership.
+     */
+    public iuh.house_keeping_service_be.models.VoiceBookingRequest getVoiceBookingRequest(
+            String requestId,
+            String username
+    ) {
+        iuh.house_keeping_service_be.models.VoiceBookingRequest voiceBookingRequest = voiceBookingRequestRepository
+                .findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Voice booking request not found: " + requestId));
+
+        String ownerUsername = voiceBookingRequest.getCustomer() != null
+                && voiceBookingRequest.getCustomer().getAccount() != null
+                ? voiceBookingRequest.getCustomer().getAccount().getUsername()
+                : null;
+
+        if (ownerUsername == null || !ownerUsername.equals(username)) {
+            throw new IllegalArgumentException("Voice booking request not found: " + requestId);
+        }
+
+        return voiceBookingRequest;
     }
 
     /**
@@ -467,12 +561,12 @@ public class VoiceBookingService {
     /**
      * Create initial voice booking request record
      */
-    private VoiceBookingRequest createInitialVoiceRequest(
+    private iuh.house_keeping_service_be.models.VoiceBookingRequest createInitialVoiceRequest(
             Customer customer,
             MultipartFile audioFile,
             Map<String, Object> hints
     ) {
-        VoiceBookingRequest voiceRequest = new VoiceBookingRequest();
+        iuh.house_keeping_service_be.models.VoiceBookingRequest voiceRequest = new iuh.house_keeping_service_be.models.VoiceBookingRequest();
         voiceRequest.setCustomer(customer);
         voiceRequest.setAudioFileName(audioFile.getOriginalFilename());
         voiceRequest.setAudioSizeBytes(audioFile.getSize());
@@ -485,11 +579,229 @@ public class VoiceBookingService {
         return voiceRequest;
     }
 
+    private VoiceBookingDraftResult prepareDraft(Customer customer, BookingCreateRequest bookingRequest) {
+        BookingValidationResult initialValidation = bookingService.validateBooking(bookingRequest);
+
+        if (!initialValidation.isValid()) {
+            throw iuh.house_keeping_service_be.exceptions.BookingValidationException.withErrors(
+                    initialValidation.getErrors() != null && !initialValidation.getErrors().isEmpty()
+                            ? initialValidation.getErrors()
+                            : List.of("Không thể dựng đơn từ thông tin hiện tại")
+            );
+        }
+
+        AutoAssignmentResult assignmentResult = ensureAssignments(customer, bookingRequest, initialValidation);
+        BookingValidationResult finalValidation = bookingService.validateBooking(assignmentResult.bookingRequest());
+
+        if (!finalValidation.isValid()) {
+            throw iuh.house_keeping_service_be.exceptions.BookingValidationException.withErrors(
+                    finalValidation.getErrors() != null && !finalValidation.getErrors().isEmpty()
+                            ? finalValidation.getErrors()
+                            : List.of("Thông tin booking không còn hợp lệ")
+            );
+        }
+
+        VoiceBookingPreview preview = buildPreview(
+                assignmentResult.bookingRequest(),
+                finalValidation,
+                assignmentResult.employeePreviews(),
+                assignmentResult.autoAssigned()
+        );
+
+        return new VoiceBookingDraftResult(assignmentResult.bookingRequest(), preview);
+    }
+
+    private AutoAssignmentResult ensureAssignments(
+            Customer customer,
+            BookingCreateRequest bookingRequest,
+            BookingValidationResult validationResult
+    ) {
+        List<AssignmentRequest> assignments = bookingRequest.assignments() != null
+                ? new ArrayList<>(bookingRequest.assignments())
+                : new ArrayList<>();
+
+        Map<String, SuitableEmployeeResponse> autoAssignedSources = new HashMap<>();
+        boolean autoAssigned = false;
+
+        if (assignments.isEmpty()) {
+            Address address = validationResult.getAddress();
+            if (address == null) {
+                throw new IllegalArgumentException("Không xác định được địa chỉ để chọn nhân viên");
+            }
+
+            List<AssignmentRequest> autoAssignments = new ArrayList<>();
+            for (BookingDetailRequest detail : bookingRequest.bookingDetails()) {
+                SuitableEmployeeRequest employeeRequest = new SuitableEmployeeRequest(
+                        detail.serviceId(),
+                        bookingRequest.bookingTime(),
+                        address.getWard(),
+                        address.getCity(),
+                        customer.getCustomerId(),
+                        null
+                );
+
+                ApiResponse<List<SuitableEmployeeResponse>> response = employeeScheduleService.findSuitableEmployees(employeeRequest);
+                if (response.success() && response.data() != null && !response.data().isEmpty()) {
+                    SuitableEmployeeResponse selected = response.data().get(0);
+                    autoAssignments.add(new AssignmentRequest(selected.employeeId(), detail.serviceId()));
+                    autoAssignedSources.put(selected.employeeId(), selected);
+                    log.info("Auto-assigned employee {} ({}) for service {}", selected.employeeId(), selected.fullName(), detail.serviceId());
+                } else {
+                    log.warn("No suitable employee found for service {} at {}", detail.serviceId(), bookingRequest.bookingTime());
+                }
+            }
+
+            if (!autoAssignments.isEmpty()) {
+                assignments = autoAssignments;
+                autoAssigned = true;
+            }
+        }
+
+        BookingCreateRequest normalizedRequest = updateAssignments(bookingRequest, assignments);
+        List<VoiceBookingEmployeePreview> employeePreviews = buildEmployeePreview(assignments, autoAssignedSources, autoAssigned);
+
+        return new AutoAssignmentResult(normalizedRequest, employeePreviews, autoAssigned);
+    }
+
+    private BookingCreateRequest updateAssignments(BookingCreateRequest original, List<AssignmentRequest> assignments) {
+        List<AssignmentRequest> normalizedAssignments = (assignments == null || assignments.isEmpty()) ? null : assignments;
+
+        return new BookingCreateRequest(
+                original.addressId(),
+                original.newAddress(),
+                original.bookingTime(),
+                original.note(),
+                original.title(),
+                original.imageUrls(),
+                original.promoCode(),
+                original.bookingDetails(),
+                normalizedAssignments,
+                original.paymentMethodId()
+        );
+    }
+
+    private List<VoiceBookingEmployeePreview> buildEmployeePreview(
+            List<AssignmentRequest> assignments,
+            Map<String, SuitableEmployeeResponse> autoAssignedSources,
+            boolean autoAssigned
+    ) {
+        if (assignments == null || assignments.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, List<Integer>> serviceIdsByEmployee = new LinkedHashMap<>();
+        assignments.stream()
+                .filter(assignment -> assignment.employeeId() != null)
+                .forEach(assignment -> serviceIdsByEmployee
+                        .computeIfAbsent(assignment.employeeId(), key -> new ArrayList<>())
+                        .add(assignment.serviceId()));
+
+        List<VoiceBookingEmployeePreview> previews = new ArrayList<>();
+
+        for (Map.Entry<String, List<Integer>> entry : serviceIdsByEmployee.entrySet()) {
+            String employeeId = entry.getKey();
+            List<Integer> serviceIds = entry.getValue();
+            SuitableEmployeeResponse autoSource = autoAssignedSources.get(employeeId);
+
+            if (autoSource != null) {
+                previews.add(new VoiceBookingEmployeePreview(
+                        employeeId,
+                        autoSource.fullName(),
+                        autoSource.avatar(),
+                        autoSource.rating(),
+                        autoSource.hasWorkedWithCustomer(),
+                        serviceIds,
+                        true
+                ));
+                continue;
+            }
+
+            employeeRepository.findById(employeeId).ifPresentOrElse(employee ->
+                            previews.add(new VoiceBookingEmployeePreview(
+                                    employeeId,
+                                    employee.getFullName(),
+                                    employee.getAvatar(),
+                                    employee.getRating() != null ? employee.getRating().name() : null,
+                                    null,
+                                    serviceIds,
+                                    autoAssigned
+                            )),
+                    () -> log.warn("Employee {} not found while building preview", employeeId)
+            );
+        }
+
+        return previews;
+    }
+
+    private VoiceBookingPreview buildPreview(
+            BookingCreateRequest bookingRequest,
+            BookingValidationResult validation,
+            List<VoiceBookingEmployeePreview> employees,
+            boolean autoAssignedEmployees
+    ) {
+        Address address = validation.getAddress();
+        List<ServiceValidationInfo> serviceValidations = validation.getServiceValidations() != null
+                ? validation.getServiceValidations()
+                : List.of();
+
+        List<VoiceBookingPreviewServiceItem> serviceItems = new ArrayList<>();
+        for (int i = 0; i < bookingRequest.bookingDetails().size(); i++) {
+            BookingDetailRequest detail = bookingRequest.bookingDetails().get(i);
+            ServiceValidationInfo serviceInfo = i < serviceValidations.size() ? serviceValidations.get(i) : null;
+
+            BigDecimal unitPrice = detail.expectedPricePerUnit();
+            BigDecimal subtotal = (serviceInfo != null && serviceInfo.getCalculatedPrice() != null)
+                    ? serviceInfo.getCalculatedPrice()
+                    : detail.expectedPrice();
+
+            serviceItems.add(new VoiceBookingPreviewServiceItem(
+                    detail.serviceId(),
+                    serviceInfo != null ? serviceInfo.getServiceName() : null,
+                    detail.quantity(),
+                    unitPrice,
+                    BookingDTOFormatter.formatPrice(unitPrice),
+                    subtotal,
+                    BookingDTOFormatter.formatPrice(subtotal),
+                    detail.selectedChoiceIds()
+            ));
+        }
+
+        BigDecimal totalAmount = validation.getCalculatedTotalAmount() != null
+                ? validation.getCalculatedTotalAmount()
+                : BigDecimal.ZERO;
+
+        return new VoiceBookingPreview(
+                bookingRequest.addressId(),
+                address != null ? address.getFullAddress() : null,
+                address != null ? address.getWard() : null,
+                address != null ? address.getCity() : null,
+                bookingRequest.bookingTime(),
+                bookingRequest.note(),
+                bookingRequest.promoCode(),
+                bookingRequest.paymentMethodId(),
+                totalAmount,
+                BookingDTOFormatter.formatPrice(totalAmount),
+                serviceItems,
+                employees,
+                autoAssignedEmployees
+        );
+    }
+
+    private record VoiceBookingDraftResult(BookingCreateRequest bookingRequest, VoiceBookingPreview preview) {
+    }
+
+    private record AutoAssignmentResult(
+            BookingCreateRequest bookingRequest,
+            List<VoiceBookingEmployeePreview> employeePreviews,
+            boolean autoAssigned
+    ) {
+    }
+
     /**
      * Update voice request with transcript results
      */
     private void updateVoiceRequestWithTranscript(
-            VoiceBookingRequest voiceRequest,
+            iuh.house_keeping_service_be.models.VoiceBookingRequest voiceRequest,
             VoiceToTextResult voiceResult
     ) {
         voiceRequest.setTranscript(voiceResult.transcript());

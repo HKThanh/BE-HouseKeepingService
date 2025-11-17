@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import iuh.house_keeping_service_be.config.JwtUtil;
 import iuh.house_keeping_service_be.dtos.VoiceBooking.VoiceBookingRequest;
 import iuh.house_keeping_service_be.dtos.VoiceBooking.VoiceBookingResponse;
+import iuh.house_keeping_service_be.dtos.VoiceBooking.request.VoiceBookingActionRequest;
 import iuh.house_keeping_service_be.services.VoiceBookingService.VoiceBookingService;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +42,7 @@ public class VoiceBookingController {
      * @return VoiceBookingResponse with processing result
      */
     @PostMapping(consumes = {"multipart/form-data"})
-    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_ADMIN')")
     public ResponseEntity<?> createVoiceBooking(
             @RequestPart(value = "audio", required = true) @NotNull MultipartFile audio,
             @RequestPart(value = "hints", required = false) String hints,
@@ -99,7 +101,9 @@ public class VoiceBookingController {
             );
 
             // Return appropriate status code based on result
-            if (response.success()) {
+            if ("AWAITING_CONFIRMATION".equals(response.status())) {
+                return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
+            } else if (response.success()) {
                 return ResponseEntity.ok(response);
             } else if ("PARTIAL".equals(response.status())) {
                 // Partial success - need clarification
@@ -137,7 +141,7 @@ public class VoiceBookingController {
      * @return Voice booking request details
      */
     @GetMapping("/{requestId}")
-    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_ADMIN')")
     public ResponseEntity<?> getVoiceBookingRequest(
             @PathVariable String requestId,
             @RequestHeader("Authorization") String authHeader
@@ -158,8 +162,8 @@ public class VoiceBookingController {
                 );
             }
 
-            // Get voice booking request
-            var voiceRequest = voiceBookingService.getVoiceBookingRequest(requestId);
+            // Get voice booking request ensuring ownership
+            var voiceRequest = voiceBookingService.getVoiceBookingRequest(requestId, username);
 
             // Check authorization (customer can only see their own requests)
             // TODO: Add proper authorization check
@@ -215,7 +219,7 @@ public class VoiceBookingController {
      * @return VoiceBookingResponse with updated result
      */
     @PostMapping(value = "/continue", consumes = {"multipart/form-data"})
-    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_ADMIN')")
     public ResponseEntity<?> continueVoiceBooking(
             @RequestPart(value = "requestId", required = true) String requestId,
             @RequestPart(value = "audio", required = false) MultipartFile audio,
@@ -282,7 +286,9 @@ public class VoiceBookingController {
             );
 
             // Return appropriate status code based on result
-            if (response.success()) {
+            if ("AWAITING_CONFIRMATION".equals(response.status())) {
+                return ResponseEntity.status(HttpStatus.ACCEPTED).body(response);
+            } else if (response.success()) {
                 return ResponseEntity.ok(response);
             } else if ("PARTIAL".equals(response.status())) {
                 return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT).body(response);
@@ -300,6 +306,95 @@ public class VoiceBookingController {
             );
         } catch (Exception e) {
             log.error("Error continuing voice booking: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    Map.of(
+                            "success", false,
+                            "message", "Internal server error: " + e.getMessage()
+                    )
+            );
+        }
+    }
+
+    /**
+     * Confirm a pending voice booking draft so it becomes a real booking
+     */
+    @PostMapping("/confirm")
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_ADMIN')")
+    public ResponseEntity<?> confirmVoiceBooking(
+            @RequestBody @Valid VoiceBookingActionRequest request,
+            @RequestHeader("Authorization") String authHeader
+    ) {
+        try {
+            String token = authHeader.substring(7);
+            String username = jwtUtil.extractUsername(token);
+
+            if (username == null || !jwtUtil.validateToken(token, username)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                        Map.of(
+                                "success", false,
+                                "message", "Invalid or expired token"
+                        )
+                );
+            }
+
+            VoiceBookingResponse response = voiceBookingService.confirmVoiceBooking(request.requestId(), username);
+            if (response.success()) {
+                return ResponseEntity.ok(response);
+            }
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            log.error("Invalid confirm request: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(
+                    Map.of(
+                            "success", false,
+                            "message", e.getMessage()
+                    )
+            );
+        } catch (Exception e) {
+            log.error("Error confirming voice booking: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
+                    Map.of(
+                            "success", false,
+                            "message", "Internal server error: " + e.getMessage()
+                    )
+            );
+        }
+    }
+
+    /**
+     * Cancel a pending voice booking draft
+     */
+    @PostMapping("/cancel")
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_ADMIN')")
+    public ResponseEntity<?> cancelVoiceBooking(
+            @RequestBody @Valid VoiceBookingActionRequest request,
+            @RequestHeader("Authorization") String authHeader
+    ) {
+        try {
+            String token = authHeader.substring(7);
+            String username = jwtUtil.extractUsername(token);
+
+            if (username == null || !jwtUtil.validateToken(token, username)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                        Map.of(
+                                "success", false,
+                                "message", "Invalid or expired token"
+                        )
+                );
+            }
+
+            VoiceBookingResponse response = voiceBookingService.cancelVoiceBooking(request.requestId(), username);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            log.error("Invalid cancel request: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(
+                    Map.of(
+                            "success", false,
+                            "message", e.getMessage()
+                    )
+            );
+        } catch (Exception e) {
+            log.error("Error cancelling voice booking: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                     Map.of(
                             "success", false,

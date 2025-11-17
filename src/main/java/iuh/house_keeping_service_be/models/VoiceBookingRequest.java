@@ -1,6 +1,8 @@
 package iuh.house_keeping_service_be.models;
 
 import com.vladmihalcea.hibernate.type.json.JsonBinaryType;
+import iuh.house_keeping_service_be.dtos.Booking.request.BookingCreateRequest;
+import iuh.house_keeping_service_be.dtos.VoiceBooking.VoiceBookingPreview;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -64,7 +66,7 @@ public class VoiceBookingRequest {
     private Booking booking;
 
     @Column(name = "status", nullable = false, length = 50)
-    private String status = "PENDING"; // PENDING, PROCESSING, COMPLETED, FAILED, PARTIAL
+    private String status = "PENDING"; // PENDING, PROCESSING, COMPLETED, FAILED, PARTIAL, AWAITING_CONFIRMATION, CANCELLED
 
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
@@ -72,6 +74,14 @@ public class VoiceBookingRequest {
     @Type(JsonBinaryType.class)
     @Column(name = "missing_fields", columnDefinition = "jsonb")
     private List<String> missingFields;
+
+    @Type(JsonBinaryType.class)
+    @Column(name = "draft_booking_request", columnDefinition = "jsonb")
+    private BookingCreateRequest draftBookingRequest;
+
+    @Type(JsonBinaryType.class)
+    @Column(name = "preview_payload", columnDefinition = "jsonb")
+    private VoiceBookingPreview previewPayload;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -103,15 +113,36 @@ public class VoiceBookingRequest {
         this.booking = booking;
         this.errorMessage = null;
         this.missingFields = null;
+        this.draftBookingRequest = null;
+        this.previewPayload = null;
     }
 
     public void markAsPartial(List<String> missingFields) {
         this.status = "PARTIAL";
         this.missingFields = missingFields;
+        this.draftBookingRequest = null;
+        this.previewPayload = null;
     }
 
     public void markAsFailed(String errorMessage) {
         this.status = "FAILED";
         this.errorMessage = errorMessage;
+        this.draftBookingRequest = null;
+        this.previewPayload = null;
+    }
+
+    public void markAsAwaitingConfirmation(BookingCreateRequest bookingRequest, VoiceBookingPreview preview) {
+        this.status = "AWAITING_CONFIRMATION";
+        this.draftBookingRequest = bookingRequest;
+        this.previewPayload = preview;
+        this.errorMessage = null;
+        this.missingFields = null;
+    }
+
+    public void markAsCancelled() {
+        this.status = "CANCELLED";
+        this.draftBookingRequest = null;
+        this.previewPayload = null;
+        this.missingFields = null;
     }
 }

@@ -6,7 +6,9 @@ package iuh.house_keeping_service_be.dtos.VoiceBooking;
 public enum VoiceBookingEventType {
     RECEIVED,
     TRANSCRIBING,
+    AWAITING_CONFIRMATION,
     PARTIAL,
+    CANCELLED,
     COMPLETED,
     FAILED
 }
