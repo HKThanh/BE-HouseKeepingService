@@ -365,7 +365,12 @@ public class BookingServiceImpl implements BookingService {
         LocalDateTime now = LocalDateTime.now();
 
         // Check if booking time is in the future
-        if (bookingTime.isBefore(now.plusHours(2))) {
+        // Skip the "2 hours from now" check for recurring bookings (bookings scheduled more than 1 day ahead)
+        // This allows recurring bookings to be generated for future dates
+        if (bookingTime.isBefore(now)) {
+            errors.add("Booking time cannot be in the past");
+        } else if (bookingTime.isBefore(now.plusDays(1)) && bookingTime.isBefore(now.plusHours(2))) {
+            // Only apply the 2-hour rule for bookings within the next 24 hours (manual bookings)
             errors.add("Booking time must be at least 2 hours from now");
         }
 
