@@ -58,6 +58,10 @@ public class Booking {
     @JoinColumn(name = "promotion_id")
     private Promotion promotion;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "recurring_booking_id")
+    private RecurringBooking recurringBooking;
+
     @Column(name = "title", length = 255)
     private String title;
 

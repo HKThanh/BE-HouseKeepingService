@@ -16,6 +16,12 @@ import java.util.Optional;
 @Repository
 public interface BookingRepository extends JpaRepository<Booking, String> {
 
+    // Check if booking exists for recurring booking at specific time
+    boolean existsByRecurringBooking_RecurringBookingIdAndBookingTime(
+            String recurringBookingId, 
+            LocalDateTime bookingTime
+    );
+
 //     Optional<Booking> findByBookingCode(String bookingCode);
 
 //     @Query("SELECT b FROM Booking b WHERE b.customer.customerId = :customerId ORDER BY b.createdAt DESC")
@@ -323,4 +329,7 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
     List<Booking> findByStatusInAndBookingTimeBetween(@Param("statuses") List<BookingStatus> statuses,
                                                        @Param("startTime") LocalDateTime startTime,
                                                        @Param("endTime") LocalDateTime endTime);
+    
+    // Count bookings by recurring booking ID
+    long countByRecurringBooking_RecurringBookingId(String recurringBookingId);
 }
