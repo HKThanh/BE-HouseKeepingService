@@ -918,6 +918,46 @@ public class BookingServiceImpl implements BookingService {
                 });
     }
 
+    private void notifyEmployeesBookingCancelled(List<Assignment> assignments, Booking booking, String reason) {
+        if (assignments == null || assignments.isEmpty() || booking == null) {
+            return;
+        }
+
+        String bookingIdentifier = booking.getBookingCode() != null
+                ? booking.getBookingCode()
+                : booking.getBookingId();
+        String normalizedReason = normalizeReason(reason, "Khách hàng không cung cấp lý do");
+
+        Map<String, Assignment> assignmentByAccount = new HashMap<>();
+        assignments.stream()
+                .filter(Objects::nonNull)
+                .forEach(assignment -> {
+                    Employee employee = assignment.getEmployee();
+                    if (employee == null || employee.getAccount() == null) {
+                        log.warn("Skip cancellation notification for assignment {} because employee/account is missing",
+                                assignment.getAssignmentId());
+                        return;
+                    }
+
+                    String accountId = employee.getAccount().getAccountId();
+                    assignmentByAccount.putIfAbsent(accountId, assignment);
+                });
+
+        assignmentByAccount.forEach((accountId, assignment) -> {
+            try {
+                notificationService.sendAssignmentCancelledNotificationForEmployee(
+                        accountId,
+                        assignment.getAssignmentId(),
+                        bookingIdentifier,
+                        normalizedReason
+                );
+            } catch (Exception ex) {
+                log.error("Failed to send cancellation notification for assignment {}: {}",
+                        assignment.getAssignmentId(), ex.getMessage(), ex);
+            }
+        });
+    }
+
     private void notifyCustomerBookingCreated(Booking booking) {
         resolveCustomerAccountId(booking).ifPresent(accountId ->
                 notificationService.sendBookingCreatedNotification(
@@ -1189,8 +1229,7 @@ public class BookingServiceImpl implements BookingService {
                 log.info("Booking {} has been approved by admin", bookingId);
             }
 
-            // TODO: Send notification to customer about approval
-
+            // Notification to customer is handled via notifyBookingVerificationResult(...)
         } else {
             // Reject the booking post
             log.info("Booking {} has been rejected by admin. Reason: {}",
@@ -1203,7 +1242,7 @@ public class BookingServiceImpl implements BookingService {
 
             booking.setIsVerified(true);
 
-            // TODO: Send notification to customer about rejection with reason
+            // Notification to customer (with rejection reason) handled via notifyBookingVerificationResult(...)
             // For now, we'll just cancel the booking
             booking.setStatus(BookingStatus.CANCELLED);
         }
@@ -1271,6 +1310,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         // 6. Cancel all assignments related to this booking
+        List<Assignment> cancelledAssignments = new ArrayList<>();
         List<BookingDetail> bookingDetails = booking.getBookingDetails();
         if (bookingDetails != null && !bookingDetails.isEmpty()) {
             for (BookingDetail detail : bookingDetails) {
@@ -1280,10 +1320,15 @@ public class BookingServiceImpl implements BookingService {
                         if (assignment.getStatus() != AssignmentStatus.CANCELLED &&
                                 assignment.getStatus() != AssignmentStatus.COMPLETED) {
                             assignment.setStatus(AssignmentStatus.CANCELLED);
-                            assignmentRepository.save(assignment);
+                            Assignment savedAssignment = assignmentRepository.save(assignment);
+                            cancelledAssignments.add(savedAssignment);
+
+                            String employeeId = savedAssignment.getEmployee() != null
+                                    ? savedAssignment.getEmployee().getEmployeeId()
+                                    : "unknown";
                             log.info("Cancelled assignment {} for employee {}",
-                                    assignment.getAssignmentId(),
-                                    assignment.getEmployee().getEmployeeId());
+                                    savedAssignment.getAssignmentId(),
+                                    employeeId);
                         }
                     }
                 }
@@ -1313,9 +1358,8 @@ public class BookingServiceImpl implements BookingService {
 
         log.info("Booking {} cancelled successfully by customer {}", bookingId, customerId);
         notifyCustomerBookingCancelled(savedBooking, reason);
+        notifyEmployeesBookingCancelled(cancelledAssignments, savedBooking, reason);
 
-        // TODO: Send notification to assigned employees about cancellation
-        // TODO: Send notification to customer about cancellation confirmation
         // TODO: Process actual refund through payment gateway
 
         return bookingMapper.toBookingResponse(savedBooking);

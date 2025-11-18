@@ -73,8 +73,8 @@ public class VNPayServiceImpl implements VNPayService {
             }
             
             vnpParams.put("vnp_TxnRef", vnpTxnRef);
-            vnpParams.put("vnp_OrderInfo", request.getOrderInfo() != null ? 
-                    request.getOrderInfo() : "Thanh toan don hang " + request.getBookingId());
+            // Always send pure booking_id to make reconciliation deterministic regardless of client payload
+            vnpParams.put("vnp_OrderInfo", booking.getBookingId());
             vnpParams.put("vnp_OrderType", request.getOrderType() != null ? 
                     request.getOrderType() : vnPayConfig.getOrderType());
             

@@ -267,7 +267,38 @@ public class NotificationServiceImpl implements NotificationService {
         
         createNotification(request);
     }
-    
+
+    @Override
+    @Transactional
+    public void sendAssignmentCancelledNotificationForEmployee(
+            String accountId,
+            String assignmentId,
+            String bookingCode,
+            String reason
+    ) {
+        String normalizedReason = (reason != null && !reason.trim().isEmpty())
+                ? reason.trim()
+                : "Khách hàng không cung cấp lý do";
+
+        String bookingIdentifier = (bookingCode != null && !bookingCode.isBlank())
+                ? bookingCode
+                : "của bạn";
+
+        NotificationRequest request = new NotificationRequest(
+                accountId,
+                "EMPLOYEE", // Notify employee assigned to this booking
+                Notification.NotificationType.ASSIGNMENT_CANCELLED,
+                "Công việc đã bị hủy",
+                String.format("Booking %s đã bị khách hàng hủy. Lý do: %s", bookingIdentifier, normalizedReason),
+                assignmentId,
+                Notification.RelatedEntityType.ASSIGNMENT,
+                Notification.NotificationPriority.HIGH,
+                "/assignments/" + assignmentId
+        );
+
+        createNotification(request);
+    }
+
     @Override
     @Transactional
     public void sendPaymentSuccessNotification(String accountId, String paymentId, double amount) {

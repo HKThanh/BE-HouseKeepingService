@@ -84,7 +84,17 @@ public interface NotificationService {
      * Send assignment cancelled notification (crisis)
      */
     void sendAssignmentCancelledNotification(String accountId, String bookingId, String bookingCode, String reason);
-    
+
+    /**
+     * Notify assigned employee when their assignment is cancelled
+     */
+    void sendAssignmentCancelledNotificationForEmployee(
+            String accountId,
+            String assignmentId,
+            String bookingCode,
+            String reason
+    );
+
     /**
      * Send payment success notification
      */
