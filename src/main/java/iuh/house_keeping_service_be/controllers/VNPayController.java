@@ -1,5 +1,6 @@
 package iuh.house_keeping_service_be.controllers;
 
+import iuh.house_keeping_service_be.config.VNPayConfig;
 import iuh.house_keeping_service_be.dtos.payment.VNPayCallbackResponse;
 import iuh.house_keeping_service_be.dtos.payment.VNPayPaymentRequest;
 import iuh.house_keeping_service_be.dtos.payment.VNPayPaymentResponse;
@@ -11,8 +12,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -23,6 +32,7 @@ import java.util.Map;
 public class VNPayController {
 
     private final VNPayService vnPayService;
+    private final VNPayConfig vnPayConfig;
 
     /**
      * Create VNPay payment URL
@@ -137,6 +147,26 @@ public class VNPayController {
     }
 
     /**
+     * Callback endpoint that redirects users (web/mobile) back to their app
+     * Endpoint: GET /api/v1/payment/vnpay/callback/redirect?client=web|mobile
+     */
+    @GetMapping("/callback/redirect")
+    public ResponseEntity<?> handleCallbackWithRedirect(
+            @RequestParam Map<String, String> params,
+            @RequestParam(name = "client", defaultValue = "web") String client) {
+        try {
+            log.info("Received VNPay redirect callback for client {} with params {}", client, params.keySet());
+            VNPayCallbackResponse response = vnPayService.handlePaymentCallback(params);
+            URI redirectUri = buildClientRedirectUri(client, response);
+            return ResponseEntity.status(HttpStatus.FOUND).location(redirectUri).build();
+        } catch (Exception e) {
+            log.error("Error handling VNPay redirect callback: {}", e.getMessage(), e);
+            URI fallback = URI.create(resolveRedirectBase(client));
+            return ResponseEntity.status(HttpStatus.FOUND).location(fallback).build();
+        }
+    }
+
+    /**
      * Get payment status
      * Endpoint: GET /api/v1/payment/vnpay/status/{bookingId}
      */
@@ -160,5 +190,45 @@ public class VNPayController {
                     "message", "Lỗi khi lấy trạng thái thanh toán: " + e.getMessage()
             ));
         }
+    }
+
+    private URI buildClientRedirectUri(String client, VNPayCallbackResponse response) {
+        String base = resolveRedirectBase(client);
+        boolean success = response != null && "00".equals(response.getResponseCode());
+
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(base)
+                .queryParam("status", success ? "success" : "failed");
+
+        if (response != null) {
+            addQueryParam(builder, "responseCode", response.getResponseCode());
+            addQueryParam(builder, "orderInfo", response.getOrderInfo());
+            addQueryParam(builder, "transactionNo", response.getTransactionNo());
+            addQueryParam(builder, "amount", response.getAmount());
+            addQueryParam(builder, "bankCode", response.getBankCode());
+            addQueryParam(builder, "cardType", response.getCardType());
+        }
+
+        return builder.build()
+                .encode()
+                .toUri();
+    }
+
+    private void addQueryParam(UriComponentsBuilder builder, String key, Object value) {
+        if (value != null) {
+            builder.queryParam(key, value);
+        }
+    }
+
+    private String resolveRedirectBase(String client) {
+        String base;
+        if ("mobile".equalsIgnoreCase(client) || "app".equalsIgnoreCase(client)) {
+            base = vnPayConfig.getMobileRedirectUrl();
+        } else {
+            base = vnPayConfig.getFrontendRedirectUrl();
+        }
+        if (base == null || base.isBlank()) {
+            base = "/";
+        }
+        return base;
     }
 }

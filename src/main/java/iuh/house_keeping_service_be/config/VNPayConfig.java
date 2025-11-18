@@ -50,4 +50,14 @@ public class VNPayConfig {
      * Order type
      */
     private String orderType = "other";
+
+    /**
+     * Frontend (web) URL to redirect user after payment
+     */
+    private String frontendRedirectUrl;
+
+    /**
+     * Mobile deep link / URL to redirect user after payment
+     */
+    private String mobileRedirectUrl;
 }

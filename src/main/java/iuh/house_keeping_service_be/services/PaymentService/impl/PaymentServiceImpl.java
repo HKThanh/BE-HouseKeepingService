@@ -4,13 +4,16 @@ import iuh.house_keeping_service_be.dtos.payment.CreatePaymentRequest;
 import iuh.house_keeping_service_be.dtos.payment.PaymentMethodResponse;
 import iuh.house_keeping_service_be.dtos.payment.PaymentResponse;
 import iuh.house_keeping_service_be.dtos.payment.UpdatePaymentStatusRequest;
+import iuh.house_keeping_service_be.models.Account;
 import iuh.house_keeping_service_be.models.Booking;
+import iuh.house_keeping_service_be.models.Customer;
 import iuh.house_keeping_service_be.models.Payment;
 import iuh.house_keeping_service_be.models.PaymentMethod;
 import iuh.house_keeping_service_be.enums.PaymentStatus;
 import iuh.house_keeping_service_be.repositories.BookingRepository;
 import iuh.house_keeping_service_be.repositories.PaymentMethodRepository;
 import iuh.house_keeping_service_be.repositories.PaymentRepository;
+import iuh.house_keeping_service_be.services.NotificationService.NotificationService;
 import iuh.house_keeping_service_be.services.PaymentService.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -22,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -32,6 +36,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository paymentRepository;
     private final BookingRepository bookingRepository;
     private final PaymentMethodRepository paymentMethodRepository;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -63,12 +68,18 @@ public class PaymentServiceImpl implements PaymentService {
         Payment payment = paymentRepository.findByTransactionCode(request.getTransactionCode())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy giao dịch với mã: " + request.getTransactionCode()));
 
-        payment.setPaymentStatus(request.getStatus());
-        if (request.getStatus() == PaymentStatus.PAID) {
+        PaymentStatus previousStatus = payment.getPaymentStatus();
+        PaymentStatus newStatus = request.getStatus();
+
+        payment.setPaymentStatus(newStatus);
+        if (newStatus == PaymentStatus.PAID) {
             payment.setPaidAt(LocalDateTime.now());
         }
 
-        paymentRepository.save(payment);
+        Payment savedPayment = paymentRepository.save(payment);
+        if (newStatus == PaymentStatus.PAID && previousStatus != PaymentStatus.PAID) {
+            dispatchPaymentSuccessNotification(savedPayment);
+        }
     }
 
     @Override
@@ -155,5 +166,31 @@ public class PaymentServiceImpl implements PaymentService {
         }
 
         return pageable;
+    }
+
+    private void dispatchPaymentSuccessNotification(Payment payment) {
+        if (payment == null) {
+            return;
+        }
+
+        Booking booking = payment.getBooking();
+        if (booking == null) {
+            return;
+        }
+
+        Optional<String> accountId = Optional.ofNullable(booking.getCustomer())
+                .map(Customer::getAccount)
+                .map(Account::getAccountId);
+
+        if (accountId.isEmpty()) {
+            return;
+        }
+
+        double amount = payment.getAmount() != null ? payment.getAmount().doubleValue() : 0D;
+        notificationService.sendPaymentSuccessNotification(
+                accountId.get(),
+                payment.getId(),
+                amount
+        );
     }
 }
