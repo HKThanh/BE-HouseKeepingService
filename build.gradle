@@ -44,6 +44,11 @@ dependencies {
     implementation 'com.google.zxing:core:3.5.3'
     // https://mvnrepository.com/artifact/com.google.zxing/javase (QR Code decoder for Java SE)
     implementation 'com.google.zxing:javase:3.5.3'
+    // OpenAI API for Whisper voice-to-text
+    implementation 'com.theokanning.openai-gpt3-java:service:0.18.2'
+    // Audio processing library
+    implementation 'com.googlecode.soundlibs:jlayer:1.0.1.4'
+    implementation 'com.googlecode.soundlibs:mp3spi:1.9.5.4'
     // https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt-impl
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
     // https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt-jackson

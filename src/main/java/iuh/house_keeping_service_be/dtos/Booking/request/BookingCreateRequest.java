@@ -1,10 +1,12 @@
 package iuh.house_keeping_service_be.dtos.Booking.request;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record BookingCreateRequest(
         String addressId,
 

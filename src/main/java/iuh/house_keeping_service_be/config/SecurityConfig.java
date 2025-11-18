@@ -54,6 +54,7 @@ public class SecurityConfig {
                                 "/api/v1/addresses/**",
                                 "/api/v1/payment/vnpay/callback",
                                 "/api/v1/payment/vnpay/ipn",
+                                "/api/v1/customer/bookings/voice/status",
                                 "/ws/**").permitAll()
                         .requestMatchers("/api/v1/auth/register").hasAnyRole("EMPLOYEE", "CUSTOMER")
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")

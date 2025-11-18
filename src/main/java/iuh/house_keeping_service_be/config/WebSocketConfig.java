@@ -1,7 +1,12 @@
 package iuh.house_keeping_service_be.config;
 
+import iuh.house_keeping_service_be.websocket.voice.VoiceBookingChannelInterceptor;
+import iuh.house_keeping_service_be.websocket.voice.VoiceBookingHandshakeHandler;
+import iuh.house_keeping_service_be.websocket.voice.VoiceBookingHandshakeInterceptor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
@@ -13,6 +18,20 @@ import org.springframework.web.socket.config.annotation.WebSocketTransportRegist
 @Configuration
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+
+    private final VoiceBookingHandshakeInterceptor voiceBookingHandshakeInterceptor;
+    private final VoiceBookingHandshakeHandler voiceBookingHandshakeHandler;
+    private final VoiceBookingChannelInterceptor voiceBookingChannelInterceptor;
+
+    public WebSocketConfig(
+            VoiceBookingHandshakeInterceptor voiceBookingHandshakeInterceptor,
+            VoiceBookingHandshakeHandler voiceBookingHandshakeHandler,
+            @Lazy VoiceBookingChannelInterceptor voiceBookingChannelInterceptor
+    ) {
+        this.voiceBookingHandshakeInterceptor = voiceBookingHandshakeInterceptor;
+        this.voiceBookingHandshakeHandler = voiceBookingHandshakeHandler;
+        this.voiceBookingChannelInterceptor = voiceBookingChannelInterceptor;
+    }
 
     /**
      * TaskScheduler for WebSocket heartbeat
@@ -55,6 +74,15 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 .setAllowedOriginPatterns("*")
                 .withSockJS()
                 .setHeartbeatTime(25000); // 25s SockJS heartbeat
+
+        // Register WebSocket endpoint for voice booking real-time updates
+        registry.addEndpoint("/ws/voice-booking")
+                .addInterceptors(voiceBookingHandshakeInterceptor)
+                .setHandshakeHandler(voiceBookingHandshakeHandler)
+                .setAllowedOriginPatterns("*")
+                .withSockJS()
+                .setHeartbeatTime(25000)
+                .setInterceptors(voiceBookingHandshakeInterceptor);
     }
 
     @Override
@@ -65,5 +93,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                 .setSendBufferSizeLimit(512 * 1024)     // 512 KB send buffer
                 .setSendTimeLimit(20 * 1000)            // 20s send timeout
                 .setTimeToFirstMessage(30 * 1000);      // 30s time to first message
+    }
+
+    @Override
+    public void configureClientInboundChannel(ChannelRegistration registration) {
+        registration.interceptors(voiceBookingChannelInterceptor);
     }
 }
