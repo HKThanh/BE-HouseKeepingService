@@ -210,7 +210,7 @@ Backend xử lý signature giống bước 4.1, sau đó trả **302** về URL 
 **HTTP Response (thành công)**:
 ```
 HTTP/1.1 302 Found
-Location: https://fe.app/payment/vnpay-result?status=success&transactionNo=14012678&amount=500000&responseCode=00&orderInfo=...
+Location: http://localhost:5173/payment/vnpay-result?status=success&responseCode=00&orderInfo=1e499f26-7fa1-4c11-9c62-34da0b1f9305&transactionNo=15269077&amount=50000&bankCode=NCB&cardType=ATM
 ```
 
 **HTTP Response (thất bại hoặc lỗi)**:
