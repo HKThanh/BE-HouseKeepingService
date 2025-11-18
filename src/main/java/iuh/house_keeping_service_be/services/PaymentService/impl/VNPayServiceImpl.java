@@ -28,6 +28,9 @@ import java.util.*;
 @Slf4j
 public class VNPayServiceImpl implements VNPayService {
 
+    private static final int VNP_TXN_REF_MAX_LENGTH = 20;
+    private static final DateTimeFormatter TXN_REF_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyMMddHHmmss");
+
     private final VNPayConfig vnPayConfig;
     private final PaymentRepository paymentRepository;
     private final BookingRepository bookingRepository;
@@ -49,8 +52,10 @@ public class VNPayServiceImpl implements VNPayService {
                         return paymentRepository.save(newPayment);
                     });
 
-            // Generate transaction reference
-            String vnpTxnRef = payment.getId() + "_" + System.currentTimeMillis();
+            // Generate transaction reference that satisfies VNPay constraints
+            String vnpTxnRef = generateTransactionReference(payment.getId());
+            payment.setTransactionCode(vnpTxnRef);
+            paymentRepository.save(payment);
             
             // Amount must be in VND (smallest unit - no decimals)
             long amount = request.getAmount() * 100; // Convert to VNPay format
@@ -96,6 +101,9 @@ public class VNPayServiceImpl implements VNPayService {
             String paymentUrl = vnPayConfig.getPayUrl() + "?" + queryUrl;
 
             log.info("VNPay payment URL created for booking: {}, txnRef: {}", request.getBookingId(), vnpTxnRef);
+            log.debug("VNPay params: {}", vnpParams);
+            log.debug("VNPay queryUrl before hash: {}", queryUrl.split("&vnp_SecureHash=")[0]);
+            log.debug("VNPay full URL: {}", paymentUrl);
 
             return new VNPayPaymentResponse("00", "success", paymentUrl);
 
@@ -115,7 +123,9 @@ public class VNPayServiceImpl implements VNPayService {
                 return new VNPayCallbackResponse("97", null, null, null, null, null, "97", null);
             }
 
+            // VNPay returns vnp_TransactionStatus in callback, not vnp_ResponseCode
             String vnpResponseCode = params.get("vnp_ResponseCode");
+            String vnpTransactionStatus = params.get("vnp_TransactionStatus");
             String vnpTransactionNo = params.get("vnp_TransactionNo");
             String vnpBankCode = params.get("vnp_BankCode");
             String vnpCardType = params.get("vnp_CardType");
@@ -124,21 +134,20 @@ public class VNPayServiceImpl implements VNPayService {
             String vnpTxnRef = params.get("vnp_TxnRef");
             String vnpAmountStr = params.get("vnp_Amount");
 
+            // Use TransactionStatus if ResponseCode is not available
+            String statusCode = vnpResponseCode != null ? vnpResponseCode : vnpTransactionStatus;
+
             Long vnpAmount = null;
             if (vnpAmountStr != null) {
                 vnpAmount = Long.parseLong(vnpAmountStr) / 100; // Convert back from VNPay format
             }
 
-            // Extract payment ID from transaction reference
-            String paymentId = vnpTxnRef.split("_")[0];
-            
-            Payment payment = paymentRepository.findById(paymentId)
-                    .orElseThrow(() -> new IllegalArgumentException("Payment not found: " + paymentId));
+            Payment payment = paymentRepository.findByTransactionCode(vnpTxnRef)
+                    .orElseThrow(() -> new IllegalArgumentException("Payment not found for transaction reference: " + vnpTxnRef));
 
             // Update payment status based on response code
-            if ("00".equals(vnpResponseCode)) {
+            if ("00".equals(statusCode)) {
                 payment.setPaymentStatus(PaymentStatus.PAID);
-                payment.setTransactionCode(vnpTransactionNo);
                 
                 // Parse payment date
                 if (vnpPayDate != null && !vnpPayDate.isEmpty()) {
@@ -152,20 +161,20 @@ public class VNPayServiceImpl implements VNPayService {
                         payment.getBooking().getBookingId(), vnpTransactionNo);
             } else {
                 payment.setPaymentStatus(PaymentStatus.FAILED);
-                log.warn("Payment failed for booking: {}, responseCode: {}", 
-                        payment.getBooking().getBookingId(), vnpResponseCode);
+                log.warn("Payment failed for booking: {}, statusCode: {}", 
+                        payment.getBooking().getBookingId(), statusCode);
             }
 
             paymentRepository.save(payment);
 
             return new VNPayCallbackResponse(
-                    vnpResponseCode,
+                    statusCode,
                     vnpTransactionNo,
                     vnpBankCode,
                     vnpCardType,
                     vnpOrderInfo,
                     vnpPayDate,
-                    "00".equals(vnpResponseCode) ? "00" : "01",
+                    "00".equals(statusCode) ? "00" : "01",
                     vnpAmount
             );
 
@@ -211,5 +220,27 @@ public class VNPayServiceImpl implements VNPayService {
             log.error("Error validating VNPay signature: {}", e.getMessage());
             return false;
         }
+    }
+
+    private String generateTransactionReference(String paymentId) {
+        for (int attempt = 0; attempt < 5; attempt++) {
+            String candidate = buildTransactionReferenceCandidate(paymentId);
+            if (!paymentRepository.existsByTransactionCode(candidate)) {
+                return candidate;
+            }
+        }
+        return buildTransactionReferenceCandidate(UUID.randomUUID().toString());
+    }
+
+    private String buildTransactionReferenceCandidate(String seed) {
+        String sanitized = seed == null ? "" : seed.replaceAll("[^A-Za-z0-9]", "").toUpperCase();
+        if (sanitized.isEmpty()) {
+            sanitized = VNPayUtil.getRandomNumber(8);
+        }
+        String raw = sanitized + TXN_REF_TIME_FORMATTER.format(LocalDateTime.now()) + VNPayUtil.getRandomNumber(6);
+        if (raw.length() > VNP_TXN_REF_MAX_LENGTH) {
+            return raw.substring(raw.length() - VNP_TXN_REF_MAX_LENGTH);
+        }
+        return raw;
     }
 }
