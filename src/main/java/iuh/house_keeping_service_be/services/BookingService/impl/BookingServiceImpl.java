@@ -15,6 +15,7 @@ import iuh.house_keeping_service_be.models.*;
 import iuh.house_keeping_service_be.repositories.*;
 import iuh.house_keeping_service_be.services.BookingService.BookingService;
 import iuh.house_keeping_service_be.services.EmployeeScheduleService.EmployeeScheduleService;
+import iuh.house_keeping_service_be.services.NotificationService.NotificationService;
 import iuh.house_keeping_service_be.services.ServiceService.ServiceService;
 import iuh.house_keeping_service_be.utils.BookingDTOFormatter;
 
@@ -57,6 +58,7 @@ public class BookingServiceImpl implements BookingService {
     private final ServiceService serviceService;
     private final BookingMapper bookingMapper;
     private final EmployeeScheduleService employeeScheduleService;
+    private final NotificationService notificationService;
 
     @Override
     @Transactional
@@ -215,6 +217,11 @@ public class BookingServiceImpl implements BookingService {
             Payment savedPayment = paymentRepository.save(payment);
 
             log.info("Booking created successfully with ID: {}", savedBooking.getBookingId());
+            notifyCustomerBookingCreated(savedBooking);
+
+            if (hasAssignments && !savedAssignments.isEmpty()) {
+                notifyAssignedEmployees(savedAssignments, savedBooking);
+            }
 
             // Step 8: Return creation summary with auto-assignment info
             boolean hasAutoAssignedEmployees = !selectedEmployees.isEmpty();
@@ -880,6 +887,77 @@ public class BookingServiceImpl implements BookingService {
         return summary;
     }
 
+    private void notifyAssignedEmployees(List<Assignment> assignments, Booking booking) {
+        if (assignments == null || assignments.isEmpty() || booking == null) {
+            return;
+        }
+
+        String bookingCode = booking.getBookingCode();
+        String fallbackBookingIdentifier = booking.getBookingId();
+
+        assignments.stream()
+                .filter(Objects::nonNull)
+                .forEach(assignment -> {
+                    try {
+                        Employee employee = assignment.getEmployee();
+                        if (employee == null || employee.getAccount() == null) {
+                            log.warn("Skip notification for assignment {} because employee/account is missing",
+                                    assignment.getAssignmentId());
+                            return;
+                        }
+
+                        notificationService.sendAssignmentCreatedNotification(
+                                employee.getAccount().getAccountId(),
+                                assignment.getAssignmentId(),
+                                bookingCode != null ? bookingCode : fallbackBookingIdentifier
+                        );
+                    } catch (Exception ex) {
+                        log.error("Failed to send assignment notification for assignment {}: {}",
+                                assignment.getAssignmentId(), ex.getMessage(), ex);
+                    }
+                });
+    }
+
+    private void notifyCustomerBookingCreated(Booking booking) {
+        resolveCustomerAccountId(booking).ifPresent(accountId ->
+                notificationService.sendBookingCreatedNotification(
+                        accountId,
+                        booking.getBookingId(),
+                        booking.getBookingCode()
+                ));
+    }
+
+    private void notifyCustomerBookingCancelled(Booking booking, String reason) {
+        resolveCustomerAccountId(booking).ifPresent(accountId ->
+                notificationService.sendBookingCancelledNotification(
+                        accountId,
+                        booking.getBookingId(),
+                        booking.getBookingCode(),
+                        normalizeReason(reason, "Khách hàng không cung cấp lý do")
+                ));
+    }
+
+    private void notifyBookingVerificationResult(Booking booking, boolean approved) {
+        resolveCustomerAccountId(booking).ifPresent(accountId ->
+                notificationService.sendBookingVerifiedNotification(
+                        accountId,
+                        booking.getBookingId(),
+                        booking.getBookingCode(),
+                        approved
+                ));
+    }
+
+    private Optional<String> resolveCustomerAccountId(Booking booking) {
+        if (booking == null || booking.getCustomer() == null || booking.getCustomer().getAccount() == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(booking.getCustomer().getAccount().getAccountId());
+    }
+
+    private String normalizeReason(String reason, String fallback) {
+        return (reason != null && !reason.trim().isEmpty()) ? reason.trim() : fallback;
+    }
+
     private record CustomerAddressContext(Customer customer, Address address, boolean isNewAddress) {
     }
 
@@ -1131,7 +1209,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         Booking savedBooking = bookingRepository.save(booking);
-
+        notifyBookingVerificationResult(savedBooking, request.approve());
         return bookingMapper.toBookingResponse(savedBooking);
     }
 
@@ -1234,6 +1312,7 @@ public class BookingServiceImpl implements BookingService {
         Booking savedBooking = bookingRepository.save(booking);
 
         log.info("Booking {} cancelled successfully by customer {}", bookingId, customerId);
+        notifyCustomerBookingCancelled(savedBooking, reason);
 
         // TODO: Send notification to assigned employees about cancellation
         // TODO: Send notification to customer about cancellation confirmation

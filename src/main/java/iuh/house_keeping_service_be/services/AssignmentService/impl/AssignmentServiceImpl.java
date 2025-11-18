@@ -501,21 +501,23 @@ public class AssignmentServiceImpl implements AssignmentService {
 
     private void sendCrisisNotification(Booking booking, Assignment assignment, String reason) {
         try {
-            // Send immediate notification to customer
-            // TODO: Implement notification service
-            // String message = String.format(
-            //         "THÔNG BÁO KHẨN: Lịch dọn dẹp %s của bạn vào %s đã bị hủy bởi nhân viên. " +
-            //         "Lý do: %s. Vui lòng liên hệ 1900-xxx để được hỗ trợ đặt lại dịch vụ.",
-            //         booking.getBookingCode(),
-            //         booking.getBookingTime(),
-            //         reason
-            // );
+            String normalizedReason = (reason != null && !reason.trim().isEmpty())
+                    ? reason.trim()
+                    : "Nhân viên hủy công việc";
 
-            // notificationService.sendCrisisNotification(
-            //         booking.getCustomer().getCustomerId(),
-            //         "Lịch dịch vụ bị hủy khẩn cấp",
-            //         message
-            // );
+            Customer customer = booking.getCustomer();
+            Account account = customer != null ? customer.getAccount() : null;
+            if (account != null) {
+                notificationService.sendAssignmentCancelledNotification(
+                        account.getAccountId(),
+                        booking.getBookingId(),
+                        booking.getBookingCode(),
+                        normalizedReason
+                );
+            } else {
+                log.warn("Skip crisis notification for assignment {} because booking {} is missing customer account",
+                        assignment.getAssignmentId(), booking.getBookingId());
+            }
 
             // Log for admin monitoring
             log.warn("CRISIS: Assignment {} cancelled by employee {}. Booking: {}, Customer: {}, Reason: {}",

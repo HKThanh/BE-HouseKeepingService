@@ -76,8 +76,15 @@ mail:
 
 vnpay:
   pay-url: ${VNPAY_PAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
-  return-url: ${VNPAY_RETURN_URL:http://localhost:8080/api/v1/payment/vnpay/callback}
+  return-url: ${VNPAY_RETURN_URL:}
   tmn-code: ${VNPAY_TMN_CODE:}
+  secret-key: ${VNPAY_SECRET_KEY:}
+  api-url: ${VNPAY_API_URL:https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
+  version: ${VNPAY_VERSION:2.1.0}
+  command: ${VNPAY_COMMAND:pay}
+  order-type: ${VNPAY_ORDER_TYPE:other}
+  frontend-redirect-url: ${VNPAY_FE_REDIRECT_URL:}
+  mobile-redirect-url: ${VNPAY_MOBILE_REDIRECT_URL:}
 
 whisper:
   enabled: ${WHISPER_ENABLED:true}
@@ -93,8 +100,3 @@ whisper:
   processing:
     async-enabled: ${WHISPER_ASYNC:true}
     thread-pool-size: ${WHISPER_THREAD_POOL:3}
-  secret-key: ${VNPAY_SECRET_KEY:}
-  api-url: ${VNPAY_API_URL:https://sandbox.vnpayment.vn/merchant_webapi/api/transaction}
-  version: ${VNPAY_VERSION:2.1.0}
-  command: ${VNPAY_COMMAND:pay}
-  order-type: ${VNPAY_ORDER_TYPE:other}

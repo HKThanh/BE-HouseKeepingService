@@ -208,6 +208,7 @@ public class VNPayServiceImpl implements VNPayService {
 
             // Remove hash params
             Map<String, String> fields = new TreeMap<>(params);
+            fields.entrySet().removeIf(entry -> entry.getKey() == null || !entry.getKey().startsWith("vnp_"));
             fields.remove("vnp_SecureHashType");
             fields.remove("vnp_SecureHash");
 

@@ -146,10 +146,19 @@ Content-Type: application/json
 
 ### Bước 4: VNPay callback về Backend
 
+Từ nay backend có **2 endpoint** để xử lý callback:
+
+| Endpoint | Mục đích | Response |
+| --- | --- | --- |
+| `GET /api/v1/payment/vnpay/callback` | API callback truyền thống. Phù hợp cho Postman/manual test. | JSON (`success`, `message`, `data`). |
+| `GET /api/v1/payment/vnpay/callback/redirect?client=web|mobile` | Callback dành cho user thực sự. Sau khi xử lý sẽ **redirect** về app FE/Mobile kèm trạng thái. | HTTP 302 → URL cấu hình. |
+
+#### 4.1 JSON callback (API/manual)
+
 **HTTP Request từ VNPay**:
 ```http
-GET /api/v1/payment/vnpay/callback?vnp_Amount=50000000&vnp_BankCode=NCB&vnp_BankTranNo=VNP01234567&vnp_CardType=ATM&vnp_OrderInfo=Thanh+toan+don+hang+booking-123-uuid&vnp_PayDate=20251110144500&vnp_ResponseCode=00&vnp_TmnCode=DEMO&vnp_TransactionNo=14012678&vnp_TransactionStatus=00&vnp_TxnRef=payment-uuid_1699614900000&vnp_SecureHash=xyz789... HTTP/1.1
-Host: localhost:8080
+GET /api/v1/payment/vnpay/callback?vnp_Amount=50000000&...&vnp_SecureHash=xyz789... HTTP/1.1
+Host: backend.local
 ```
 
 **HTTP Response từ Backend (Thành công)**:
@@ -185,6 +194,32 @@ Content-Type: application/json
   }
 }
 ```
+
+#### 4.2 Redirect callback (đi vào thực tế)
+
+VNPay sẽ gọi:  
+`GET /api/v1/payment/vnpay/callback/redirect?client=web&{params_vnp...}`
+
+Backend xử lý signature giống bước 4.1, sau đó trả **302** về URL tương ứng client:
+
+| Query `client` | Config (application.yml) | Default |
+| --- | --- | --- |
+| `web` | `vnpay.frontend-redirect-url` (`VNPAY_FE_REDIRECT_URL`) | `http://localhost:5173/payment/vnpay-result` |
+| `mobile`/`app` | `vnpay.mobile-redirect-url` (`VNPAY_MOBILE_REDIRECT_URL`) | `housekeeping://payment/vnpay-result` |
+
+**HTTP Response (thành công)**:
+```
+HTTP/1.1 302 Found
+Location: https://fe.app/payment/vnpay-result?status=success&transactionNo=14012678&amount=500000&responseCode=00&orderInfo=...
+```
+
+**HTTP Response (thất bại hoặc lỗi)**:
+```
+HTTP/1.1 302 Found
+Location: https://fe.app/payment/vnpay-result?status=failed&responseCode=24&orderInfo=...
+```
+
+Payload redirect kèm sẵn: `status`, `responseCode`, `transactionNo`, `amount`, `bankCode`, `cardType`, `orderInfo`. FE/Mobile chỉ cần đọc query và hiển thị trạng thái.
 
 **Các Response Code của VNPay**:
 - `00`: Giao dịch thành công
@@ -411,5 +446,9 @@ Content-Type: application/json
    - Failure: `FAILED` (sau callback/IPN với responseCode khác "00")
 
 7. **Security**: Luôn validate `vnp_SecureHash` trước khi xử lý callback/IPN
+
+8. **Redirect Config**: 
+   - `vnpay.frontend-redirect-url` & `vnpay.mobile-redirect-url` có thể override qua biến môi trường (`VNPAY_FE_REDIRECT_URL`, `VNPAY_MOBILE_REDIRECT_URL`).
+   - Khi VNPay redirect user thật, hãy cấu hình `vnp_ReturnUrl` trỏ tới `/callback/redirect?client=web` (hoặc `client=mobile`) để tránh người dùng bị kẹt lại ở backend JSON.
 
 

@@ -12,6 +12,7 @@ import iuh.house_keeping_service_be.models.*;
 import iuh.house_keeping_service_be.repositories.*;
 import iuh.house_keeping_service_be.services.AdminService.PermissionService;
 import iuh.house_keeping_service_be.services.AuthorizationService.AuthorizationService;
+import iuh.house_keeping_service_be.services.NotificationService.NotificationService;
 import iuh.house_keeping_service_be.services.ReviewService.ReviewService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +41,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final ReviewDetailRepository reviewDetailRepository;
     private final ReviewCriteriaRepository reviewCriteriaRepository;
     private final EmployeeRepository employeeRepository;
+    private final NotificationService notificationService;
 
     @Override
     public ReviewResponse createReview(String authorizationHeader, ReviewCreateRequest request) {
@@ -113,6 +115,7 @@ public class ReviewServiceImpl implements ReviewService {
         employee.setRating(ratingTier);
         employeeRepository.save(employee);
 
+        notifyEmployeeReviewReceived(savedReview, employee, request.criteriaRatings());
         return toReviewResponse(savedReview);
     }
 
@@ -138,6 +141,27 @@ public class ReviewServiceImpl implements ReviewService {
         double average = averageRating != null ?
                 BigDecimal.valueOf(averageRating).setScale(2, RoundingMode.HALF_UP).doubleValue() : 0.0;
         return new ReviewSummaryResponse(employeeId, totalReviews, average, ratingTier);
+    }
+
+    private void notifyEmployeeReviewReceived(Review review,
+                                              Employee employee,
+                                              List<CriteriaRatingRequest> criteriaRatings) {
+        if (review == null || employee == null || employee.getAccount() == null ||
+                criteriaRatings == null || criteriaRatings.isEmpty()) {
+            return;
+        }
+
+        double average = criteriaRatings.stream()
+                .mapToDouble(CriteriaRatingRequest::rating)
+                .average()
+                .orElse(0D);
+
+        int roundedRating = (int) Math.max(1, Math.min(5, Math.round(average)));
+        notificationService.sendReviewReceivedNotification(
+                employee.getAccount().getAccountId(),
+                review.getReviewId() != null ? String.valueOf(review.getReviewId()) : null,
+                roundedRating
+        );
     }
 
     private ReviewResponse toReviewResponse(Review review) {

@@ -53,6 +53,7 @@ public class SecurityConfig {
                                 "/api/v1/reviews/**",
                                 "/api/v1/addresses/**",
                                 "/api/v1/payment/vnpay/callback",
+                                "/api/v1/payment/vnpay/callback/**",
                                 "/api/v1/payment/vnpay/ipn",
                                 "/api/v1/customer/bookings/voice/status",
                                 "/ws/**").permitAll()
