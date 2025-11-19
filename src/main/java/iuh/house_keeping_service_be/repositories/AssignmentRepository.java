@@ -196,4 +196,49 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
             "WHERE b.customer.customerId = :customerId " +
             "AND b.status = 'COMPLETED'")
     List<String> findEmployeeIdsByCustomerWithCompletedBookings(@Param("customerId") String customerId);
+    
+    // Count assignments by employee and status within date range
+    @Query("SELECT COUNT(a) FROM Assignment a " +
+            "JOIN a.bookingDetail bd " +
+            "JOIN bd.booking b " +
+            "WHERE a.employee.employeeId = :employeeId " +
+            "AND a.status = :status " +
+            "AND b.bookingTime BETWEEN :startDate AND :endDate")
+    long countByEmployeeIdAndStatusAndDateRange(@Param("employeeId") String employeeId,
+                                                 @Param("status") AssignmentStatus status,
+                                                 @Param("startDate") LocalDateTime startDate,
+                                                 @Param("endDate") LocalDateTime endDate);
+    
+    // Count assignments by employee within date range
+    @Query("SELECT COUNT(a) FROM Assignment a " +
+            "JOIN a.bookingDetail bd " +
+            "JOIN bd.booking b " +
+            "WHERE a.employee.employeeId = :employeeId " +
+            "AND b.bookingTime BETWEEN :startDate AND :endDate")
+    long countByEmployeeIdAndDateRange(@Param("employeeId") String employeeId,
+                                        @Param("startDate") LocalDateTime startDate,
+                                        @Param("endDate") LocalDateTime endDate);
+    
+    // Count distinct bookings by employee and booking status within date range
+    @Query("SELECT COUNT(DISTINCT b.bookingId) FROM Assignment a " +
+            "JOIN a.bookingDetail bd " +
+            "JOIN bd.booking b " +
+            "WHERE a.employee.employeeId = :employeeId " +
+            "AND b.status = :bookingStatus " +
+            "AND b.bookingTime BETWEEN :startDate AND :endDate")
+    long countDistinctBookingsByEmployeeIdAndBookingStatusAndDateRange(
+            @Param("employeeId") String employeeId,
+            @Param("bookingStatus") iuh.house_keeping_service_be.enums.BookingStatus bookingStatus,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+    
+    // Count distinct bookings by employee within date range
+    @Query("SELECT COUNT(DISTINCT b.bookingId) FROM Assignment a " +
+            "JOIN a.bookingDetail bd " +
+            "JOIN bd.booking b " +
+            "WHERE a.employee.employeeId = :employeeId " +
+            "AND b.bookingTime BETWEEN :startDate AND :endDate")
+    long countDistinctBookingsByEmployeeIdAndDateRange(@Param("employeeId") String employeeId,
+                                                        @Param("startDate") LocalDateTime startDate,
+                                                        @Param("endDate") LocalDateTime endDate);
 }

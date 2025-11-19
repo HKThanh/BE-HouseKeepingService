@@ -332,4 +332,22 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
     
     // Count bookings by recurring booking ID
     long countByRecurringBooking_RecurringBookingId(String recurringBookingId);
+    
+    // Count bookings by customer and status within date range
+    @Query("SELECT COUNT(b) FROM Booking b " +
+           "WHERE b.customer.customerId = :customerId " +
+           "AND b.status = :status " +
+           "AND b.bookingTime BETWEEN :startDate AND :endDate")
+    long countByCustomerIdAndStatusAndDateRange(@Param("customerId") String customerId,
+                                                 @Param("status") BookingStatus status,
+                                                 @Param("startDate") LocalDateTime startDate,
+                                                 @Param("endDate") LocalDateTime endDate);
+    
+    // Count bookings by customer within date range
+    @Query("SELECT COUNT(b) FROM Booking b " +
+           "WHERE b.customer.customerId = :customerId " +
+           "AND b.bookingTime BETWEEN :startDate AND :endDate")
+    long countByCustomerIdAndDateRange(@Param("customerId") String customerId,
+                                        @Param("startDate") LocalDateTime startDate,
+                                        @Param("endDate") LocalDateTime endDate);
 }

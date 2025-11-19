@@ -75,6 +75,16 @@ services:
       - VNPAY_ORDER_TYPE=${VNPAY_ORDER_TYPE}
       - VNPAY_FE_REDIRECT_URL=${VNPAY_FE_REDIRECT_URL}
       - VNPAY_MOBILE_REDIRECT_URL=${VNPAY_MOBILE_REDIRECT_URL}
+      - FPT_TTS_ENABLED=${FPT_TTS_ENABLED:-true}
+      - FPT_TTS_API_URL=${FPT_TTS_API_URL:-https://api.fpt.ai/hmi/tts/v5}
+      - FPT_TTS_API_KEY=${FPT_TTS_API_KEY}
+      - FPT_TTS_VOICE=${FPT_TTS_VOICE:-banmai}
+      - FPT_TTS_SPEED=${FPT_TTS_SPEED:-0}
+      - FPT_TTS_TEXT_LIMIT=${FPT_TTS_TEXT_LIMIT:-1500}
+      - FPT_TTS_VERIFY_ATTEMPTS=${FPT_TTS_VERIFY_ATTEMPTS:-10}
+      - FPT_TTS_VERIFY_DELAY=${FPT_TTS_VERIFY_DELAY:-1200}
+      - FPT_TTS_VERIFY_TIMEOUT=${FPT_TTS_VERIFY_TIMEOUT:-45000}
+      - FPT_TTS_CLOUDINARY_FOLDER=${FPT_TTS_CLOUDINARY_FOLDER:-voice_booking/tts}
       - SPRING_APPLICATION_JSON={"logging":{"level":{"iuh.house_keeping_service_be":"DEBUG"}}}
     networks:
       - house_keeping_network
