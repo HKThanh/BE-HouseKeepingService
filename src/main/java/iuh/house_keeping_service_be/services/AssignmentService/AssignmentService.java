@@ -3,9 +3,12 @@ package iuh.house_keeping_service_be.services.AssignmentService;
 import iuh.house_keeping_service_be.dtos.Assignment.request.AssignmentActionRequest;
 import iuh.house_keeping_service_be.dtos.Assignment.request.AssignmentCancelRequest;
 import iuh.house_keeping_service_be.dtos.Assignment.response.AssignmentDetailResponse;
+import iuh.house_keeping_service_be.dtos.Assignment.response.AssignmentStatisticsByStatusResponse;
 import iuh.house_keeping_service_be.dtos.Assignment.response.BookingSummary;
+import iuh.house_keeping_service_be.dtos.Employee.response.EmployeeBookingStatisticsByStatusResponse;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface AssignmentService {
@@ -18,4 +21,10 @@ public interface AssignmentService {
 
     AssignmentDetailResponse checkIn(String assignmentId, String employeeId, List<MultipartFile> images, String imageDescription);
     AssignmentDetailResponse checkOut(String assignmentId, String employeeId, List<MultipartFile> images, String imageDescription);
+    
+    // Get assignment statistics by status and time unit for employee
+    AssignmentStatisticsByStatusResponse getAssignmentStatisticsByStatus(String employeeId, String timeUnit, LocalDateTime startDate, LocalDateTime endDate);
+    
+    // Get booking statistics by status and time unit for employee
+    EmployeeBookingStatisticsByStatusResponse getEmployeeBookingStatisticsByStatus(String employeeId, String timeUnit, LocalDateTime startDate, LocalDateTime endDate);
 }

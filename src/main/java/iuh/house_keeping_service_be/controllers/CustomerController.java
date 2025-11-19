@@ -42,6 +42,8 @@ public class CustomerController {
     private final CloudinaryService cloudinaryService;
 
     private final JwtUtil jwtUtil;
+    
+    private final iuh.house_keeping_service_be.services.BookingService.BookingService bookingService;
 
     @GetMapping("/{customerId}")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_CUSTOMER')")
@@ -231,6 +233,56 @@ public class CustomerController {
             return ResponseEntity.status(500).body(Map.of(
                     "success", false,
                     "message", "Đã xảy ra lỗi khi tải ảnh đại diện"
+            ));
+        }
+    }
+
+    @GetMapping("/{customerId}/bookings/statistics")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_CUSTOMER')")
+    public ResponseEntity<?> getBookingStatisticsByStatus(
+            @PathVariable String customerId,
+            @RequestParam String timeUnit,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate,
+            @RequestHeader("Authorization") String authHeader) {
+        try {
+            if (!authorizationService.canAccessResource(authHeader, customerId)) {
+                return ResponseEntity.status(403).body(Map.of(
+                        "success", false,
+                        "message", "Không có quyền truy cập. Bạn chỉ có thể xem thống kê của chính mình."
+                ));
+            }
+
+            // Parse dates if provided
+            java.time.LocalDateTime parsedStartDate = null;
+            java.time.LocalDateTime parsedEndDate = null;
+            
+            if (startDate != null && !startDate.isEmpty()) {
+                parsedStartDate = java.time.LocalDateTime.parse(startDate);
+            }
+            
+            if (endDate != null && !endDate.isEmpty()) {
+                parsedEndDate = java.time.LocalDateTime.parse(endDate);
+            }
+
+            var statistics = bookingService.getBookingStatisticsByStatus(
+                    customerId, timeUnit, parsedStartDate, parsedEndDate);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "data", statistics
+            ));
+        } catch (IllegalArgumentException e) {
+            log.error("Invalid request: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            log.error("Error fetching booking statistics: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "message", "Đã xảy ra lỗi khi lấy thống kê booking"
             ));
         }
     }

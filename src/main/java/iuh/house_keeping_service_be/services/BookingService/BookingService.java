@@ -7,6 +7,7 @@ import iuh.house_keeping_service_be.dtos.Booking.request.BookingVerificationRequ
 import iuh.house_keeping_service_be.dtos.Booking.request.UpdateBookingStatusRequest;
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingHistoryResponse;
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingResponse;
+import iuh.house_keeping_service_be.dtos.Booking.response.BookingStatisticsByStatusResponse;
 import iuh.house_keeping_service_be.dtos.Booking.summary.BookingCreationSummary;
 import iuh.house_keeping_service_be.dtos.Booking.summary.MultipleBookingCreationSummary;
 import iuh.house_keeping_service_be.dtos.Booking.internal.BookingValidationResult;
@@ -50,4 +51,7 @@ public interface BookingService {
     // Get bookings where employee has assignment, sorted by booking time
     Page<BookingResponse> getBookingsByEmployeeId(String employeeId, Pageable pageable);
     Page<BookingResponse> getBookingsByEmployeeId(String employeeId, LocalDateTime fromDate, Pageable pageable);
+    
+    // Get booking statistics by status and time unit for customer
+    BookingStatisticsByStatusResponse getBookingStatisticsByStatus(String customerId, String timeUnit, LocalDateTime startDate, LocalDateTime endDate);
 }

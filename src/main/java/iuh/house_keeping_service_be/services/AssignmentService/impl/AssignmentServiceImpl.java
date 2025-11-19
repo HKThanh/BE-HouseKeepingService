@@ -736,4 +736,122 @@ public class AssignmentServiceImpl implements AssignmentService {
             bookingRepository.save(booking);
         }
     }
+
+    @Override
+    public iuh.house_keeping_service_be.dtos.Assignment.response.AssignmentStatisticsByStatusResponse 
+            getAssignmentStatisticsByStatus(String employeeId, String timeUnit, LocalDateTime startDate, LocalDateTime endDate) {
+        
+        log.info("Getting assignment statistics for employee: {}, timeUnit: {}, from: {} to: {}", 
+                 employeeId, timeUnit, startDate, endDate);
+        
+        // Validate employee exists
+        employeeRepository.findById(employeeId)
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nhân viên với ID: " + employeeId));
+        
+        // Calculate date range based on time unit if not provided
+        LocalDateTime calculatedStartDate = startDate;
+        LocalDateTime calculatedEndDate = endDate;
+        
+        if (startDate == null || endDate == null) {
+            calculatedEndDate = LocalDateTime.now();
+            
+            switch (timeUnit.toUpperCase()) {
+                case "DAY":
+                    calculatedStartDate = calculatedEndDate.minusDays(1).withHour(0).withMinute(0).withSecond(0);
+                    calculatedEndDate = calculatedEndDate.withHour(23).withMinute(59).withSecond(59);
+                    break;
+                case "WEEK":
+                    calculatedStartDate = calculatedEndDate.minusWeeks(1).withHour(0).withMinute(0).withSecond(0);
+                    break;
+                case "MONTH":
+                    calculatedStartDate = calculatedEndDate.minusMonths(1).withHour(0).withMinute(0).withSecond(0);
+                    break;
+                case "YEAR":
+                    calculatedStartDate = calculatedEndDate.minusYears(1).withHour(0).withMinute(0).withSecond(0);
+                    break;
+                default:
+                    throw new IllegalArgumentException("Đơn vị thời gian không hợp lệ. Chỉ chấp nhận: DAY, WEEK, MONTH, YEAR");
+            }
+        }
+        
+        // Count assignments by each status
+        Map<AssignmentStatus, Long> countByStatus = new HashMap<>();
+        long totalAssignments = 0;
+        
+        for (AssignmentStatus status : AssignmentStatus.values()) {
+            long count = assignmentRepository.countByEmployeeIdAndStatusAndDateRange(
+                employeeId, status, calculatedStartDate, calculatedEndDate);
+            countByStatus.put(status, count);
+            totalAssignments += count;
+        }
+        
+        log.info("Statistics retrieved: {} total assignments for employee {}", totalAssignments, employeeId);
+        
+        return iuh.house_keeping_service_be.dtos.Assignment.response.AssignmentStatisticsByStatusResponse.builder()
+            .timeUnit(timeUnit.toUpperCase())
+            .startDate(calculatedStartDate.toString())
+            .endDate(calculatedEndDate.toString())
+            .totalAssignments(totalAssignments)
+            .countByStatus(countByStatus)
+            .build();
+    }
+
+    @Override
+    public iuh.house_keeping_service_be.dtos.Employee.response.EmployeeBookingStatisticsByStatusResponse 
+            getEmployeeBookingStatisticsByStatus(String employeeId, String timeUnit, LocalDateTime startDate, LocalDateTime endDate) {
+        
+        log.info("Getting booking statistics for employee: {}, timeUnit: {}, from: {} to: {}", 
+                 employeeId, timeUnit, startDate, endDate);
+        
+        // Validate employee exists
+        employeeRepository.findById(employeeId)
+            .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nhân viên với ID: " + employeeId));
+        
+        // Calculate date range based on time unit if not provided
+        LocalDateTime calculatedStartDate = startDate;
+        LocalDateTime calculatedEndDate = endDate;
+        
+        if (startDate == null || endDate == null) {
+            calculatedEndDate = LocalDateTime.now();
+            
+            switch (timeUnit.toUpperCase()) {
+                case "DAY":
+                    calculatedStartDate = calculatedEndDate.minusDays(1).withHour(0).withMinute(0).withSecond(0);
+                    calculatedEndDate = calculatedEndDate.withHour(23).withMinute(59).withSecond(59);
+                    break;
+                case "WEEK":
+                    calculatedStartDate = calculatedEndDate.minusWeeks(1).withHour(0).withMinute(0).withSecond(0);
+                    break;
+                case "MONTH":
+                    calculatedStartDate = calculatedEndDate.minusMonths(1).withHour(0).withMinute(0).withSecond(0);
+                    break;
+                case "YEAR":
+                    calculatedStartDate = calculatedEndDate.minusYears(1).withHour(0).withMinute(0).withSecond(0);
+                    break;
+                default:
+                    throw new IllegalArgumentException("Đơn vị thời gian không hợp lệ. Chỉ chấp nhận: DAY, WEEK, MONTH, YEAR");
+            }
+        }
+        
+        // Count distinct bookings by each booking status
+        Map<BookingStatus, Long> countByStatus = new HashMap<>();
+        long totalBookings = 0;
+        
+        for (BookingStatus status : BookingStatus.values()) {
+            long count = assignmentRepository.countDistinctBookingsByEmployeeIdAndBookingStatusAndDateRange(
+                employeeId, status, calculatedStartDate, calculatedEndDate);
+            countByStatus.put(status, count);
+            totalBookings += count;
+        }
+        
+        log.info("Statistics retrieved: {} total bookings for employee {}", totalBookings, employeeId);
+        
+        return iuh.house_keeping_service_be.dtos.Employee.response.EmployeeBookingStatisticsByStatusResponse.builder()
+            .timeUnit(timeUnit.toUpperCase())
+            .startDate(calculatedStartDate.toString())
+            .endDate(calculatedEndDate.toString())
+            .totalBookings(totalBookings)
+            .countByStatus(countByStatus)
+            .build();
+    }
 }
