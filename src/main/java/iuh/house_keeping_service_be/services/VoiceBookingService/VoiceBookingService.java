@@ -51,6 +51,7 @@ public class VoiceBookingService {
     private final VoiceBookingEventPublisher voiceBookingEventPublisher;
     private final EmployeeScheduleService employeeScheduleService;
     private final EmployeeRepository employeeRepository;
+    private final GeminiPromptService geminiPromptService;
     private static final List<String> INTENT_KEYWORDS = List.of(
             "dọn", "don", "dọn dẹp", "don dep", "lau", "lau dọn", "lau don",
             "vệ sinh", "ve sinh", "giúp việc", "giup viec", "housekeeping",
@@ -58,6 +59,7 @@ public class VoiceBookingService {
             "dịch vụ", "dich vu", "quét", "quet", "chà", "cha", "lau nhà", "lau nha"
     );
     private static final String MISSING_DETAIL_PROMPT = "Bạn vui lòng cung cấp thêm thông tin chi tiết về dịch vụ bạn muốn đặt cho chúng tôi.";
+    private static final String AI_SERVICE_INSTRUCTION = "Bạn không được bịa đặt hay nói sai về tên các dịch vụ hiện có.";
 
     @Value("${whisper.processing.async-enabled:true}")
     private boolean asyncEnabled;
@@ -82,6 +84,7 @@ public class VoiceBookingService {
         voiceRequest.markAsProcessing();
         voiceRequest = voiceBookingRequestRepository.save(voiceRequest);
         voiceBookingEventPublisher.emitReceived(voiceRequest.getId(), username, null, null);
+        String aiPrompt = null;
 
         try {
             // Step 1: Voice to text conversion
@@ -89,15 +92,24 @@ public class VoiceBookingService {
             voiceBookingEventPublisher.emitTranscribing(voiceRequest.getId(), username, 0.1, null, null);
             VoiceToTextResult voiceResult = voiceToTextService.transcribe(audioFile, "vi");
             voiceBookingEventPublisher.emitTranscribing(voiceRequest.getId(), username, 1.0, null, null);
+            aiPrompt = geminiPromptService.generatePromptWithInstruction(
+                    voiceResult.transcript(),
+                    buildAiInstruction(List.of("service", "bookingTime", "address"), null)
+            ).orElse(null);
+            if (StringUtils.hasText(aiPrompt)) {
+                log.info("Gemini prompt generated for request {} ({} chars)", voiceRequest.getId(), aiPrompt.length());
+            } else {
+                log.debug("Gemini prompt skipped or empty for request {}", voiceRequest.getId());
+            }
 
             if (!voiceResult.hasTranscript()) {
                 voiceRequest.markAsFailed("Failed to transcribe audio");
                 voiceBookingRequestRepository.save(voiceRequest);
-                VoiceBookingResponse response = VoiceBookingResponse.failed(
+                VoiceBookingResponse response = enrichFailure(VoiceBookingResponse.failed(
                         voiceRequest.getId(),
                         "Không thể chuyển đổi giọng nói thành văn bản",
                         "No transcript generated"
-                );
+                ));
                 VoiceBookingSpeechPayload speech = buildSpeechPayload(response.message(), response.clarificationMessage());
                 voiceBookingEventPublisher.emitFailed(
                         voiceRequest.getId(),
@@ -106,7 +118,9 @@ public class VoiceBookingService {
                         null,
                         voiceRequest.getProcessingTimeMs(),
                         response.message(),
-                        speech
+                        speech,
+                        defaultFailureHints(),
+                        3000
                 );
                 return attachSpeech(response, speech);
             }
@@ -117,6 +131,12 @@ public class VoiceBookingService {
                 List<String> missing = List.of("service", "bookingTime", "address");
                 Map<String, Object> extractedInfo = new HashMap<>();
                 extractedInfo.put("note", voiceResult.transcript());
+                String baseClarification = MISSING_DETAIL_PROMPT;
+                boolean allowAiPrompt = allowAiPromptForMissing(missing) && shouldUseAiPrompt(missing, extractedInfo);
+                String instruction = buildAiInstruction(missing, extractedInfo);
+                String localAiPrompt = allowAiPrompt
+                        ? geminiPromptService.generatePromptWithInstruction(baseClarification, instruction).orElse(null)
+                        : null;
 
                 voiceRequest.markAsPartial(missing);
                 voiceRequest.setTranscript(voiceResult.transcript());
@@ -127,13 +147,22 @@ public class VoiceBookingService {
                         voiceRequest.getId(),
                         voiceResult.transcript(),
                         missing,
-                        MISSING_DETAIL_PROMPT,
+                        baseClarification,
                         extractedInfo,
                         voiceResult.confidenceScore(),
                         (int) voiceResult.processingTimeMs()
                 );
+                String speakMessage = baseClarification;
+                if (allowAiPrompt && StringUtils.hasText(localAiPrompt)) {
+                    extractedInfo.put("aiPrompt", localAiPrompt);
+                    response = response.toBuilder()
+                            .message(localAiPrompt)
+                            .clarificationMessage(baseClarification)
+                            .build();
+                    speakMessage = localAiPrompt;
+                }
                 VoiceBookingSpeechPayload speech = buildSpeechPayload(
-                        response.message(),
+                        speakMessage,
                         response.clarificationMessage()
                 );
                 voiceBookingEventPublisher.emitPartial(
@@ -141,10 +170,12 @@ public class VoiceBookingService {
                         username,
                         voiceResult.transcript(),
                         missing,
-                        MISSING_DETAIL_PROMPT,
+                        response.clarificationMessage(),
                         (int) voiceResult.processingTimeMs(),
                         response.message(),
-                        speech
+                        speech,
+                        false,
+                        voiceResult.confidenceScore()
                 );
                 return attachSpeech(response, speech);
             }
@@ -173,14 +204,20 @@ public class VoiceBookingService {
                         voiceResult.confidenceScore(),
                         (int) voiceResult.processingTimeMs()
                 );
-                VoiceBookingSpeechPayload speech = buildSpeechPayload(response.message(), response.clarificationMessage());
+                String speakMessage = pickTtsMessage(aiPrompt, response.message(), response.clarificationMessage());
+                if (StringUtils.hasText(aiPrompt)) {
+                    response = response.toBuilder().message(aiPrompt).build();
+                }
+                VoiceBookingSpeechPayload speech = buildSpeechPayload(speakMessage, response.clarificationMessage());
                 voiceBookingEventPublisher.emitAwaitingConfirmation(
                         voiceRequest.getId(),
                         username,
                         draftResult.preview(),
                         response.processingTimeMs(),
                         response.message(),
-                        speech
+                        speech,
+                        true,
+                        voiceResult.confidenceScore()
                 );
                 return attachSpeech(response, speech);
             } else if (parsedInfo.requiresClarification()) {
@@ -190,25 +227,50 @@ public class VoiceBookingService {
 
                 // Convert extractedFields to Map<String, Object> for better FE handling
                 Map<String, Object> extractedInfo = new java.util.HashMap<>(parsedInfo.extractedFields());
-                String clarificationMsg = buildClarificationText(parsedInfo.missingFields(), extractedInfo, parsedInfo.clarificationMessage());
+                String baseClarification = buildClarificationText(parsedInfo.missingFields(), extractedInfo, parsedInfo.clarificationMessage());
+                boolean missingServiceOnly = parsedInfo.missingFields().size() == 1 && parsedInfo.missingFields().contains("service");
+                boolean allowAi = allowAiPromptForMissing(parsedInfo.missingFields());
+                String localAiPrompt = aiPrompt;
+                if (!shouldUseAiPrompt(parsedInfo.missingFields(), extractedInfo)) {
+                    allowAi = false;
+                    localAiPrompt = null;
+                }
+                if (missingServiceOnly) {
+                    String instruction = buildServiceAiInstruction(extractedInfo);
+                    localAiPrompt = geminiPromptService.generatePromptWithInstruction(
+                            baseClarification,
+                            instruction
+                    ).orElse(localAiPrompt);
+                    allowAi = true;
+                } else {
+                    String instruction = buildAiInstruction(parsedInfo.missingFields(), extractedInfo);
+                    localAiPrompt = allowAi
+                            ? geminiPromptService.generatePromptWithInstruction(baseClarification, instruction).orElse(localAiPrompt)
+                            : localAiPrompt;
+                }
+                if (allowAi && StringUtils.hasText(localAiPrompt)) {
+                    extractedInfo.put("aiPrompt", localAiPrompt);
+                }
                 VoiceBookingResponse response = VoiceBookingResponse.partial(
                         voiceRequest.getId(),
                         voiceResult.transcript(),
                         parsedInfo.missingFields(),
-                        clarificationMsg,
+                        baseClarification,
                         extractedInfo,
                         voiceResult.confidenceScore(),
                         (int) voiceResult.processingTimeMs()
                 );
-                if (!Objects.equals(response.message(), clarificationMsg)) {
+                if (!Objects.equals(response.message(), baseClarification)) {
                     response = response.toBuilder()
-                            .message(clarificationMsg)
-                            .clarificationMessage(clarificationMsg)
+                            .message(baseClarification)
+                            .clarificationMessage(baseClarification)
                             .build();
                 }
-                String speakMessage = StringUtils.hasText(response.clarificationMessage())
-                        ? response.clarificationMessage()
-                        : response.message();
+                String speakMessage = baseClarification;
+                if (allowAi && StringUtils.hasText(localAiPrompt)) {
+                    response = response.toBuilder().message(localAiPrompt).build();
+                    speakMessage = localAiPrompt;
+                }
                 VoiceBookingSpeechPayload speech = buildSpeechPayload(
                         speakMessage,
                         response.clarificationMessage()
@@ -221,7 +283,9 @@ public class VoiceBookingService {
                         parsedInfo.clarificationMessage(),
                         response.processingTimeMs(),
                         response.message(),
-                        speech
+                        speech,
+                        false,
+                        voiceResult.confidenceScore()
                 );
 
                 return attachSpeech(response, speech);
@@ -229,11 +293,11 @@ public class VoiceBookingService {
             } else {
                 voiceRequest.markAsFailed("Failed to parse transcript");
                 voiceBookingRequestRepository.save(voiceRequest);
-                VoiceBookingResponse response = VoiceBookingResponse.failed(
+                VoiceBookingResponse response = enrichFailure(VoiceBookingResponse.failed(
                         voiceRequest.getId(),
                         "Không thể phân tích yêu cầu từ giọng nói",
                         "Parsing failed with low confidence"
-                );
+                ));
                 VoiceBookingSpeechPayload speech = buildSpeechPayload(response.message(), response.clarificationMessage());
                 voiceBookingEventPublisher.emitFailed(
                         voiceRequest.getId(),
@@ -242,7 +306,9 @@ public class VoiceBookingService {
                         voiceResult.transcript(),
                         (int) voiceResult.processingTimeMs(),
                         response.message(),
-                        speech
+                        speech,
+                        defaultFailureHints(),
+                        3000
                 );
 
                 return attachSpeech(response, speech);
@@ -256,11 +322,11 @@ public class VoiceBookingService {
             log.error("Booking validation failed for voice request {}: {}", voiceRequest.getId(), errorDetails);
             voiceRequest.markAsFailed(errorDetails);
             voiceBookingRequestRepository.save(voiceRequest);
-            VoiceBookingResponse response = VoiceBookingResponse.failed(
+            VoiceBookingResponse response = enrichFailure(VoiceBookingResponse.failed(
                     voiceRequest.getId(),
                     "Không thể tạo booking: " + errorDetails,
                     errorDetails
-            );
+            ));
             VoiceBookingSpeechPayload speech = buildSpeechPayload(response.message(), response.clarificationMessage());
             voiceBookingEventPublisher.emitFailed(
                     voiceRequest.getId(),
@@ -269,7 +335,9 @@ public class VoiceBookingService {
                     voiceRequest.getTranscript(),
                     voiceRequest.getProcessingTimeMs(),
                     response.message(),
-                    speech
+                    speech,
+                    defaultFailureHints(),
+                    3000
             );
 
             return attachSpeech(response, speech);
@@ -277,11 +345,11 @@ public class VoiceBookingService {
             log.error("Error processing voice booking: {}", e.getMessage(), e);
             voiceRequest.markAsFailed(e.getMessage());
             voiceBookingRequestRepository.save(voiceRequest);
-            VoiceBookingResponse response = VoiceBookingResponse.failed(
+            VoiceBookingResponse response = enrichFailure(VoiceBookingResponse.failed(
                     voiceRequest.getId(),
                     "Đã xảy ra lỗi khi xử lý yêu cầu đặt lịch bằng giọng nói",
                     e.getMessage()
-            );
+            ));
             VoiceBookingSpeechPayload speech = buildSpeechPayload(response.message(), response.clarificationMessage());
             voiceBookingEventPublisher.emitFailed(
                     voiceRequest.getId(),
@@ -290,7 +358,9 @@ public class VoiceBookingService {
                     voiceRequest.getTranscript(),
                     voiceRequest.getProcessingTimeMs(),
                     response.message(),
-                    speech
+                    speech,
+                    defaultFailureHints(),
+                    3000
             );
 
             return attachSpeech(response, speech);
@@ -331,11 +401,11 @@ public class VoiceBookingService {
 
         // Validate status
         if (!"PARTIAL".equals(voiceRequest.getStatus()) && !"AWAITING_CONFIRMATION".equals(voiceRequest.getStatus())) {
-            VoiceBookingResponse failedResponse = VoiceBookingResponse.failed(
+            VoiceBookingResponse failedResponse = enrichFailure(VoiceBookingResponse.failed(
                     requestId,
                     "Không thể tiếp tục yêu cầu này",
                     "Request status is not PARTIAL, current status: " + voiceRequest.getStatus()
-            );
+            ));
             VoiceBookingSpeechPayload speech = buildSpeechPayload(failedResponse.message(), failedResponse.clarificationMessage());
             voiceBookingEventPublisher.emitFailed(
                     requestId,
@@ -344,7 +414,9 @@ public class VoiceBookingService {
                     voiceRequest.getTranscript(),
                     voiceRequest.getProcessingTimeMs(),
                     failedResponse.message(),
-                    speech
+                    speech,
+                    defaultFailureHints(),
+                    3000
             );
             return attachSpeech(failedResponse, speech);
         }
@@ -354,11 +426,11 @@ public class VoiceBookingService {
                 .orElseThrow(() -> new IllegalArgumentException("Customer not found: " + username));
         
         if (!voiceRequest.getCustomer().getCustomerId().equals(customer.getCustomerId())) {
-            VoiceBookingResponse failedResponse = VoiceBookingResponse.failed(
+            VoiceBookingResponse failedResponse = enrichFailure(VoiceBookingResponse.failed(
                     requestId,
                     "Không có quyền truy cập yêu cầu này",
                     "Customer mismatch"
-            );
+            ));
             VoiceBookingSpeechPayload speech = buildSpeechPayload(failedResponse.message(), failedResponse.clarificationMessage());
             voiceBookingEventPublisher.emitFailed(
                     requestId,
@@ -367,7 +439,9 @@ public class VoiceBookingService {
                     voiceRequest.getTranscript(),
                     voiceRequest.getProcessingTimeMs(),
                     failedResponse.message(),
-                    speech
+                    speech,
+                    defaultFailureHints(),
+                    3000
             );
             return attachSpeech(failedResponse, speech);
         }
@@ -415,6 +489,10 @@ public class VoiceBookingService {
                     customer.getCustomerId(),
                     enhancedHints
             );
+            String aiPrompt = geminiPromptService.generatePromptWithInstruction(
+                    combinedTranscript,
+                    buildAiInstruction(List.of("service", "bookingTime", "address"), null)
+            ).orElse(null);
             
             // Check if now complete
             if (parsedInfo.isComplete()) {
@@ -429,14 +507,20 @@ public class VoiceBookingService {
                         voiceRequest.getConfidenceScore() != null ? voiceRequest.getConfidenceScore().doubleValue() : null,
                         voiceRequest.getProcessingTimeMs()
                 );
-                VoiceBookingSpeechPayload speech = buildSpeechPayload(response.message(), response.clarificationMessage());
+                String speakMessage = pickTtsMessage(aiPrompt, response.message(), response.clarificationMessage());
+                if (StringUtils.hasText(aiPrompt)) {
+                    response = response.toBuilder().message(aiPrompt).build();
+                }
+                VoiceBookingSpeechPayload speech = buildSpeechPayload(speakMessage, response.clarificationMessage());
                 voiceBookingEventPublisher.emitAwaitingConfirmation(
                         requestId,
                         username,
                         draftResult.preview(),
                         voiceRequest.getProcessingTimeMs(),
                         response.message(),
-                        speech
+                        speech,
+                        true,
+                        voiceRequest.getConfidenceScore() != null ? voiceRequest.getConfidenceScore().doubleValue() : null
                 );
 
                 return attachSpeech(response, speech);
@@ -446,7 +530,31 @@ public class VoiceBookingService {
                 voiceBookingRequestRepository.save(voiceRequest);
                 
                 Map<String, Object> extractedInfo = new java.util.HashMap<>(parsedInfo.extractedFields());
-                String clarificationMsg = buildClarificationText(parsedInfo.missingFields(), extractedInfo, parsedInfo.clarificationMessage());
+                String baseClarification = buildClarificationText(parsedInfo.missingFields(), extractedInfo, parsedInfo.clarificationMessage());
+                boolean missingServiceOnly = parsedInfo.missingFields().size() == 1 && parsedInfo.missingFields().contains("service");
+                boolean allowAi = allowAiPromptForMissing(parsedInfo.missingFields())
+                        && shouldUseAiPrompt(parsedInfo.missingFields(), extractedInfo);
+                String localAiPrompt = allowAi ? aiPrompt : null;
+
+                if (missingServiceOnly) {
+                    String instruction = buildServiceAiInstruction(extractedInfo);
+                    localAiPrompt = geminiPromptService.generatePromptWithInstruction(
+                            baseClarification,
+                            instruction
+                    ).orElse(localAiPrompt);
+                    allowAi = true;
+                } else if (allowAi) {
+                    String instruction = buildAiInstruction(parsedInfo.missingFields(), extractedInfo);
+                    localAiPrompt = geminiPromptService.generatePromptWithInstruction(
+                            baseClarification,
+                            instruction
+                    ).orElse(localAiPrompt);
+                }
+
+                if (allowAi && StringUtils.hasText(localAiPrompt)) {
+                    extractedInfo.put("aiPrompt", localAiPrompt);
+                }
+                String clarificationMsg = baseClarification;
                 VoiceBookingResponse response = VoiceBookingResponse.partial(
                         requestId,
                         combinedTranscript,
@@ -462,9 +570,11 @@ public class VoiceBookingService {
                             .clarificationMessage(clarificationMsg)
                             .build();
                 }
-                String speakMessage = StringUtils.hasText(response.clarificationMessage())
-                        ? response.clarificationMessage()
-                        : response.message();
+                String speakMessage = clarificationMsg;
+                if (allowAi && StringUtils.hasText(localAiPrompt)) {
+                    response = response.toBuilder().message(localAiPrompt).build();
+                    speakMessage = localAiPrompt;
+                }
                 VoiceBookingSpeechPayload speech = buildSpeechPayload(
                         speakMessage,
                         response.clarificationMessage()
@@ -474,10 +584,12 @@ public class VoiceBookingService {
                         username,
                         combinedTranscript,
                         parsedInfo.missingFields(),
-                        parsedInfo.clarificationMessage(),
+                        response.clarificationMessage(),
                         voiceRequest.getProcessingTimeMs(),
                         response.message(),
-                        speech
+                        speech,
+                        false,
+                        voiceRequest.getConfidenceScore() != null ? voiceRequest.getConfidenceScore().doubleValue() : null
                 );
                 
                 return attachSpeech(response, speech);
@@ -490,11 +602,11 @@ public class VoiceBookingService {
             log.error("Booking validation failed for continued request {}: {}", requestId, errorDetails);
             voiceRequest.markAsFailed(errorDetails);
             voiceBookingRequestRepository.save(voiceRequest);
-            VoiceBookingResponse response = VoiceBookingResponse.failed(
+            VoiceBookingResponse response = enrichFailure(VoiceBookingResponse.failed(
                     requestId,
                     "Không thể tạo booking: " + errorDetails,
                     errorDetails
-            );
+            ));
             VoiceBookingSpeechPayload speech = buildSpeechPayload(response.message(), response.clarificationMessage());
             voiceBookingEventPublisher.emitFailed(
                     requestId,
@@ -503,7 +615,9 @@ public class VoiceBookingService {
                     voiceRequest.getTranscript(),
                     voiceRequest.getProcessingTimeMs(),
                     response.message(),
-                    speech
+                    speech,
+                    defaultFailureHints(),
+                    3000
             );
             
             return attachSpeech(response, speech);
@@ -511,11 +625,11 @@ public class VoiceBookingService {
             log.error("Error continuing voice booking: {}", e.getMessage(), e);
             voiceRequest.markAsFailed(e.getMessage());
             voiceBookingRequestRepository.save(voiceRequest);
-            VoiceBookingResponse response = VoiceBookingResponse.failed(
+            VoiceBookingResponse response = enrichFailure(VoiceBookingResponse.failed(
                     requestId,
                     "Đã xảy ra lỗi khi tiếp tục xử lý yêu cầu",
                     e.getMessage()
-            );
+            ));
             VoiceBookingSpeechPayload speech = buildSpeechPayload(response.message(), response.clarificationMessage());
             voiceBookingEventPublisher.emitFailed(
                     requestId,
@@ -524,7 +638,9 @@ public class VoiceBookingService {
                     voiceRequest.getTranscript(),
                     voiceRequest.getProcessingTimeMs(),
                     response.message(),
-                    speech
+                    speech,
+                    defaultFailureHints(),
+                    3000
             );
             
             return attachSpeech(response, speech);
@@ -582,7 +698,8 @@ public class VoiceBookingService {
                     voiceRequest.getTranscript(),
                     voiceRequest.getProcessingTimeMs(),
                     response.message(),
-                    speech
+                    speech,
+                    voiceRequest.getConfidenceScore() != null ? voiceRequest.getConfidenceScore().doubleValue() : null
             );
 
             return attachSpeech(response, speech);
@@ -590,11 +707,11 @@ public class VoiceBookingService {
             log.error("Booking validation failed during confirmation {}: {}", requestId, e.getMessage());
             voiceRequest.markAsFailed(e.getMessage());
             voiceBookingRequestRepository.save(voiceRequest);
-            VoiceBookingResponse response = VoiceBookingResponse.failed(
+            VoiceBookingResponse response = enrichFailure(VoiceBookingResponse.failed(
                     requestId,
                     "Không thể tạo booking: " + e.getMessage(),
                     e.getMessage()
-            );
+            ));
             VoiceBookingSpeechPayload speech = buildSpeechPayload(response.message(), response.clarificationMessage());
             voiceBookingEventPublisher.emitFailed(
                     requestId,
@@ -603,7 +720,9 @@ public class VoiceBookingService {
                     voiceRequest.getTranscript(),
                     voiceRequest.getProcessingTimeMs(),
                     response.message(),
-                    speech
+                    speech,
+                    defaultFailureHints(),
+                    3000
             );
 
             return attachSpeech(response, speech);
@@ -611,11 +730,11 @@ public class VoiceBookingService {
             log.error("Unexpected error confirming booking {}: {}", requestId, e.getMessage(), e);
             voiceRequest.markAsFailed(e.getMessage());
             voiceBookingRequestRepository.save(voiceRequest);
-            VoiceBookingResponse response = VoiceBookingResponse.failed(
+            VoiceBookingResponse response = enrichFailure(VoiceBookingResponse.failed(
                     requestId,
                     "Đã xảy ra lỗi khi xác nhận đơn",
                     e.getMessage()
-            );
+            ));
             VoiceBookingSpeechPayload speech = buildSpeechPayload(response.message(), response.clarificationMessage());
             voiceBookingEventPublisher.emitFailed(
                     requestId,
@@ -624,7 +743,9 @@ public class VoiceBookingService {
                     voiceRequest.getTranscript(),
                     voiceRequest.getProcessingTimeMs(),
                     response.message(),
-                    speech
+                    speech,
+                    defaultFailureHints(),
+                    3000
             );
 
             return attachSpeech(response, speech);
@@ -981,9 +1102,12 @@ public class VoiceBookingService {
         if (missingFields == null) {
             return fallback;
         }
-        boolean missingCore = missingFields.contains("service")
+
+        boolean missingService = missingFields.contains("service");
+        boolean missingCore = missingService
                 && missingFields.contains("bookingTime")
                 && missingFields.contains("address");
+
         boolean hasExtraInfo = extractedInfo != null && extractedInfo.entrySet().stream()
                 .anyMatch(e -> {
                     String key = e.getKey();
@@ -992,13 +1116,35 @@ public class VoiceBookingService {
                     }
                     return e.getValue() != null && !"".equals(String.valueOf(e.getValue()).trim());
                 });
-        if (missingFields.contains("service") && !hasExtraInfo) {
-            return MISSING_DETAIL_PROMPT;
+
+        String availableServices = formatAvailableServices(extractedInfo != null ? extractedInfo.get("availableServices") : null);
+
+        if (missingService && !hasExtraInfo) {
+            return availableServices != null
+                    ? MISSING_DETAIL_PROMPT + "\n" + availableServices
+                    : MISSING_DETAIL_PROMPT;
         }
         if (missingCore && !hasExtraInfo) {
-            return MISSING_DETAIL_PROMPT;
+            return availableServices != null
+                    ? MISSING_DETAIL_PROMPT + "\n" + availableServices
+                    : MISSING_DETAIL_PROMPT;
         }
-        return StringUtils.hasText(fallback) ? fallback : MISSING_DETAIL_PROMPT;
+        String base = StringUtils.hasText(fallback) ? fallback : MISSING_DETAIL_PROMPT;
+        if (availableServices != null && missingService) {
+            return base + "\n" + availableServices;
+        }
+        return base;
+    }
+
+    private String formatAvailableServices(Object raw) {
+        if (raw == null) {
+            return null;
+        }
+        String text = String.valueOf(raw).trim();
+        if (text.isEmpty()) {
+            return null;
+        }
+        return "Các dịch vụ hiện có: " + text;
     }
 
     private String stripAccents(String input) {
@@ -1007,6 +1153,89 @@ public class VoiceBookingService {
         }
         String normalized = Normalizer.normalize(input, Normalizer.Form.NFD);
         return normalized.replaceAll("\\p{M}", "");
+    }
+
+    private String pickTtsMessage(String aiPrompt, String message, String clarification) {
+        if (StringUtils.hasText(aiPrompt)) {
+            return aiPrompt;
+        }
+        if (StringUtils.hasText(clarification)) {
+            return clarification;
+        }
+        return message;
+    }
+
+    private List<String> defaultFailureHints() {
+        return List.of(
+                "Vui lòng kiểm tra micro và thử ghi âm lại.",
+                "Đảm bảo đường truyền mạng ổn định.",
+                "Thử nói rõ hơn về dịch vụ, thời gian và địa chỉ."
+        );
+    }
+
+    private VoiceBookingResponse enrichFailure(VoiceBookingResponse response) {
+        if (response == null) {
+            return null;
+        }
+        return response.toBuilder()
+                .failureHints(defaultFailureHints())
+                .retryAfterMs(3000)
+                .isFinal(true)
+                .build();
+    }
+
+    private boolean allowAiPromptForMissing(List<String> missingFields) {
+        if (missingFields == null || missingFields.isEmpty()) {
+            return false;
+        }
+        if (missingFields.size() == 1 && missingFields.contains("service")) {
+            return false; // chỉ thiếu dịch vụ thì dùng message hệ thống
+        }
+        // thiếu thời gian/địa chỉ hoặc nhiều hơn 1 trường -> cho phép AI gợi ý
+        return missingFields.contains("bookingTime") || missingFields.contains("address") || missingFields.size() > 1;
+    }
+
+    private String buildAiInstruction(List<String> missingFields, Map<String, Object> extractedInfo) {
+        if (missingFields == null || missingFields.isEmpty()) {
+            return "";
+        }
+        List<String> display = new ArrayList<>();
+        for (String f : missingFields) {
+            display.add(formatFieldNameLocal(f));
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("Chỉ hỏi về các thông tin còn thiếu: ").append(String.join(", ", display)).append(". Không yêu cầu hay bịa đặt thêm thông tin khác.");
+        if (missingFields.contains("service") && extractedInfo != null) {
+            Object available = extractedInfo.get("availableServices");
+            if (available != null) {
+                sb.append(" Danh sách dịch vụ hợp lệ: ").append(String.valueOf(available));
+            }
+        }
+        return sb.toString();
+    }
+
+    private String buildServiceAiInstruction(Map<String, Object> extractedInfo) {
+        Object services = extractedInfo != null ? extractedInfo.get("availableServices") : null;
+        String list = services != null ? String.valueOf(services) : "";
+        return AI_SERVICE_INSTRUCTION + " Danh sách dịch vụ hợp lệ: " + list;
+    }
+
+    private String formatFieldNameLocal(String fieldName) {
+        return switch (fieldName) {
+            case "service", "services" -> "dịch vụ";
+            case "bookingTime" -> "thời gian";
+            case "address" -> "địa chỉ";
+            case "note" -> "ghi chú";
+            default -> fieldName;
+        };
+    }
+
+    private boolean shouldUseAiPrompt(List<String> missingFields, Map<String, Object> extractedInfo) {
+        if (missingFields == null || missingFields.isEmpty()) {
+            return false;
+        }
+        // Always allow AI to build prompt when we have missing fields; upstream will decide instruction text.
+        return true;
     }
 
     private record VoiceBookingDraftResult(BookingCreateRequest bookingRequest, VoiceBookingPreview preview) {

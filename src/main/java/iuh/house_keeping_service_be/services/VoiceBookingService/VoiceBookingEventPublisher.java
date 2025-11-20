@@ -32,6 +32,10 @@ public class VoiceBookingEventPublisher {
                 VoiceBookingStatus.PROCESSING,
                 message,
                 speech,
+                false,
+                null,
+                null,
+                null,
                 builder -> {}
         );
         sendToTopic(username, payload);
@@ -44,6 +48,10 @@ public class VoiceBookingEventPublisher {
                 VoiceBookingStatus.PROCESSING,
                 message,
                 speech,
+                false,
+                null,
+                null,
+                null,
                 builder -> builder.progress(sanitizeProgress(progress))
         );
         sendToTopic(username, payload);
@@ -55,7 +63,9 @@ public class VoiceBookingEventPublisher {
             VoiceBookingPreview preview,
             Integer processingTimeMs,
             String message,
-            VoiceBookingSpeechPayload speech
+            VoiceBookingSpeechPayload speech,
+            Boolean isFinal,
+            Double confidence
     ) {
         VoiceBookingEventPayload payload = buildPayload(
                 requestId,
@@ -63,6 +73,10 @@ public class VoiceBookingEventPublisher {
                 VoiceBookingStatus.AWAITING_CONFIRMATION,
                 message,
                 speech,
+                isFinal,
+                confidence,
+                null,
+                null,
                 builder -> builder
                         .preview(preview)
                         .processingTimeMs(processingTimeMs)
@@ -78,7 +92,9 @@ public class VoiceBookingEventPublisher {
             String clarificationMessage,
             Integer processingTimeMs,
             String message,
-            VoiceBookingSpeechPayload speech
+            VoiceBookingSpeechPayload speech,
+            Boolean isFinal,
+            Double confidence
     ) {
         VoiceBookingEventPayload payload = buildPayload(
                 requestId,
@@ -86,6 +102,10 @@ public class VoiceBookingEventPublisher {
                 VoiceBookingStatus.PARTIAL,
                 message,
                 speech,
+                isFinal,
+                confidence,
+                null,
+                null,
                 builder -> builder
                         .transcript(transcript)
                         .missingFields(missingFields)
@@ -102,7 +122,8 @@ public class VoiceBookingEventPublisher {
             String transcript,
             Integer processingTimeMs,
             String message,
-            VoiceBookingSpeechPayload speech
+            VoiceBookingSpeechPayload speech,
+            Double confidence
     ) {
         VoiceBookingEventPayload payload = buildPayload(
                 requestId,
@@ -110,6 +131,10 @@ public class VoiceBookingEventPublisher {
                 VoiceBookingStatus.COMPLETED,
                 message,
                 speech,
+                true,
+                confidence,
+                null,
+                null,
                 builder -> builder
                         .bookingId(bookingId)
                         .transcript(transcript)
@@ -125,7 +150,9 @@ public class VoiceBookingEventPublisher {
             String transcript,
             Integer processingTimeMs,
             String message,
-            VoiceBookingSpeechPayload speech
+            VoiceBookingSpeechPayload speech,
+            List<String> failureHints,
+            Integer retryAfterMs
     ) {
         VoiceBookingEventPayload payload = buildPayload(
                 requestId,
@@ -133,6 +160,10 @@ public class VoiceBookingEventPublisher {
                 VoiceBookingStatus.FAILED,
                 message,
                 speech,
+                true,
+                null,
+                failureHints,
+                retryAfterMs,
                 builder -> builder
                         .errorMessage(errorMessage)
                         .transcript(transcript)
@@ -153,6 +184,10 @@ public class VoiceBookingEventPublisher {
                 VoiceBookingStatus.CANCELLED,
                 message,
                 speech,
+                true,
+                null,
+                null,
+                null,
                 builder -> {}
         );
         sendToTopic(username, payload);
@@ -181,6 +216,10 @@ public class VoiceBookingEventPublisher {
             VoiceBookingStatus status,
             String message,
             VoiceBookingSpeechPayload speech,
+            Boolean isFinal,
+            Double confidence,
+            List<String> failureHints,
+            Integer retryAfterMs,
             Consumer<VoiceBookingEventPayload.VoiceBookingEventPayloadBuilder> customizer
     ) {
         VoiceBookingEventPayload.VoiceBookingEventPayloadBuilder builder = VoiceBookingEventPayload.builder()
@@ -188,6 +227,10 @@ public class VoiceBookingEventPublisher {
                 .requestId(requestId)
                 .message(message)
                 .speech(speech)
+                .isFinal(isFinal)
+                .confidence(confidence)
+                .failureHints(failureHints)
+                .retryAfterMs(retryAfterMs)
                 .status(status != null ? status.name() : null)
                 .timestamp(Instant.now());
 

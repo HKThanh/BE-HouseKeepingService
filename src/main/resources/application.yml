@@ -101,6 +101,12 @@ whisper:
     async-enabled: ${WHISPER_ASYNC:true}
     thread-pool-size: ${WHISPER_THREAD_POOL:3}
 
+gemini:
+  enabled: ${GEMINI_ENABLED:false}
+  api-key: ${GEMINI_API_KEY:}
+  model: ${GEMINI_MODEL:gemini-1.5-flash}
+  prompt-prefix: ${GEMINI_PROMPT_PREFIX:Bạn là trợ lý đặt lịch dịch vụ giúp việc. Hãy trả lời ngắn gọn, thân thiện dựa trên nội dung:}
+
 fpt:
   tts:
     enabled: ${FPT_TTS_ENABLED:false}

@@ -16,6 +16,8 @@ public record VoiceBookingResponse(
         String message,
         String requestId, // UUID of voice_booking_request
         String status, // PENDING, PROCESSING, COMPLETED, FAILED, PARTIAL
+        Boolean isFinal,
+        Double confidence,
         
         // Transcript data
         String transcript,
@@ -35,6 +37,8 @@ public record VoiceBookingResponse(
         
         // Error details (if failed)
         String errorDetails,
+        List<String> failureHints,
+        Integer retryAfterMs,
 
         // Optional voice responses
         VoiceBookingSpeechPayload speech
@@ -72,6 +76,8 @@ public record VoiceBookingResponse(
                 .message("Booking created successfully from voice input")
                 .requestId(requestId)
                 .status("COMPLETED")
+                .isFinal(true)
+                .confidence(confidenceScore)
                 .bookingId(bookingId)
                 .transcript(transcript)
                 .confidenceScore(confidenceScore)
@@ -94,6 +100,8 @@ public record VoiceBookingResponse(
                 .message("Đã dựng đơn nháp, vui lòng xác nhận để hoàn tất đặt lịch")
                 .requestId(requestId)
                 .status("AWAITING_CONFIRMATION")
+                .isFinal(true)
+                .confidence(confidenceScore)
                 .transcript(transcript)
                 .preview(preview)
                 .confidenceScore(confidenceScore)
@@ -130,6 +138,8 @@ public record VoiceBookingResponse(
                 .message("Could not extract all required information from voice input")
                 .requestId(requestId)
                 .status("PARTIAL")
+                .isFinal(false)
+                .confidence(confidenceScore)
                 .transcript(transcript)
                 .missingFields(missingFields)
                 .clarificationMessage(clarificationMessage)
@@ -152,6 +162,8 @@ public record VoiceBookingResponse(
                 .message(errorMessage)
                 .requestId(requestId)
                 .status("FAILED")
+                .isFinal(true)
+                .confidence(null)
                 .errorDetails(errorDetails)
                 .build();
     }
