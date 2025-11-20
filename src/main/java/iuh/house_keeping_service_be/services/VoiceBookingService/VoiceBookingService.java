@@ -27,6 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import iuh.house_keeping_service_be.utils.BookingDTOFormatter;
 
+import java.text.Normalizer;
 import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.*;
@@ -53,9 +54,10 @@ public class VoiceBookingService {
     private static final List<String> INTENT_KEYWORDS = List.of(
             "dọn", "don", "dọn dẹp", "don dep", "lau", "lau dọn", "lau don",
             "vệ sinh", "ve sinh", "giúp việc", "giup viec", "housekeeping",
-            "dọn nhà", "don nha", "dọn phòng", "don phong", "clean", "booking", "đặt lịch", "dat lich",
+            "dọn nhà", "don nha", "dọn phòng", "don phong", "clean", "booking", "đặt lịch", "dat lich", "đặt", "dat", "lịch", "lich",
             "dịch vụ", "dich vu", "quét", "quet", "chà", "cha", "lau nhà", "lau nha"
     );
+    private static final String MISSING_DETAIL_PROMPT = "Bạn vui lòng cung cấp thêm thông tin chi tiết về dịch vụ bạn muốn đặt cho chúng tôi.";
 
     @Value("${whisper.processing.async-enabled:true}")
     private boolean asyncEnabled;
@@ -111,23 +113,35 @@ public class VoiceBookingService {
 
             // Step 1.5: Detect booking intent via keywords
             if (!containsBookingIntent(voiceResult.transcript())) {
-                String friendlyMsg = "Xin lỗi, hiện tôi chỉ hỗ trợ các yêu cầu đặt dịch vụ giúp việc. " +
-                        "Vui lòng mô tả dịch vụ hoặc lịch bạn muốn đặt.";
-                voiceRequest.markAsFailed("Non-booking intent");
+                // Treat as a booking intent without details -> partial and ask for details
+                List<String> missing = List.of("service", "bookingTime", "address");
+                Map<String, Object> extractedInfo = new HashMap<>();
+                extractedInfo.put("note", voiceResult.transcript());
+
+                voiceRequest.markAsPartial(missing);
                 voiceRequest.setTranscript(voiceResult.transcript());
                 voiceRequest.setProcessingTimeMs((int) voiceResult.processingTimeMs());
                 voiceBookingRequestRepository.save(voiceRequest);
-                VoiceBookingResponse response = VoiceBookingResponse.failed(
+
+                VoiceBookingResponse response = VoiceBookingResponse.partial(
                         voiceRequest.getId(),
-                        friendlyMsg,
-                        "Transcript does not contain booking/service keywords"
+                        voiceResult.transcript(),
+                        missing,
+                        MISSING_DETAIL_PROMPT,
+                        extractedInfo,
+                        voiceResult.confidenceScore(),
+                        (int) voiceResult.processingTimeMs()
                 );
-                VoiceBookingSpeechPayload speech = buildSpeechPayload(response.message(), null);
-                voiceBookingEventPublisher.emitFailed(
+                VoiceBookingSpeechPayload speech = buildSpeechPayload(
+                        response.message(),
+                        response.clarificationMessage()
+                );
+                voiceBookingEventPublisher.emitPartial(
                         voiceRequest.getId(),
                         username,
-                        friendlyMsg,
                         voiceResult.transcript(),
+                        missing,
+                        MISSING_DETAIL_PROMPT,
                         (int) voiceResult.processingTimeMs(),
                         response.message(),
                         speech
@@ -176,15 +190,22 @@ public class VoiceBookingService {
 
                 // Convert extractedFields to Map<String, Object> for better FE handling
                 Map<String, Object> extractedInfo = new java.util.HashMap<>(parsedInfo.extractedFields());
+                String clarificationMsg = buildClarificationText(parsedInfo.missingFields(), extractedInfo, parsedInfo.clarificationMessage());
                 VoiceBookingResponse response = VoiceBookingResponse.partial(
                         voiceRequest.getId(),
                         voiceResult.transcript(),
                         parsedInfo.missingFields(),
-                        parsedInfo.clarificationMessage(),
+                        clarificationMsg,
                         extractedInfo,
                         voiceResult.confidenceScore(),
                         (int) voiceResult.processingTimeMs()
                 );
+                if (!Objects.equals(response.message(), clarificationMsg)) {
+                    response = response.toBuilder()
+                            .message(clarificationMsg)
+                            .clarificationMessage(clarificationMsg)
+                            .build();
+                }
                 String speakMessage = StringUtils.hasText(response.clarificationMessage())
                         ? response.clarificationMessage()
                         : response.message();
@@ -425,15 +446,22 @@ public class VoiceBookingService {
                 voiceBookingRequestRepository.save(voiceRequest);
                 
                 Map<String, Object> extractedInfo = new java.util.HashMap<>(parsedInfo.extractedFields());
+                String clarificationMsg = buildClarificationText(parsedInfo.missingFields(), extractedInfo, parsedInfo.clarificationMessage());
                 VoiceBookingResponse response = VoiceBookingResponse.partial(
                         requestId,
                         combinedTranscript,
                         parsedInfo.missingFields(),
-                        parsedInfo.clarificationMessage(),
+                        clarificationMsg,
                         extractedInfo,
                         voiceRequest.getConfidenceScore() != null ? voiceRequest.getConfidenceScore().doubleValue() : null,
                         voiceRequest.getProcessingTimeMs()
                 );
+                if (!Objects.equals(response.message(), clarificationMsg)) {
+                    response = response.toBuilder()
+                            .message(clarificationMsg)
+                            .clarificationMessage(clarificationMsg)
+                            .build();
+                }
                 String speakMessage = StringUtils.hasText(response.clarificationMessage())
                         ? response.clarificationMessage()
                         : response.message();
@@ -942,7 +970,43 @@ public class VoiceBookingService {
             return false;
         }
         String normalized = transcript.toLowerCase();
-        return INTENT_KEYWORDS.stream().anyMatch(normalized::contains);
+        String plain = stripAccents(normalized);
+        return INTENT_KEYWORDS.stream().anyMatch(keyword -> {
+            String kwNorm = keyword.toLowerCase();
+            return normalized.contains(kwNorm) || plain.contains(stripAccents(kwNorm));
+        });
+    }
+
+    private String buildClarificationText(List<String> missingFields, Map<String, Object> extractedInfo, String fallback) {
+        if (missingFields == null) {
+            return fallback;
+        }
+        boolean missingCore = missingFields.contains("service")
+                && missingFields.contains("bookingTime")
+                && missingFields.contains("address");
+        boolean hasExtraInfo = extractedInfo != null && extractedInfo.entrySet().stream()
+                .anyMatch(e -> {
+                    String key = e.getKey();
+                    if ("note".equalsIgnoreCase(key) || "availableServices".equalsIgnoreCase(key)) {
+                        return false;
+                    }
+                    return e.getValue() != null && !"".equals(String.valueOf(e.getValue()).trim());
+                });
+        if (missingFields.contains("service") && !hasExtraInfo) {
+            return MISSING_DETAIL_PROMPT;
+        }
+        if (missingCore && !hasExtraInfo) {
+            return MISSING_DETAIL_PROMPT;
+        }
+        return StringUtils.hasText(fallback) ? fallback : MISSING_DETAIL_PROMPT;
+    }
+
+    private String stripAccents(String input) {
+        if (input == null) {
+            return "";
+        }
+        String normalized = Normalizer.normalize(input, Normalizer.Form.NFD);
+        return normalized.replaceAll("\\p{M}", "");
     }
 
     private record VoiceBookingDraftResult(BookingCreateRequest bookingRequest, VoiceBookingPreview preview) {
