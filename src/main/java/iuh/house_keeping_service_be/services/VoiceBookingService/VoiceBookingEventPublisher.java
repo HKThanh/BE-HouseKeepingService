@@ -49,7 +49,8 @@ public class VoiceBookingEventPublisher {
             String requestId,
             String username,
             VoiceBookingPreview preview,
-            Integer processingTimeMs
+            Integer processingTimeMs,
+            VoiceBookingSpeech speech
     ) {
         VoiceBookingEventPayload payload = buildPayload(
                 requestId,
@@ -58,6 +59,7 @@ public class VoiceBookingEventPublisher {
                 builder -> builder
                         .preview(preview)
                         .processingTimeMs(processingTimeMs)
+                        .speech(speech)
         );
         sendToTopic(username, payload);
     }
@@ -68,7 +70,8 @@ public class VoiceBookingEventPublisher {
             String transcript,
             List<String> missingFields,
             String clarificationMessage,
-            Integer processingTimeMs
+            Integer processingTimeMs,
+            VoiceBookingSpeech speech
     ) {
         VoiceBookingEventPayload payload = buildPayload(
                 requestId,
@@ -79,6 +82,7 @@ public class VoiceBookingEventPublisher {
                         .missingFields(missingFields)
                         .clarificationMessage(clarificationMessage)
                         .processingTimeMs(processingTimeMs)
+                        .speech(speech)
         );
         sendToTopic(username, payload);
     }
@@ -88,7 +92,8 @@ public class VoiceBookingEventPublisher {
             String username,
             String bookingId,
             String transcript,
-            Integer processingTimeMs
+            Integer processingTimeMs,
+            VoiceBookingSpeech speech
     ) {
         VoiceBookingEventPayload payload = buildPayload(
                 requestId,
@@ -98,6 +103,7 @@ public class VoiceBookingEventPublisher {
                         .bookingId(bookingId)
                         .transcript(transcript)
                         .processingTimeMs(processingTimeMs)
+                        .speech(speech)
         );
         sendToTopic(username, payload);
     }
@@ -107,7 +113,8 @@ public class VoiceBookingEventPublisher {
             String username,
             String errorMessage,
             String transcript,
-            Integer processingTimeMs
+            Integer processingTimeMs,
+            VoiceBookingSpeech speech
     ) {
         VoiceBookingEventPayload payload = buildPayload(
                 requestId,
@@ -117,19 +124,21 @@ public class VoiceBookingEventPublisher {
                         .errorMessage(errorMessage)
                         .transcript(transcript)
                         .processingTimeMs(processingTimeMs)
+                        .speech(speech)
         );
         sendToTopic(username, payload);
     }
 
     public void emitCancelled(
             String requestId,
-            String username
+            String username,
+            VoiceBookingSpeech speech
     ) {
         VoiceBookingEventPayload payload = buildPayload(
                 requestId,
                 VoiceBookingEventType.CANCELLED,
                 VoiceBookingStatus.CANCELLED,
-                builder -> {}
+                builder -> builder.speech(speech)
         );
         sendToTopic(username, payload);
     }

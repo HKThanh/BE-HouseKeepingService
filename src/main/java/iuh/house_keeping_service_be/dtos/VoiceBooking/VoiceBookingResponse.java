@@ -9,7 +9,7 @@ import java.util.Map;
 /**
  * Response DTO for voice booking processing
  */
-@Builder
+@Builder(toBuilder = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record VoiceBookingResponse(
         boolean success,
@@ -21,7 +21,8 @@ public record VoiceBookingResponse(
         String transcript,
         Double confidenceScore,
         Integer processingTimeMs,
-        
+        Map<String, VoiceToTextResult> transcriptsByProvider,
+
         // Booking result (if completed)
         String bookingId,
         VoiceBookingPreview preview,
@@ -32,6 +33,9 @@ public record VoiceBookingResponse(
         
         // Extracted/Understood information (for FE to display)
         Map<String, Object> extractedInfo,
+        
+        // Text-to-speech payload, if available
+        VoiceBookingSpeech speech,
         
         // Error details (if failed)
         String errorDetails

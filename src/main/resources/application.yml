@@ -100,3 +100,19 @@ whisper:
   processing:
     async-enabled: ${WHISPER_ASYNC:true}
     thread-pool-size: ${WHISPER_THREAD_POOL:3}
+
+tts:
+  fpt:
+    enabled: ${FPT_TTS_ENABLED:true}
+    api-url: ${FPT_TTS_API_URL:https://api.fpt.ai/hmi/tts/v5}
+    api-key: ${FPT_TTS_API_KEY:}
+    voice: ${FPT_TTS_VOICE:banmai}
+    speed: ${FPT_TTS_SPEED:0}
+    text-limit: ${FPT_TTS_TEXT_LIMIT:1500}
+    verify-attempts: ${FPT_TTS_VERIFY_ATTEMPTS:120}
+    verify-delay-ms: ${FPT_TTS_VERIFY_DELAY:2000}
+    verify-timeout-ms: ${FPT_TTS_VERIFY_TIMEOUT:240000}
+    cloudinary-folder: ${FPT_TTS_CLOUDINARY_FOLDER:voice_booking/tts}
+    provider-retries: ${FPT_TTS_PROVIDER_RETRIES:2}
+    provider-retry-delay-ms: ${FPT_TTS_PROVIDER_RETRY_DELAY:5000}
+    download-initial-delay-ms: ${FPT_TTS_DOWNLOAD_INITIAL_DELAY:2000}

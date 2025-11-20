@@ -52,6 +52,37 @@ public class CloudinaryService {
         }
     }
 
+    public Map<String, Object> uploadBytes(byte[] data, String contentType, String folder, String publicId) {
+        if (data == null || data.length == 0) {
+            throw new IllegalArgumentException("Data must not be empty");
+        }
+
+        Map<String, Object> options = new HashMap<>();
+        options.put("resource_type", determineResourceType(contentType));
+        if (folder != null && !folder.isBlank()) {
+            options.put("folder", folder);
+        }
+        if (publicId != null && !publicId.isBlank()) {
+            options.put("public_id", publicId);
+            options.put("overwrite", true);
+        }
+
+        try {
+            Uploader uploader = cloudinary.uploader();
+            @SuppressWarnings("unchecked")
+            Map<String, Object> uploadResult = (Map<String, Object>) uploader.upload(data, options);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("secureUrl", uploadResult.get("secure_url"));
+            response.put("publicId", uploadResult.get("public_id"));
+            return response;
+        } catch (IOException ex) {
+            log.error("Error uploading bytes to Cloudinary", ex);
+            throw new RuntimeException("Failed to upload bytes to Cloudinary", ex);
+        }
+    }
+
     private String determineResourceType(String contentType) {
         if (contentType == null) {
             return "auto";

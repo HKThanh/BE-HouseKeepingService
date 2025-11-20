@@ -48,6 +48,7 @@ public class VoiceBookingService {
     private final VoiceBookingEventPublisher voiceBookingEventPublisher;
     private final EmployeeScheduleService employeeScheduleService;
     private final EmployeeRepository employeeRepository;
+    private final FptTextToSpeechService textToSpeechService;
 
     @Value("${whisper.processing.async-enabled:true}")
     private boolean asyncEnabled;
@@ -83,18 +84,20 @@ public class VoiceBookingService {
             if (!voiceResult.hasTranscript()) {
                 voiceRequest.markAsFailed("Failed to transcribe audio");
                 voiceBookingRequestRepository.save(voiceRequest);
+                VoiceBookingResponse response = withSpeech(VoiceBookingResponse.failed(
+                        voiceRequest.getId(),
+                        "Không thể chuyển đổi giọng nói thành văn bản",
+                        "No transcript generated"
+                ));
                 voiceBookingEventPublisher.emitFailed(
                         voiceRequest.getId(),
                         username,
                         "Không thể chuyển đổi giọng nói thành văn bản",
                         null,
-                        null
+                        null,
+                        response.speech()
                 );
-                return VoiceBookingResponse.failed(
-                        voiceRequest.getId(),
-                        "Không thể chuyển đổi giọng nói thành văn bản",
-                        "No transcript generated"
-                );
+                return response;
             }
 
             // Update voice request with transcript
@@ -114,20 +117,22 @@ public class VoiceBookingService {
                 VoiceBookingDraftResult draftResult = prepareDraft(customer, parsedInfo.bookingRequest());
                 voiceRequest.markAsAwaitingConfirmation(draftResult.bookingRequest(), draftResult.preview());
                 voiceRequest = voiceBookingRequestRepository.save(voiceRequest);
-                voiceBookingEventPublisher.emitAwaitingConfirmation(
-                        voiceRequest.getId(),
-                        username,
-                        draftResult.preview(),
-                        (int) voiceResult.processingTimeMs()
-                );
-
-                return VoiceBookingResponse.awaitingConfirmation(
+                VoiceBookingResponse response = withSpeech(VoiceBookingResponse.awaitingConfirmation(
                         voiceRequest.getId(),
                         voiceResult.transcript(),
                         draftResult.preview(),
                         voiceResult.confidenceScore(),
                         (int) voiceResult.processingTimeMs()
+                ));
+                voiceBookingEventPublisher.emitAwaitingConfirmation(
+                        voiceRequest.getId(),
+                        username,
+                        draftResult.preview(),
+                        (int) voiceResult.processingTimeMs(),
+                        response.speech()
                 );
+
+                return response;
             } else if (parsedInfo.requiresClarification()) {
                 // Mark as partial
                 voiceRequest.markAsPartial(parsedInfo.missingFields());
@@ -135,16 +140,7 @@ public class VoiceBookingService {
 
                 // Convert extractedFields to Map<String, Object> for better FE handling
                 Map<String, Object> extractedInfo = new java.util.HashMap<>(parsedInfo.extractedFields());
-                voiceBookingEventPublisher.emitPartial(
-                        voiceRequest.getId(),
-                        username,
-                        voiceResult.transcript(),
-                        parsedInfo.missingFields(),
-                        parsedInfo.clarificationMessage(),
-                        (int) voiceResult.processingTimeMs()
-                );
-
-                return VoiceBookingResponse.partial(
+                VoiceBookingResponse response = withSpeech(VoiceBookingResponse.partial(
                         voiceRequest.getId(),
                         voiceResult.transcript(),
                         parsedInfo.missingFields(),
@@ -152,24 +148,37 @@ public class VoiceBookingService {
                         extractedInfo,
                         voiceResult.confidenceScore(),
                         (int) voiceResult.processingTimeMs()
+                ));
+                voiceBookingEventPublisher.emitPartial(
+                        voiceRequest.getId(),
+                        username,
+                        voiceResult.transcript(),
+                        parsedInfo.missingFields(),
+                        parsedInfo.clarificationMessage(),
+                        (int) voiceResult.processingTimeMs(),
+                        response.speech()
                 );
+
+                return response;
 
             } else {
                 voiceRequest.markAsFailed("Failed to parse transcript");
                 voiceBookingRequestRepository.save(voiceRequest);
+                VoiceBookingResponse response = withSpeech(VoiceBookingResponse.failed(
+                        voiceRequest.getId(),
+                        "Không thể phân tích yêu cầu từ giọng nói",
+                        "Parsing failed with low confidence"
+                ));
                 voiceBookingEventPublisher.emitFailed(
                         voiceRequest.getId(),
                         username,
                         "Failed to parse transcript",
                         voiceResult.transcript(),
-                        (int) voiceResult.processingTimeMs()
+                        (int) voiceResult.processingTimeMs(),
+                        response.speech()
                 );
 
-                return VoiceBookingResponse.failed(
-                        voiceRequest.getId(),
-                        "Không thể phân tích yêu cầu từ giọng nói",
-                        "Parsing failed with low confidence"
-                );
+                return response;
             }
 
         } catch (iuh.house_keeping_service_be.exceptions.BookingValidationException e) {
@@ -180,36 +189,40 @@ public class VoiceBookingService {
             log.error("Booking validation failed for voice request {}: {}", voiceRequest.getId(), errorDetails);
             voiceRequest.markAsFailed(errorDetails);
             voiceBookingRequestRepository.save(voiceRequest);
+            VoiceBookingResponse response = withSpeech(VoiceBookingResponse.failed(
+                    voiceRequest.getId(),
+                    "Không thể tạo booking: " + errorDetails,
+                    errorDetails
+            ));
             voiceBookingEventPublisher.emitFailed(
                     voiceRequest.getId(),
                     username,
                     errorDetails,
                     voiceRequest.getTranscript(),
-                    voiceRequest.getProcessingTimeMs()
+                    voiceRequest.getProcessingTimeMs(),
+                    response.speech()
             );
 
-            return VoiceBookingResponse.failed(
-                    voiceRequest.getId(),
-                    "Không thể tạo booking: " + errorDetails,
-                    errorDetails
-            );
+            return response;
         } catch (Exception e) {
             log.error("Error processing voice booking: {}", e.getMessage(), e);
             voiceRequest.markAsFailed(e.getMessage());
             voiceBookingRequestRepository.save(voiceRequest);
+            VoiceBookingResponse response = withSpeech(VoiceBookingResponse.failed(
+                    voiceRequest.getId(),
+                    "Đã xảy ra lỗi khi xử lý yêu cầu đặt lịch bằng giọng nói",
+                    e.getMessage()
+            ));
             voiceBookingEventPublisher.emitFailed(
                     voiceRequest.getId(),
                     username,
                     e.getMessage(),
                     voiceRequest.getTranscript(),
-                    voiceRequest.getProcessingTimeMs()
+                    voiceRequest.getProcessingTimeMs(),
+                    response.speech()
             );
 
-            return VoiceBookingResponse.failed(
-                    voiceRequest.getId(),
-                    "Đã xảy ra lỗi khi xử lý yêu cầu đặt lịch bằng giọng nói",
-                    e.getMessage()
-            );
+            return response;
         }
     }
 
@@ -247,17 +260,18 @@ public class VoiceBookingService {
 
         // Validate status
         if (!"PARTIAL".equals(voiceRequest.getStatus()) && !"AWAITING_CONFIRMATION".equals(voiceRequest.getStatus())) {
-            VoiceBookingResponse failedResponse = VoiceBookingResponse.failed(
+            VoiceBookingResponse failedResponse = withSpeech(VoiceBookingResponse.failed(
                     requestId,
                     "Không thể tiếp tục yêu cầu này",
                     "Request status is not PARTIAL, current status: " + voiceRequest.getStatus()
-            );
+            ));
             voiceBookingEventPublisher.emitFailed(
                     requestId,
                     username,
                     "Request status is not PARTIAL, current status: " + voiceRequest.getStatus(),
                     voiceRequest.getTranscript(),
-                    voiceRequest.getProcessingTimeMs()
+                    voiceRequest.getProcessingTimeMs(),
+                    failedResponse.speech()
             );
             return failedResponse;
         }
@@ -267,17 +281,18 @@ public class VoiceBookingService {
                 .orElseThrow(() -> new IllegalArgumentException("Customer not found: " + username));
         
         if (!voiceRequest.getCustomer().getCustomerId().equals(customer.getCustomerId())) {
-            VoiceBookingResponse failedResponse = VoiceBookingResponse.failed(
+            VoiceBookingResponse failedResponse = withSpeech(VoiceBookingResponse.failed(
                     requestId,
                     "Không có quyền truy cập yêu cầu này",
                     "Customer mismatch"
-            );
+            ));
             voiceBookingEventPublisher.emitFailed(
                     requestId,
                     username,
                     "Customer mismatch",
                     voiceRequest.getTranscript(),
-                    voiceRequest.getProcessingTimeMs()
+                    voiceRequest.getProcessingTimeMs(),
+                    failedResponse.speech()
             );
             return failedResponse;
         }
@@ -332,36 +347,29 @@ public class VoiceBookingService {
                 VoiceBookingDraftResult draftResult = prepareDraft(customer, parsedInfo.bookingRequest());
                 voiceRequest.markAsAwaitingConfirmation(draftResult.bookingRequest(), draftResult.preview());
                 voiceRequest = voiceBookingRequestRepository.save(voiceRequest);
-                voiceBookingEventPublisher.emitAwaitingConfirmation(
-                        requestId,
-                        username,
-                        draftResult.preview(),
-                        voiceRequest.getProcessingTimeMs()
-                );
-
-                return VoiceBookingResponse.awaitingConfirmation(
+                VoiceBookingResponse response = withSpeech(VoiceBookingResponse.awaitingConfirmation(
                         requestId,
                         combinedTranscript,
                         draftResult.preview(),
                         voiceRequest.getConfidenceScore() != null ? voiceRequest.getConfidenceScore().doubleValue() : null,
                         voiceRequest.getProcessingTimeMs()
+                ));
+                voiceBookingEventPublisher.emitAwaitingConfirmation(
+                        requestId,
+                        username,
+                        draftResult.preview(),
+                        voiceRequest.getProcessingTimeMs(),
+                        response.speech()
                 );
+
+                return response;
             } else {
                 // Still missing information
                 voiceRequest.markAsPartial(parsedInfo.missingFields());
                 voiceBookingRequestRepository.save(voiceRequest);
                 
                 Map<String, Object> extractedInfo = new java.util.HashMap<>(parsedInfo.extractedFields());
-                voiceBookingEventPublisher.emitPartial(
-                        requestId,
-                        username,
-                        combinedTranscript,
-                        parsedInfo.missingFields(),
-                        parsedInfo.clarificationMessage(),
-                        voiceRequest.getProcessingTimeMs()
-                );
-                
-                return VoiceBookingResponse.partial(
+                VoiceBookingResponse response = withSpeech(VoiceBookingResponse.partial(
                         requestId,
                         combinedTranscript,
                         parsedInfo.missingFields(),
@@ -369,9 +377,20 @@ public class VoiceBookingService {
                         extractedInfo,
                         voiceRequest.getConfidenceScore() != null ? voiceRequest.getConfidenceScore().doubleValue() : null,
                         voiceRequest.getProcessingTimeMs()
+                ));
+                voiceBookingEventPublisher.emitPartial(
+                        requestId,
+                        username,
+                        combinedTranscript,
+                        parsedInfo.missingFields(),
+                        parsedInfo.clarificationMessage(),
+                        voiceRequest.getProcessingTimeMs(),
+                        response.speech()
                 );
+                
+                return response;
             }
-            
+
         } catch (iuh.house_keeping_service_be.exceptions.BookingValidationException e) {
             String errorDetails = e.getErrors() != null && !e.getErrors().isEmpty() 
                     ? String.join("; ", e.getErrors())
@@ -379,36 +398,40 @@ public class VoiceBookingService {
             log.error("Booking validation failed for continued request {}: {}", requestId, errorDetails);
             voiceRequest.markAsFailed(errorDetails);
             voiceBookingRequestRepository.save(voiceRequest);
+            VoiceBookingResponse response = withSpeech(VoiceBookingResponse.failed(
+                    requestId,
+                    "Không thể tạo booking: " + errorDetails,
+                    errorDetails
+            ));
             voiceBookingEventPublisher.emitFailed(
                     requestId,
                     username,
                     errorDetails,
                     voiceRequest.getTranscript(),
-                    voiceRequest.getProcessingTimeMs()
+                    voiceRequest.getProcessingTimeMs(),
+                    response.speech()
             );
             
-            return VoiceBookingResponse.failed(
-                    requestId,
-                    "Không thể tạo booking: " + errorDetails,
-                    errorDetails
-            );
+            return response;
         } catch (Exception e) {
             log.error("Error continuing voice booking: {}", e.getMessage(), e);
             voiceRequest.markAsFailed(e.getMessage());
             voiceBookingRequestRepository.save(voiceRequest);
+            VoiceBookingResponse response = withSpeech(VoiceBookingResponse.failed(
+                    requestId,
+                    "Đã xảy ra lỗi khi tiếp tục xử lý yêu cầu",
+                    e.getMessage()
+            ));
             voiceBookingEventPublisher.emitFailed(
                     requestId,
                     username,
                     e.getMessage(),
                     voiceRequest.getTranscript(),
-                    voiceRequest.getProcessingTimeMs()
+                    voiceRequest.getProcessingTimeMs(),
+                    response.speech()
             );
             
-            return VoiceBookingResponse.failed(
-                    requestId,
-                    "Đã xảy ra lỗi khi tiếp tục xử lý yêu cầu",
-                    e.getMessage()
-            );
+            return response;
         }
     }
 
@@ -448,55 +471,61 @@ public class VoiceBookingService {
             booking.setBookingId(bookingSummary.getBookingId());
             voiceRequest.markAsCompleted(booking);
             voiceRequest = voiceBookingRequestRepository.save(voiceRequest);
-            voiceBookingEventPublisher.emitCompleted(
-                    requestId,
-                    username,
-                    bookingSummary.getBookingId(),
-                    voiceRequest.getTranscript(),
-                    voiceRequest.getProcessingTimeMs()
-            );
-
-            return VoiceBookingResponse.completed(
+            VoiceBookingResponse response = withSpeech(VoiceBookingResponse.completed(
                     requestId,
                     bookingSummary.getBookingId(),
                     voiceRequest.getTranscript(),
                     voiceRequest.getConfidenceScore() != null ? voiceRequest.getConfidenceScore().doubleValue() : null,
                     voiceRequest.getProcessingTimeMs()
+            ));
+            voiceBookingEventPublisher.emitCompleted(
+                    requestId,
+                    username,
+                    bookingSummary.getBookingId(),
+                    voiceRequest.getTranscript(),
+                    voiceRequest.getProcessingTimeMs(),
+                    response.speech()
             );
+
+            return response;
         } catch (iuh.house_keeping_service_be.exceptions.BookingValidationException e) {
             log.error("Booking validation failed during confirmation {}: {}", requestId, e.getMessage());
             voiceRequest.markAsFailed(e.getMessage());
             voiceBookingRequestRepository.save(voiceRequest);
+            VoiceBookingResponse response = withSpeech(VoiceBookingResponse.failed(
+                    requestId,
+                    "Không thể tạo booking: " + e.getMessage(),
+                    e.getMessage()
+            ));
             voiceBookingEventPublisher.emitFailed(
                     requestId,
                     username,
                     e.getMessage(),
                     voiceRequest.getTranscript(),
-                    voiceRequest.getProcessingTimeMs()
+                    voiceRequest.getProcessingTimeMs(),
+                    response.speech()
             );
 
-            return VoiceBookingResponse.failed(
-                    requestId,
-                    "Không thể tạo booking: " + e.getMessage(),
-                    e.getMessage()
-            );
+            return response;
         } catch (Exception e) {
             log.error("Unexpected error confirming booking {}: {}", requestId, e.getMessage(), e);
             voiceRequest.markAsFailed(e.getMessage());
             voiceBookingRequestRepository.save(voiceRequest);
+            VoiceBookingResponse response = withSpeech(VoiceBookingResponse.failed(
+                    requestId,
+                    "Đã xảy ra lỗi khi xác nhận đơn",
+                    e.getMessage()
+            ));
             voiceBookingEventPublisher.emitFailed(
                     requestId,
                     username,
                     e.getMessage(),
                     voiceRequest.getTranscript(),
-                    voiceRequest.getProcessingTimeMs()
+                    voiceRequest.getProcessingTimeMs(),
+                    response.speech()
             );
 
-            return VoiceBookingResponse.failed(
-                    requestId,
-                    "Đã xảy ra lỗi khi xác nhận đơn",
-                    e.getMessage()
-            );
+            return response;
         }
     }
 
@@ -522,10 +551,11 @@ public class VoiceBookingService {
         }
 
         voiceRequest.markAsCancelled();
-        voiceBookingEventPublisher.emitCancelled(requestId, username);
+        VoiceBookingResponse response = withSpeech(VoiceBookingResponse.cancelled(requestId));
+        voiceBookingEventPublisher.emitCancelled(requestId, username, response.speech());
         voiceBookingRequestRepository.delete(voiceRequest);
 
-        return VoiceBookingResponse.cancelled(requestId);
+        return response;
     }
 
     /**
@@ -795,6 +825,15 @@ public class VoiceBookingService {
             List<VoiceBookingEmployeePreview> employeePreviews,
             boolean autoAssigned
     ) {
+    }
+
+    private VoiceBookingResponse withSpeech(VoiceBookingResponse response) {
+        if (response == null) {
+            return null;
+        }
+        return textToSpeechService.synthesizeResponseSpeech(response)
+                .map(speech -> response.toBuilder().speech(speech).build())
+                .orElse(response);
     }
 
     /**

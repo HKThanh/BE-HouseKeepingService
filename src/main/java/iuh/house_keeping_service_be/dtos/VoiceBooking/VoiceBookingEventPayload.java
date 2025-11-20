@@ -23,6 +23,7 @@ public record VoiceBookingEventPayload(
         Integer processingTimeMs,
         String errorMessage,
         VoiceBookingPreview preview,
+        VoiceBookingSpeech speech,
         Instant timestamp,
         Double progress
 ) {

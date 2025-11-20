@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Voice Booking Draft Flow Tester</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        :root { color-scheme: light dark; }
+        * { box-sizing: border-box; }
+        body {
+            font-family: "Segoe UI", system-ui, sans-serif;
+            background: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            color: #0f172a;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 32px 18px 80px;
+        }
+        h1 { margin-bottom: 8px; }
+        h2 { margin-top: 0; color: #1363df; }
+        section {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 22px 24px;
+            margin-top: 20px;
+            box-shadow: 0 15px 40px rgba(15, 23, 42, 0.08);
+        }
+        label {
+            font-weight: 600;
+            display: block;
+            margin-top: 14px;
+        }
+        input[type="text"],
+        input[type="url"],
+        textarea {
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid #cbd5f5;
+            padding: 10px 12px;
+            margin-top: 6px;
+            font-size: 15px;
+            font-family: "Fira Code", "SFMono-Regular", Consolas, monospace;
+            resize: vertical;
+        }
+        textarea { min-height: 80px; }
+        input[type="file"] { margin-top: 6px; }
+        button {
+            border: none;
+            border-radius: 8px;
+            padding: 9px 16px;
+            margin-top: 16px;
+            margin-right: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            background: #0f62fe;
+            color: #ffffff;
+            transition: opacity 120ms ease;
+        }
+        button.secondary { background: #e2e8f0; color: #0f172a; }
+        button:disabled { opacity: 0.4; cursor: not-allowed; }
+        .row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 16px;
+            margin-top: 6px;
+        }
+        .log-box {
+            background: #0f172a;
+            color: #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+            height: 240px;
+            overflow-y: auto;
+            font-family: "Fira Code", "SFMono-Regular", Consolas, monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+        }
+        .log-line { margin: 0; }
+        .log-line.error { color: #f87171; }
+        .log-line.success { color: #34d399; }
+        .log-line.warn { color: #facc15; }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+        .status-badge.connected {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .status-badge.disconnected {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        .inline-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .inline-checkbox input[type="checkbox"] {
+            width: auto;
+            margin-top: 0;
+        }
+        pre.preview {
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 14px;
+            border: 1px solid #cbd5f5;
+            min-height: 120px;
+            overflow-x: auto;
+            font-size: 13px;
+        }
+        .hint { font-size: 13px; color: #64748b; margin-top: 4px; }
+        @media (max-width: 768px) {
+            section { padding: 18px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Voice Booking Draft Flow Tester</h1>
+    <p>Trang HTML mini để kiểm thử các bước tạo draft, tiếp tục, xác nhận và huỷ booking từ giọng nói.</p>
+
+    <section>
+        <h2>1. Cấu hình chung</h2>
+        <label>Base URL (ví dụ: http://localhost:8080)</label>
+        <input type="url" id="baseUrl" value="http://localhost:8080">
+
+        <label>JWT Token (Bearer …)</label>
+        <textarea id="token" placeholder="dán access token vào đây"></textarea>
+
+        <div class="row">
+            <div>
+                <label>Voice Request ID</label>
+                <input type="text" id="requestId" placeholder="Được fill tự động sau khi gọi API">
+                <div class="hint">Có thể dán ID khác để tiếp tục / confirm thủ công.</div>
+            </div>
+            <div>
+                <label>Hints JSON (tuỳ chọn)</label>
+                <textarea id="hints" placeholder='{"addressId":"..."}'></textarea>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>2. Gửi audio & dựng draft</h2>
+        <label>Audio file</label>
+        <input type="file" id="voiceAudio" accept="audio/*">
+        <div class="hint">Tối đa 5MB theo cấu hình backend.</div>
+
+        <button onclick="startVoiceBooking()">Gửi voice booking</button>
+    </section>
+
+    <section>
+        <h2>3. Continue / Confirm / Cancel</h2>
+        <label>Additional text (cho bước continue)</label>
+        <textarea id="additionalText" placeholder="Ví dụ: Thêm ghi chú, đổi thời gian..."></textarea>
+
+        <label>Explicit fields JSON</label>
+        <textarea id="explicitFields" placeholder='{"bookingTime":"2025-11-20T09:00:00"}'></textarea>
+
+        <label>Additional audio (optional)</label>
+        <input type="file" id="continueAudio" accept="audio/*">
+
+        <div>
+            <button onclick="continueVoiceBooking()">Continue voice booking</button>
+            <button class="secondary" onclick="confirmVoiceBooking()">Confirm draft</button>
+            <button class="secondary" onclick="cancelVoiceBooking()">Cancel draft</button>
+            <button class="secondary" onclick="fetchStatus()">Get status</button>
+        </div>
+    </section>
+
+    <section>
+        <h2>4. Theo dõi WebSocket</h2>
+        <label>WebSocket URL (SockJS endpoint, ví dụ: http://localhost:8080/ws/voice-booking)</label>
+        <input type="url" id="wsUrl" value="http://localhost:8080/ws/voice-booking">
+
+        <div class="inline-checkbox">
+            <input type="checkbox" id="autoSubscribe" checked>
+            <label for="autoSubscribe">Tự subscribe requestId mới sau khi tạo draft</label>
+        </div>
+
+        <div class="row">
+            <div>
+                <label>Trạng thái kết nối</label>
+                <div>
+                    <span class="status-badge disconnected" id="wsStatus">Disconnected</span>
+                </div>
+                <button id="connectWs" onclick="connectVoiceWebSocket()">Connect WebSocket</button>
+                <button id="disconnectWs" class="secondary" onclick="disconnectVoiceWebSocket()">Disconnect</button>
+            </div>
+            <div>
+                <label>Request ID để subscribe (mặc định dùng ô phía trên)</label>
+                <input type="text" id="wsTopicInput" placeholder="vd: req_123">
+                <button class="secondary" onclick="subscribeVoiceTopic()">Subscribe topic</button>
+                <div class="hint">Server push sự kiện tại /topic/voice-booking/{requestId} và lỗi tại /user/queue/voice-booking/errors.</div>
+            </div>
+        </div>
+
+        <h3>WebSocket Log</h3>
+        <div class="log-box" id="wsLog"></div>
+    </section>
+
+    <section>
+        <h2>5. Preview / Payload</h2>
+        <label>Latest response preview</label>
+        <pre class="preview" id="previewBox">{ }</pre>
+
+        <h3>Log</h3>
+        <div class="log-box" id="logBox"></div>
+    </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+<script>
+    const logBox = document.getElementById('logBox');
+    const wsLogBox = document.getElementById('wsLog');
+    const wsStatusBadge = document.getElementById('wsStatus');
+    const previewBox = document.getElementById('previewBox');
+    const state = {
+        requestId: null,
+        wsClient: null,
+        wsTopicSubscriptions: new Map(),
+        wsErrorSubscription: null,
+        wsXhrInterceptorCleanup: null
+    };
+
+    function normalizeBaseUrl(value = '') {
+        return value.trim().replace(/\/+$/, '');
+    }
+
+    function toHttpUrl(value = '') {
+        if (value.startsWith('ws://')) {
+            return 'http://' + value.substring(5);
+        }
+        if (value.startsWith('wss://')) {
+            return 'https://' + value.substring(6);
+        }
+        return value;
+    }
+
+    function requireTokenValue() {
+        const token = document.getElementById('token').value.trim();
+        if (!token) throw new Error('Chưa nhập token');
+        return token;
+    }
+
+    function log(message, type = 'info') {
+        const line = document.createElement('div');
+        line.className = `log-line ${type}`;
+        line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        logBox.prepend(line);
+    }
+
+    function logWs(message, type = 'info') {
+        if (!wsLogBox) return;
+        const line = document.createElement('div');
+        line.className = `log-line ${type}`;
+        line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        wsLogBox.prepend(line);
+    }
+
+    function setPreview(data) {
+        previewBox.textContent = JSON.stringify(data, null, 2);
+    }
+
+    function getAuthHeaders() {
+        return { 'Authorization': `Bearer ${requireTokenValue()}` };
+    }
+
+    function getBaseUrl() {
+        const url = normalizeBaseUrl(document.getElementById('baseUrl').value || '');
+        if (!url) throw new Error('Chưa nhập base URL');
+        return url;
+    }
+
+    function setWsStatus(isConnected) {
+        if (!wsStatusBadge) return;
+        wsStatusBadge.textContent = isConnected ? 'Connected' : 'Disconnected';
+        wsStatusBadge.classList.toggle('connected', isConnected);
+        wsStatusBadge.classList.toggle('disconnected', !isConnected);
+    }
+
+    function getWsEndpoint() {
+        const input = document.getElementById('wsUrl');
+        const manual = input ? normalizeBaseUrl(input.value || '') : '';
+        if (manual) return manual;
+        return `${getBaseUrl()}/ws/voice-booking`;
+    }
+
+    function cleanupWsSubscriptions() {
+        state.wsTopicSubscriptions.forEach((sub) => sub.unsubscribe());
+        state.wsTopicSubscriptions.clear();
+        if (state.wsErrorSubscription) {
+            state.wsErrorSubscription.unsubscribe();
+            state.wsErrorSubscription = null;
+        }
+    }
+
+    function installXhrAuthInterceptor(token, wsBaseUrl) {
+        const httpBase = normalizeBaseUrl(toHttpUrl(wsBaseUrl));
+        const originalOpen = XMLHttpRequest.prototype.open;
+        const originalSend = XMLHttpRequest.prototype.send;
+
+        XMLHttpRequest.prototype.open = function (method, url) {
+            this._voiceWsShouldAttachAuth = typeof url === 'string' && url.startsWith(httpBase);
+            return originalOpen.apply(this, arguments);
+        };
+
+        XMLHttpRequest.prototype.send = function (body) {
+            if (this._voiceWsShouldAttachAuth) {
+                this.setRequestHeader('Authorization', `Bearer ${token}`);
+            }
+            return originalSend.apply(this, arguments);
+        };
+
+        return () => {
+            XMLHttpRequest.prototype.open = originalOpen;
+            XMLHttpRequest.prototype.send = originalSend;
+        };
+    }
+
+    function updateRequestId(newId) {
+        if (!newId) return;
+        state.requestId = newId;
+        document.getElementById('requestId').value = newId;
+        const topicInput = document.getElementById('wsTopicInput');
+        if (topicInput) topicInput.value = newId;
+        log(`Request ID cập nhật: ${newId}`, 'success');
+        const autoSubEl = document.getElementById('autoSubscribe');
+        if (autoSubEl && autoSubEl.checked && state.wsClient && state.wsClient.connected) {
+            subscribeVoiceTopic(newId);
+        }
+    }
+
+    function connectVoiceWebSocket() {
+        try {
+            if (state.wsClient && state.wsClient.connected) {
+                logWs('Đã kết nối WebSocket.', 'warn');
+                return;
+            }
+
+            const token = requireTokenValue();
+            const headers = { 'Authorization': `Bearer ${token}` };
+            const endpoint = getWsEndpoint();
+            logWs(`Đang kết nối ${endpoint}...`);
+
+            if (state.wsXhrInterceptorCleanup) {
+                state.wsXhrInterceptorCleanup();
+            }
+            state.wsXhrInterceptorCleanup = installXhrAuthInterceptor(token, endpoint);
+
+            const sock = new SockJS(endpoint, null, {
+                transports: ['xhr-streaming', 'xhr-polling']
+            });
+            const client = Stomp.over(sock);
+            client.debug = (msg) => logWs(msg);
+
+            client.connect(
+                { Authorization: headers['Authorization'] },
+                () => {
+                    state.wsClient = client;
+                    setWsStatus(true);
+                    logWs('Đã connect đến /ws/voice-booking', 'success');
+
+                    state.wsErrorSubscription = client.subscribe('/user/queue/voice-booking/errors', (message) => {
+                        logWs(`ERROR QUEUE: ${message.body}`, 'error');
+                    });
+
+                    const currentRequestId = document.getElementById('requestId').value.trim();
+                    const autoSubEl = document.getElementById('autoSubscribe');
+                    if (currentRequestId && autoSubEl && autoSubEl.checked) {
+                        subscribeVoiceTopic(currentRequestId);
+                    }
+                },
+                (err) => {
+                    logWs(`WebSocket lỗi: ${err}`, 'error');
+                    cleanupWsSubscriptions();
+                    if (state.wsXhrInterceptorCleanup) {
+                        state.wsXhrInterceptorCleanup();
+                        state.wsXhrInterceptorCleanup = null;
+                    }
+                    state.wsClient = null;
+                    setWsStatus(false);
+                }
+            );
+        } catch (err) {
+            logWs(err.message || err, 'error');
+        }
+    }
+
+    function disconnectVoiceWebSocket() {
+        if (!state.wsClient) {
+            logWs('Chưa kết nối WebSocket', 'warn');
+            return;
+        }
+
+        cleanupWsSubscriptions();
+        state.wsClient.disconnect(() => logWs('Đã ngắt kết nối WS.'));
+        state.wsClient = null;
+        setWsStatus(false);
+        if (state.wsXhrInterceptorCleanup) {
+            state.wsXhrInterceptorCleanup();
+            state.wsXhrInterceptorCleanup = null;
+        }
+    }
+
+    function subscribeVoiceTopic(requestIdOverride) {
+        try {
+            if (!state.wsClient || !state.wsClient.connected) {
+                throw new Error('Chưa kết nối WebSocket');
+            }
+
+            const manualInput = document.getElementById('wsTopicInput');
+            const requestId =
+                requestIdOverride ||
+                (manualInput ? manualInput.value.trim() : '') ||
+                document.getElementById('requestId').value.trim();
+
+            if (!requestId) {
+                throw new Error('Chưa có requestId để subscribe');
+            }
+
+            if (state.wsTopicSubscriptions.has(requestId)) {
+                logWs(`Đã subscribe /topic/voice-booking/${requestId}`, 'warn');
+                return;
+            }
+
+            const destination = `/topic/voice-booking/${requestId}`;
+            const subscription = state.wsClient.subscribe(destination, (message) => {
+                logWs(`EVENT (${requestId}): ${message.body}`);
+                try {
+                    const parsed = JSON.parse(message.body);
+                    setPreview(parsed);
+                } catch (_) {
+                    // ignore parse error, log raw content only
+                }
+            });
+
+            state.wsTopicSubscriptions.set(requestId, subscription);
+            logWs(`Subscribed ${destination}`, 'success');
+        } catch (err) {
+            logWs(err.message || err, 'error');
+        }
+    }
+
+    window.addEventListener('beforeunload', () => {
+        if (state.wsClient) {
+            cleanupWsSubscriptions();
+            state.wsClient.disconnect();
+            state.wsClient = null;
+        }
+        if (state.wsXhrInterceptorCleanup) {
+            state.wsXhrInterceptorCleanup();
+            state.wsXhrInterceptorCleanup = null;
+        }
+    });
+
+    async function startVoiceBooking() {
+        try {
+            const audio = document.getElementById('voiceAudio').files[0];
+            if (!audio) throw new Error('Chưa chọn audio');
+
+            const form = new FormData();
+            form.append('audio', audio);
+
+            const hints = document.getElementById('hints').value.trim();
+            if (hints) form.append('hints', hints);
+
+            log('Đang gửi yêu cầu voice booking...');
+            const res = await fetch(`${getBaseUrl()}/api/v1/customer/bookings/voice`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: form
+            });
+
+            const data = await res.json();
+            setPreview(data);
+
+            if (!res.ok) {
+                log(`Voice booking thất bại: ${data.message || res.status}`, 'error');
+                return;
+            }
+
+            updateRequestId(data.requestId);
+            log(`[${res.status}] Voice booking response: ${data.status}`, 'success');
+        } catch (err) {
+            log(err.message, 'error');
+        }
+    }
+
+    async function continueVoiceBooking() {
+        try {
+            const requestId = document.getElementById('requestId').value.trim();
+            if (!requestId) throw new Error('Chưa có requestId để continue');
+
+            const form = new FormData();
+            form.append('requestId', requestId);
+
+            const audio = document.getElementById('continueAudio').files[0];
+            if (audio) form.append('audio', audio);
+
+            const additionalText = document.getElementById('additionalText').value.trim();
+            if (additionalText) form.append('additionalText', additionalText);
+
+            const explicitFields = document.getElementById('explicitFields').value.trim();
+            if (explicitFields) form.append('explicitFields', explicitFields);
+
+            log('Đang gửi continue request...');
+            const res = await fetch(`${getBaseUrl()}/api/v1/customer/bookings/voice/continue`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: form
+            });
+
+            const data = await res.json();
+            setPreview(data);
+
+            if (!res.ok) {
+                log(`Continue thất bại: ${data.message || res.status}`, 'error');
+                return;
+            }
+
+            updateRequestId(data.requestId);
+            log(`[${res.status}] Continue response: ${data.status}`, 'success');
+        } catch (err) {
+            log(err.message, 'error');
+        }
+    }
+
+    async function confirmVoiceBooking() {
+        await postSimpleAction('confirm');
+    }
+
+    async function cancelVoiceBooking() {
+        await postSimpleAction('cancel');
+    }
+
+    async function postSimpleAction(action) {
+        try {
+            const requestId = document.getElementById('requestId').value.trim();
+            if (!requestId) throw new Error('Chưa có requestId để xử lý');
+
+            log(`Đang gửi ${action} request...`);
+            const res = await fetch(`${getBaseUrl()}/api/v1/customer/bookings/voice/${action}`, {
+                method: 'POST',
+                headers: {
+                    ...getAuthHeaders(),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ requestId })
+            });
+
+            const data = await res.json();
+            setPreview(data);
+
+            if (!res.ok) {
+                log(`${action} thất bại: ${data.message || res.status}`, 'error');
+                return;
+            }
+
+            log(`[${res.status}] ${action} response: ${data.status}`, 'success');
+        } catch (err) {
+            log(err.message, 'error');
+        }
+    }
+
+    async function fetchStatus() {
+        try {
+            const requestId = document.getElementById('requestId').value.trim();
+            if (!requestId) throw new Error('Chưa có requestId');
+
+            log('Đang lấy trạng thái...');
+            const res = await fetch(`${getBaseUrl()}/api/v1/customer/bookings/voice/${requestId}`, {
+                headers: getAuthHeaders()
+            });
+
+            const data = await res.json();
+            setPreview(data);
+
+            if (!res.ok) {
+                log(`Lấy trạng thái thất bại: ${data.message || res.status}`, 'error');
+                return;
+            }
+
+            log(`[${res.status}] Đã lấy trạng thái current request`, 'success');
+        } catch (err) {
+            log(err.message, 'error');
+        }
+    }
+</script>
+</body>
+</html>
