@@ -9,7 +9,7 @@ import java.util.Map;
 /**
  * Response DTO for voice booking processing
  */
-@Builder
+@Builder(toBuilder = true)
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record VoiceBookingResponse(
         boolean success,
@@ -34,8 +34,17 @@ public record VoiceBookingResponse(
         Map<String, Object> extractedInfo,
         
         // Error details (if failed)
-        String errorDetails
+        String errorDetails,
+
+        // Optional voice responses
+        VoiceBookingSpeechPayload speech
 ) {
+    public VoiceBookingResponse withSpeech(VoiceBookingSpeechPayload speechPayload) {
+        return this.toBuilder()
+                .speech(speechPayload)
+                .build();
+    }
+
     /**
      * Factory method for accepted async request
      */

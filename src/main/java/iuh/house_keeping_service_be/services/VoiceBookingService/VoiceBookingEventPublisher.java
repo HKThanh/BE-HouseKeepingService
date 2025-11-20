@@ -25,21 +25,25 @@ public class VoiceBookingEventPublisher {
 
     private final SimpMessagingTemplate messagingTemplate;
 
-    public void emitReceived(String requestId, String username) {
+    public void emitReceived(String requestId, String username, String message, VoiceBookingSpeechPayload speech) {
         VoiceBookingEventPayload payload = buildPayload(
                 requestId,
                 VoiceBookingEventType.RECEIVED,
                 VoiceBookingStatus.PROCESSING,
+                message,
+                speech,
                 builder -> {}
         );
         sendToTopic(username, payload);
     }
 
-    public void emitTranscribing(String requestId, String username, double progress) {
+    public void emitTranscribing(String requestId, String username, double progress, String message, VoiceBookingSpeechPayload speech) {
         VoiceBookingEventPayload payload = buildPayload(
                 requestId,
                 VoiceBookingEventType.TRANSCRIBING,
                 VoiceBookingStatus.PROCESSING,
+                message,
+                speech,
                 builder -> builder.progress(sanitizeProgress(progress))
         );
         sendToTopic(username, payload);
@@ -49,12 +53,16 @@ public class VoiceBookingEventPublisher {
             String requestId,
             String username,
             VoiceBookingPreview preview,
-            Integer processingTimeMs
+            Integer processingTimeMs,
+            String message,
+            VoiceBookingSpeechPayload speech
     ) {
         VoiceBookingEventPayload payload = buildPayload(
                 requestId,
                 VoiceBookingEventType.AWAITING_CONFIRMATION,
                 VoiceBookingStatus.AWAITING_CONFIRMATION,
+                message,
+                speech,
                 builder -> builder
                         .preview(preview)
                         .processingTimeMs(processingTimeMs)
@@ -68,12 +76,16 @@ public class VoiceBookingEventPublisher {
             String transcript,
             List<String> missingFields,
             String clarificationMessage,
-            Integer processingTimeMs
+            Integer processingTimeMs,
+            String message,
+            VoiceBookingSpeechPayload speech
     ) {
         VoiceBookingEventPayload payload = buildPayload(
                 requestId,
                 VoiceBookingEventType.PARTIAL,
                 VoiceBookingStatus.PARTIAL,
+                message,
+                speech,
                 builder -> builder
                         .transcript(transcript)
                         .missingFields(missingFields)
@@ -88,12 +100,16 @@ public class VoiceBookingEventPublisher {
             String username,
             String bookingId,
             String transcript,
-            Integer processingTimeMs
+            Integer processingTimeMs,
+            String message,
+            VoiceBookingSpeechPayload speech
     ) {
         VoiceBookingEventPayload payload = buildPayload(
                 requestId,
                 VoiceBookingEventType.COMPLETED,
                 VoiceBookingStatus.COMPLETED,
+                message,
+                speech,
                 builder -> builder
                         .bookingId(bookingId)
                         .transcript(transcript)
@@ -107,12 +123,16 @@ public class VoiceBookingEventPublisher {
             String username,
             String errorMessage,
             String transcript,
-            Integer processingTimeMs
+            Integer processingTimeMs,
+            String message,
+            VoiceBookingSpeechPayload speech
     ) {
         VoiceBookingEventPayload payload = buildPayload(
                 requestId,
                 VoiceBookingEventType.FAILED,
                 VoiceBookingStatus.FAILED,
+                message,
+                speech,
                 builder -> builder
                         .errorMessage(errorMessage)
                         .transcript(transcript)
@@ -123,12 +143,16 @@ public class VoiceBookingEventPublisher {
 
     public void emitCancelled(
             String requestId,
-            String username
+            String username,
+            String message,
+            VoiceBookingSpeechPayload speech
     ) {
         VoiceBookingEventPayload payload = buildPayload(
                 requestId,
                 VoiceBookingEventType.CANCELLED,
                 VoiceBookingStatus.CANCELLED,
+                message,
+                speech,
                 builder -> {}
         );
         sendToTopic(username, payload);
@@ -155,11 +179,15 @@ public class VoiceBookingEventPublisher {
             String requestId,
             VoiceBookingEventType eventType,
             VoiceBookingStatus status,
+            String message,
+            VoiceBookingSpeechPayload speech,
             Consumer<VoiceBookingEventPayload.VoiceBookingEventPayloadBuilder> customizer
     ) {
         VoiceBookingEventPayload.VoiceBookingEventPayloadBuilder builder = VoiceBookingEventPayload.builder()
                 .eventType(eventType)
                 .requestId(requestId)
+                .message(message)
+                .speech(speech)
                 .status(status != null ? status.name() : null)
                 .timestamp(Instant.now());
 
