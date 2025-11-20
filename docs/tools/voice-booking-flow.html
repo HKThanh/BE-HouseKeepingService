@@ -749,6 +749,12 @@
             const message = `${label} that bai${error?.status ? ` (HTTP ${error.status})` : ''}: ${error?.message || ''}`;
             logError(message);
             renderJson(ui.responseJson, error?.payload || { error: error?.message || 'Unknown error' }, 'Khong co du lieu loi.');
+            if (error?.payload?.speech) {
+                renderSpeech(error.payload.speech);
+            }
+            if (error?.payload?.requestId) {
+                setRequestId(error.payload.requestId);
+            }
         };
 
         const parseJsonResponse = async (response) => {

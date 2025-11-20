@@ -752,39 +752,14 @@ public class VoiceBookingParserService {
         // Check if service is missing (highest priority)
         boolean serviceMissing = missingFields.contains("service");
         
-        if (serviceMissing && extractedFields.containsKey("availableServices")) {
-            // CRITICAL: Service is missing - this is the most important field
-            message.append("Xin lỗi, tôi không thể xác định được dịch vụ bạn muốn đặt.\n\n");
-            message.append("📋 Các dịch vụ hiện có:\n");
-            message.append(extractedFields.get("availableServices"));
-            message.append("\n\n💡 Vui lòng nói lại và chỉ rõ dịch vụ bạn cần.");
-            
-            // Show what was understood (if any)
-            Map<String, String> otherFields = new HashMap<>(extractedFields);
-            otherFields.remove("availableServices");
-            
-            if (!otherFields.isEmpty()) {
-                message.append("\n\n✓ Thông tin tôi đã hiểu:\n");
-                for (Map.Entry<String, String> entry : otherFields.entrySet()) {
-                    message.append("  • ").append(formatFieldName(entry.getKey()))
-                           .append(": ").append(entry.getValue()).append("\n");
-                }
-            }
+            if (serviceMissing && extractedFields.containsKey("availableServices")) {
+                // CRITICAL: Service is missing - this is the most important field
+                message.append("Xin lỗi, tôi không thể xác định được dịch vụ bạn muốn đặt.\n\n");
+                message.append("📋 Các dịch vụ hiện có:\n");
+                message.append(extractedFields.get("availableServices"));
+                message.append("\n\n💡 Vui lòng nói lại và chỉ rõ dịch vụ bạn cần.");
         } else {
-            // Standard handling for other missing fields (when service is already identified)
-            if (!extractedFields.isEmpty()) {
-                message.append("✓ Tôi đã hiểu được:\n");
-                
-                Map<String, String> displayFields = new HashMap<>(extractedFields);
-                displayFields.remove("availableServices"); // Don't show in standard format
-                
-                for (Map.Entry<String, String> entry : displayFields.entrySet()) {
-                    message.append("  • ").append(formatFieldName(entry.getKey()))
-                           .append(": ").append(entry.getValue()).append("\n");
-                }
-                message.append("\n");
-            }
-
+            // Standard handling for other missing fields without echoing understood fields
             if (!missingFields.isEmpty()) {
                 message.append("⚠️ Tôi cần thêm thông tin về:\n");
                 for (String field : missingFields) {

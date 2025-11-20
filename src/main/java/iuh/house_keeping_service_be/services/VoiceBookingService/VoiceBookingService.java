@@ -28,6 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 import iuh.house_keeping_service_be.utils.BookingDTOFormatter;
 
 import java.math.BigDecimal;
+import java.util.Objects;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
@@ -49,6 +50,12 @@ public class VoiceBookingService {
     private final VoiceBookingEventPublisher voiceBookingEventPublisher;
     private final EmployeeScheduleService employeeScheduleService;
     private final EmployeeRepository employeeRepository;
+    private static final List<String> INTENT_KEYWORDS = List.of(
+            "dọn", "don", "dọn dẹp", "don dep", "lau", "lau dọn", "lau don",
+            "vệ sinh", "ve sinh", "giúp việc", "giup viec", "housekeeping",
+            "dọn nhà", "don nha", "dọn phòng", "don phong", "clean", "booking", "đặt lịch", "dat lich",
+            "dịch vụ", "dich vu", "quét", "quet", "chà", "cha", "lau nhà", "lau nha"
+    );
 
     @Value("${whisper.processing.async-enabled:true}")
     private boolean asyncEnabled;
@@ -96,6 +103,32 @@ public class VoiceBookingService {
                         response.message(),
                         null,
                         voiceRequest.getProcessingTimeMs(),
+                        response.message(),
+                        speech
+                );
+                return attachSpeech(response, speech);
+            }
+
+            // Step 1.5: Detect booking intent via keywords
+            if (!containsBookingIntent(voiceResult.transcript())) {
+                String friendlyMsg = "Xin lỗi, hiện tôi chỉ hỗ trợ các yêu cầu đặt dịch vụ giúp việc. " +
+                        "Vui lòng mô tả dịch vụ hoặc lịch bạn muốn đặt.";
+                voiceRequest.markAsFailed("Non-booking intent");
+                voiceRequest.setTranscript(voiceResult.transcript());
+                voiceRequest.setProcessingTimeMs((int) voiceResult.processingTimeMs());
+                voiceBookingRequestRepository.save(voiceRequest);
+                VoiceBookingResponse response = VoiceBookingResponse.failed(
+                        voiceRequest.getId(),
+                        friendlyMsg,
+                        "Transcript does not contain booking/service keywords"
+                );
+                VoiceBookingSpeechPayload speech = buildSpeechPayload(response.message(), null);
+                voiceBookingEventPublisher.emitFailed(
+                        voiceRequest.getId(),
+                        username,
+                        friendlyMsg,
+                        voiceResult.transcript(),
+                        (int) voiceResult.processingTimeMs(),
                         response.message(),
                         speech
                 );
@@ -152,7 +185,13 @@ public class VoiceBookingService {
                         voiceResult.confidenceScore(),
                         (int) voiceResult.processingTimeMs()
                 );
-                VoiceBookingSpeechPayload speech = buildSpeechPayload(response.message(), response.clarificationMessage());
+                String speakMessage = StringUtils.hasText(response.clarificationMessage())
+                        ? response.clarificationMessage()
+                        : response.message();
+                VoiceBookingSpeechPayload speech = buildSpeechPayload(
+                        speakMessage,
+                        response.clarificationMessage()
+                );
                 voiceBookingEventPublisher.emitPartial(
                         voiceRequest.getId(),
                         username,
@@ -395,7 +434,13 @@ public class VoiceBookingService {
                         voiceRequest.getConfidenceScore() != null ? voiceRequest.getConfidenceScore().doubleValue() : null,
                         voiceRequest.getProcessingTimeMs()
                 );
-                VoiceBookingSpeechPayload speech = buildSpeechPayload(response.message(), response.clarificationMessage());
+                String speakMessage = StringUtils.hasText(response.clarificationMessage())
+                        ? response.clarificationMessage()
+                        : response.message();
+                VoiceBookingSpeechPayload speech = buildSpeechPayload(
+                        speakMessage,
+                        response.clarificationMessage()
+                );
                 voiceBookingEventPublisher.emitPartial(
                         requestId,
                         username,
@@ -860,7 +905,15 @@ public class VoiceBookingService {
         }
 
         TextToSpeechResult messageAudio = synthesizeSafe(message);
-        TextToSpeechResult clarificationAudio = synthesizeSafe(clarification);
+        TextToSpeechResult clarificationAudio = synthesizeSafe(
+                StringUtils.hasText(clarification) && !clarification.equals(message) ? clarification : null
+        );
+
+        // Deduplicate: if clarification text collapses to same audio, keep only one
+        if (messageAudio != null && clarificationAudio != null
+                && Objects.equals(messageAudio.audioUrl(), clarificationAudio.audioUrl())) {
+            clarificationAudio = null;
+        }
 
         if (messageAudio == null && clarificationAudio == null) {
             return null;
@@ -882,6 +935,14 @@ public class VoiceBookingService {
             log.warn("TTS synthesis failed: {}", ex.getMessage());
             return null;
         }
+    }
+
+    private boolean containsBookingIntent(String transcript) {
+        if (!StringUtils.hasText(transcript)) {
+            return false;
+        }
+        String normalized = transcript.toLowerCase();
+        return INTENT_KEYWORDS.stream().anyMatch(normalized::contains);
     }
 
     private record VoiceBookingDraftResult(BookingCreateRequest bookingRequest, VoiceBookingPreview preview) {
