@@ -1,6 +1,7 @@
 package iuh.house_keeping_service_be.dtos.Booking.summary;
 
 import iuh.house_keeping_service_be.dtos.Booking.response.*;
+import java.math.BigDecimal;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -42,6 +43,9 @@ public class BookingCreationSummary {
     private String estimatedDuration;
     private boolean hasPromotion;
     private boolean hasAutoAssignedEmployees;
+    private BigDecimal baseAmount;
+    private BigDecimal totalFees;
+    private List<FeeBreakdownResponse> fees;
     
     // Factory method
     public static BookingCreationSummary from(String bookingId, String bookingCode, String status,

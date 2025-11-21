@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import iuh.house_keeping_service_be.dtos.Booking.response.FeeBreakdownResponse;
 
 @Data
 @NoArgsConstructor
@@ -29,6 +30,9 @@ public class BookingData {
     private String note;
     private BigDecimal totalAmount;
     private String formattedTotalAmount;
+    private BigDecimal baseAmount;
+    private BigDecimal totalFees;
+    private List<FeeBreakdownResponse> fees;
     private String status;
     
     private String title;

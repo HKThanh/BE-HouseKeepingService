@@ -15,6 +15,9 @@ import lombok.RequiredArgsConstructor;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import java.math.BigDecimal;
+import iuh.house_keeping_service_be.models.BookingAdditionalFee;
+import iuh.house_keeping_service_be.dtos.Booking.response.FeeBreakdownResponse;
 
 @Component
 @RequiredArgsConstructor
@@ -39,6 +42,26 @@ public class BookingMapper {
         // Calculate isPost: true if title OR imageUrls is not null/empty
         boolean isPost = (booking.getTitle() != null && !booking.getTitle().trim().isEmpty()) 
                       || (booking.getImageUrls() != null && !booking.getImageUrls().isEmpty());
+
+        BigDecimal feeTotal = booking.getAdditionalFees() != null
+                ? booking.getAdditionalFees().stream()
+                    .map(BookingAdditionalFee::getFeeAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add)
+                : BigDecimal.ZERO;
+        BigDecimal baseAmount = booking.getTotalAmount() != null
+                ? booking.getTotalAmount().subtract(feeTotal)
+                : null;
+        List<FeeBreakdownResponse> fees = booking.getAdditionalFees() != null
+                ? booking.getAdditionalFees().stream()
+                    .map(f -> FeeBreakdownResponse.builder()
+                            .name(f.getFeeName())
+                            .type(f.getFeeType())
+                            .value(f.getFeeValue())
+                            .amount(f.getFeeAmount())
+                            .systemSurcharge(f.isSystemSurcharge())
+                            .build())
+                    .toList()
+                : List.of();
         
         BookingData data = new BookingData(
             booking.getBookingId(),
@@ -51,6 +74,9 @@ public class BookingMapper {
             booking.getNote(),
             booking.getTotalAmount(),
             BookingDTOFormatter.formatPrice(booking.getTotalAmount()),
+            baseAmount,
+            feeTotal,
+            fees,
             booking.getStatus().toString(),
             booking.getTitle(),
             booking.getImageUrls(),
