@@ -32,6 +32,7 @@ import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.regex.Pattern;
 
 /**
  * Main service for voice booking workflow
@@ -125,12 +126,21 @@ public class VoiceBookingService {
                 return attachSpeech(response, speech);
             }
 
+            String rawTranscript = voiceResult.transcript();
+            String sanitizedTranscript = sanitizeTranscriptForBooking(rawTranscript);
+            boolean hasBookingIntent = StringUtils.hasText(sanitizedTranscript);
+            if (!hasBookingIntent && StringUtils.hasText(rawTranscript)) {
+                log.info("Transcript for request {} has no booking/service intent, clearing transcript output", voiceRequest.getId());
+            }
+
             // Step 1.5: Detect booking intent via keywords
-            if (!containsBookingIntent(voiceResult.transcript())) {
+            if (!hasBookingIntent) {
                 // Treat as a booking intent without details -> partial and ask for details
                 List<String> missing = List.of("service", "bookingTime", "address");
                 Map<String, Object> extractedInfo = new HashMap<>();
-                extractedInfo.put("note", voiceResult.transcript());
+                if (StringUtils.hasText(rawTranscript)) {
+                    extractedInfo.put("note", rawTranscript);
+                }
                 String baseClarification = MISSING_DETAIL_PROMPT;
                 boolean allowAiPrompt = allowAiPromptForMissing(missing) && shouldUseAiPrompt(missing, extractedInfo);
                 String instruction = buildAiInstruction(missing, extractedInfo);
@@ -139,13 +149,13 @@ public class VoiceBookingService {
                         : null;
 
                 voiceRequest.markAsPartial(missing);
-                voiceRequest.setTranscript(voiceResult.transcript());
+                voiceRequest.setTranscript(sanitizedTranscript);
                 voiceRequest.setProcessingTimeMs((int) voiceResult.processingTimeMs());
                 voiceBookingRequestRepository.save(voiceRequest);
 
                 VoiceBookingResponse response = VoiceBookingResponse.partial(
                         voiceRequest.getId(),
-                        voiceResult.transcript(),
+                        sanitizedTranscript,
                         missing,
                         baseClarification,
                         extractedInfo,
@@ -168,7 +178,7 @@ public class VoiceBookingService {
                 voiceBookingEventPublisher.emitPartial(
                         voiceRequest.getId(),
                         username,
-                        voiceResult.transcript(),
+                        sanitizedTranscript,
                         missing,
                         response.clarificationMessage(),
                         (int) voiceResult.processingTimeMs(),
@@ -448,7 +458,11 @@ public class VoiceBookingService {
 
         try {
             String originalTranscript = voiceRequest.getTranscript();
-            String combinedTranscript = originalTranscript;
+            StringBuilder combinedBuilder = new StringBuilder();
+            if (StringUtils.hasText(originalTranscript)) {
+                combinedBuilder.append(originalTranscript.trim());
+            }
+            boolean hasIntent = containsBookingIntent(combinedBuilder.toString());
             
             // Process additional information sources
             if (audioFile != null && !audioFile.isEmpty()) {
@@ -459,13 +473,40 @@ public class VoiceBookingService {
                 voiceBookingEventPublisher.emitTranscribing(requestId, username, 1.0, null, null);
                 
                 if (additionalVoice.hasTranscript()) {
-                    combinedTranscript = originalTranscript + " " + additionalVoice.transcript();
-                    log.info("Combined transcript with audio: {}", combinedTranscript);
+                    String additionalRaw = additionalVoice.transcript().trim();
+                    String toAppend = pickAppendableChunk(additionalRaw, hasIntent);
+                    if (StringUtils.hasText(toAppend)) {
+                        if (combinedBuilder.length() > 0) {
+                            combinedBuilder.append(' ');
+                        }
+                        combinedBuilder.append(toAppend);
+                        hasIntent = hasIntent || containsBookingIntent(toAppend);
+                        log.info("Combined transcript with audio: {}", combinedBuilder);
+                    } else {
+                        log.info("Additional audio transcript for request {} has no booking/service intent, ignoring content", requestId);
+                    }
                 }
-            } else if (additionalText != null && !additionalText.isBlank()) {
+            }
+
+            if (additionalText != null && !additionalText.isBlank()) {
                 // Use provided text
-                combinedTranscript = originalTranscript + " " + additionalText;
-                log.info("Combined transcript with text: {}", combinedTranscript);
+                String toAppend = pickAppendableChunk(additionalText.trim(), hasIntent);
+                if (combinedBuilder.length() > 0) {
+                    combinedBuilder.append(' ');
+                }
+                if (StringUtils.hasText(toAppend)) {
+                    combinedBuilder.append(toAppend);
+                    hasIntent = hasIntent || containsBookingIntent(toAppend);
+                    log.info("Combined transcript with text: {}", combinedBuilder);
+                } else {
+                    log.info("Additional text for request {} has no booking/service intent, ignoring content", requestId);
+                }
+            }
+
+            String combinedTranscript = combinedBuilder.toString().trim();
+            String sanitizedCombined = sanitizeTranscriptForBooking(combinedTranscript);
+            if (!StringUtils.hasText(sanitizedCombined) && StringUtils.hasText(combinedTranscript)) {
+                log.info("Combined transcript for request {} has no booking/service intent, clearing transcript output", requestId);
             }
             
             // Prepare enhanced hints with explicit fields
@@ -480,17 +521,17 @@ public class VoiceBookingService {
             
             // Re-parse with combined information
             voiceRequest.markAsProcessing();
-            voiceRequest.setTranscript(combinedTranscript);
+            voiceRequest.setTranscript(sanitizedCombined);
             voiceBookingRequestRepository.save(voiceRequest);
             voiceBookingEventPublisher.emitReceived(requestId, username, null, null);
             
             ParsedBookingInfo parsedInfo = parserService.parseTranscript(
-                    combinedTranscript,
+                    sanitizedCombined,
                     customer.getCustomerId(),
                     enhancedHints
             );
             String aiPrompt = geminiPromptService.generatePromptWithInstruction(
-                    combinedTranscript,
+                    sanitizedCombined,
                     buildAiInstruction(List.of("service", "bookingTime", "address"), null)
             ).orElse(null);
             
@@ -502,7 +543,7 @@ public class VoiceBookingService {
                 voiceRequest = voiceBookingRequestRepository.save(voiceRequest);
                 VoiceBookingResponse response = VoiceBookingResponse.awaitingConfirmation(
                         requestId,
-                        combinedTranscript,
+                        sanitizedCombined,
                         draftResult.preview(),
                         voiceRequest.getConfidenceScore() != null ? voiceRequest.getConfidenceScore().doubleValue() : null,
                         voiceRequest.getProcessingTimeMs()
@@ -557,7 +598,7 @@ public class VoiceBookingService {
                 String clarificationMsg = baseClarification;
                 VoiceBookingResponse response = VoiceBookingResponse.partial(
                         requestId,
-                        combinedTranscript,
+                        sanitizedCombined,
                         parsedInfo.missingFields(),
                         clarificationMsg,
                         extractedInfo,
@@ -1094,8 +1135,59 @@ public class VoiceBookingService {
         String plain = stripAccents(normalized);
         return INTENT_KEYWORDS.stream().anyMatch(keyword -> {
             String kwNorm = keyword.toLowerCase();
-            return normalized.contains(kwNorm) || plain.contains(stripAccents(kwNorm));
+            String kwPlain = stripAccents(kwNorm);
+            return containsWord(normalized, kwNorm) || containsWord(plain, kwPlain);
         });
+    }
+
+    private boolean containsWord(String text, String keyword) {
+        if (!StringUtils.hasText(text) || !StringUtils.hasText(keyword)) {
+            return false;
+        }
+        String pattern = "(?<![\\p{L}\\p{N}])" + Pattern.quote(keyword) + "(?![\\p{L}\\p{N}])";
+        return Pattern.compile(pattern, Pattern.UNICODE_CASE).matcher(text).find();
+    }
+
+    private String sanitizeTranscriptForBooking(String transcript) {
+        return containsBookingIntent(transcript) ? transcript : "";
+    }
+
+    private String pickAppendableChunk(String raw, boolean hasIntent) {
+        if (!StringUtils.hasText(raw)) {
+            return "";
+        }
+        String sanitized = sanitizeTranscriptForBooking(raw);
+        if (StringUtils.hasText(sanitized)) {
+            return sanitized;
+        }
+        if (hasIntent && isLikelyBookingDetail(raw)) {
+            return raw;
+        }
+        return "";
+    }
+
+    private boolean isLikelyBookingDetail(String raw) {
+        if (!StringUtils.hasText(raw)) {
+            return false;
+        }
+        String plain = stripAccents(raw.toLowerCase());
+        if (plain.matches(".*\\d.*")) {
+            return true;
+        }
+        if (plain.matches(".*\\b(gi(ó|o)|h|am|pm|sáng|ch(i|í)ều|t(ố|ô)i|mai|ng(à|a)y|th(ứ|u)|ca)\\b.*")) {
+            return true;
+        }
+        List<String> detailKeywords = List.of(
+                "dia chi", "địa chỉ", "diachi", "address", "phuong", "quan", "duong", "hcm", "ha noi",
+                "tp", "tp.", "thanh pho", "khu", "can ho", "block", "toa", "apartment", "so ", "số "
+        );
+        for (String kw : detailKeywords) {
+            String kwPlain = stripAccents(kw.toLowerCase());
+            if (plain.contains(kwPlain)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String buildClarificationText(List<String> missingFields, Map<String, Object> extractedInfo, String fallback) {
