@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Voice Booking Flow Console</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        :root {
+            color-scheme: light dark;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Segoe UI", "Inter", sans-serif;
+            background: #f4f6fb;
+            color: #0f172a;
+        }
+
+        .container {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 32px 20px 80px;
+        }
+
+        header {
+            margin-bottom: 24px;
+        }
+
+        header h1 {
+            margin: 0 0 6px;
+            font-size: 32px;
+        }
+
+        header p {
+            margin: 0;
+            color: #475569;
+            max-width: 800px;
+        }
+
+        section.card {
+            background: #fff;
+            border-radius: 14px;
+            padding: 20px 24px 26px;
+            box-shadow: 0 25px 60px rgba(15, 23, 42, 0.08);
+            margin-top: 22px;
+        }
+
+        section.card h2 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 20px;
+            color: #0a5bd6;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-top: 14px;
+        }
+
+        input[type="text"],
+        input[type="url"],
+        textarea {
+            width: 100%;
+            border: 1px solid #cbd5f5;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 14px;
+            margin-top: 6px;
+            font-family: "Fira Code", "SFMono-Regular", Consolas, monospace;
+            background: #fff;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        input[type="file"] {
+            margin-top: 10px;
+        }
+
+        button {
+            margin-top: 14px;
+            margin-right: 10px;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-weight: 600;
+            cursor: pointer;
+            color: #fff;
+            background: linear-gradient(135deg, #2563eb, #0ea5e9);
+            transition: opacity 0.15s ease;
+        }
+
+        button.secondary {
+            background: #e2e8f0;
+            color: #0f172a;
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+        }
+
+        .small-log,
+        pre.code-block {
+            margin-top: 14px;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 14px;
+            border-radius: 10px;
+            font-size: 13px;
+            overflow-x: auto;
+            line-height: 1.5;
+        }
+
+        .panel {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 12px;
+            min-height: 80px;
+            background: #fbfdff;
+        }
+
+        .panel p {
+            margin: 4px 0;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .status-badge.connected {
+            background: #dcfce7;
+            color: #15803d;
+        }
+
+        .status-badge.disconnected {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+        .log {
+            margin-top: 12px;
+            background: #0f172a;
+            color: #e2e8f0;
+            border-radius: 10px;
+            padding: 14px;
+            min-height: 120px;
+            max-height: 260px;
+            overflow-y: auto;
+            font-family: "Fira Code", monospace;
+            font-size: 13px;
+        }
+
+        .log-line {
+            margin: 0 0 6px;
+        }
+
+        .log-line.success {
+            color: #4ade80;
+        }
+
+        .log-line.error {
+            color: #f87171;
+        }
+
+        .log-line.warn {
+            color: #fbbf24;
+        }
+
+        .split-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 18px;
+        }
+
+        audio {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 13px;
+        }
+
+        table th,
+        table td {
+            border: 1px solid #e2e8f0;
+            padding: 6px 8px;
+            text-align: left;
+        }
+
+        table th {
+            background: #f0f4ff;
+        }
+
+        .inline-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .inline-actions label {
+            margin-top: 0;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>Voice Booking Flow Console</h1>
+        <p>
+            Trang cong cu nay ho tro test end-to-end cho toan bo luong voice booking:
+            ghi am/dinh kem audio, tao request, bo sung du lieu khi PARTIAL, xac nhan hoac huy draft,
+            cung nhu xem cac su kien realtime va audio TTS tra ve tu FPT.AI.
+        </p>
+    </header>
+
+    <section class="card">
+        <h2>1. Cau hinh moi truong</h2>
+        <div class="row">
+            <div>
+                <label for="apiBase">API base URL</label>
+                <input type="url" id="apiBase" value="http://localhost" placeholder="http://localhos">
+            </div>
+            <div>
+                <label for="wsEndpoint">WebSocket endpoint</label>
+                <input type="url" id="wsEndpoint" value="http://localhost/ws/voice-booking">
+            </div>
+            <div>
+                <label for="jwtToken">JWT token (Bearer)</label>
+                <input type="text" id="jwtToken" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+            </div>
+        </div>
+        <button id="serviceBtn">Check voice booking /status</button>
+        <pre id="statusResult" class="small-log">Chua goi /status.</pre>
+    </section>
+
+    <section class="card">
+        <h2>2. Thu hoac chon audio</h2>
+        <p>
+            Ban co the dung trinh ghi am tich hop hoac upload file WAV/MP3/M4A. Khi tao hoac tiep tuc yeu cau,
+            cong cu se uu tien file ban chon. Neu khong co file, ban ghi gan nhat se duoc su dung.
+        </p>
+        <div class="inline-actions">
+            <button id="recordStart">Bat dau ghi am</button>
+            <button id="recordStop" class="secondary">Dung ghi</button>
+            <button id="recordReset" class="secondary">Xoa ban ghi</button>
+            <span id="recordState">Chua ghi am</span>
+        </div>
+        <div id="audioPreviewWrap" class="panel" style="margin-top: 12px;">
+            <p>Audio preview (ghi am moi nhat)</p>
+            <audio id="audioPreview" controls></audio>
+        </div>
+        <label for="audioFile">Hoac chon file audio de tao moi</label>
+        <input type="file" id="audioFile" accept="audio/*">
+    </section>
+
+    <section class="card">
+        <h2>3. Tao voice booking</h2>
+        <label for="hints">Hints (JSON, optional)</label>
+        <textarea id="hints" placeholder='{"city":"HCM","preferredService":"deep_clean"}'></textarea>
+        <button id="createBtn">Upload audio va tao yeu cau</button>
+    </section>
+
+    <section class="card">
+        <h2>4. Bo sung thong tin (PARTIAL / continue)</h2>
+        <label for="requestId">requestId dang test</label>
+        <input type="text" id="requestId" placeholder="UUID se tu dien sau khi tao">
+
+        <label for="continueAudio">Audio bo sung (optional)</label>
+        <input type="file" id="continueAudio" accept="audio/*">
+
+        <label for="additionalText">additionalText (plain text, optional)</label>
+        <textarea id="additionalText" placeholder="Toi muon doi lich sang chieu mai..."></textarea>
+
+        <label for="explicitFields">explicitFields (JSON, optional)</label>
+        <textarea id="explicitFields" placeholder='{"bookingTime":"2025-11-30T09:00:00","paymentMethodId":2}'></textarea>
+
+        <button id="continueBtn">Gui thong tin bo sung</button>
+    </section>
+
+    <section class="card">
+        <h2>5. Xac nhan hoac huy draft</h2>
+        <div class="inline-actions">
+            <button id="confirmBtn">/confirm</button>
+            <button id="cancelBtn" class="secondary">/cancel</button>
+        </div>
+        <div class="inline-actions">
+            <button id="fetchRequestBtn" class="secondary">GET /{requestId}</button>
+            <span class="hint">Thong tin se hien o vung "Request details".</span>
+        </div>
+    </section>
+
+    <section class="card">
+        <h2>6. Preview, TTS va du lieu lien quan</h2>
+        <div class="split-grid">
+            <div>
+                <h3>FPT.AI speech</h3>
+                <div id="speechBox" class="panel">Chua co audio TTS.</div>
+            </div>
+            <div>
+                <h3>VoiceBookingPreview</h3>
+                <div id="previewBox" class="panel">Chua co preview.</div>
+            </div>
+        </div>
+        <div class="split-grid" style="margin-top: 18px;">
+            <div>
+                <h3>Missing fields</h3>
+                <div id="missingBox" class="panel">Khong co du lieu.</div>
+            </div>
+            <div>
+                <h3>Extracted info</h3>
+                <div id="extractedBox" class="panel">Khong co du lieu.</div>
+            </div>
+        </div>
+        <h3 style="margin-top: 18px;">VoiceBookingResponse (raw)</h3>
+        <pre id="responseJson" class="code-block">Chua thuc hien hanh dong nao.</pre>
+        <h3>Latest WS event (real-time)</h3>
+        <pre id="wsEventJson" class="code-block">Chua nhan duoc su kien nao.</pre>
+        <h3>Request details (GET /{id})</h3>
+        <pre id="requestDetailsOutput" class="code-block">Chua goi /{requestId}.</pre>
+    </section>
+
+    <section class="card">
+        <h2>7. Real-time monitor (WebSocket STOMP)</h2>
+        <div class="inline-actions">
+            <button id="wsConnect">Connect</button>
+            <button id="wsDisconnect" class="secondary">Disconnect</button>
+            <button id="wsSubscribe" class="secondary">Subscribe requestId</button>
+            <button id="wsClear" class="secondary">Clear log</button>
+            <span id="wsStatus" class="status-badge disconnected">Disconnected</span>
+        </div>
+        <label class="inline-actions" style="margin-top: 12px;">
+            <input type="checkbox" id="autoSubscribe" checked>
+            Auto subscribe khi co requestId moi
+        </label>
+        <div id="wsLog" class="log"></div>
+    </section>
+
+    <section class="card">
+        <h2>8. Console log</h2>
+        <div id="globalLog" class="log"></div>
+    </section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+<script>
+    (() => {
+        const $ = (selector) => document.querySelector(selector);
+
+        const ui = {
+            baseUrl: $('#apiBase'),
+            wsEndpoint: $('#wsEndpoint'),
+            token: $('#jwtToken'),
+            statusResult: $('#statusResult'),
+            recordStart: $('#recordStart'),
+            recordStop: $('#recordStop'),
+            recordReset: $('#recordReset'),
+            recordState: $('#recordState'),
+            audioFile: $('#audioFile'),
+            continueAudio: $('#continueAudio'),
+            audioPreview: $('#audioPreview'),
+            createBtn: $('#createBtn'),
+            continueBtn: $('#continueBtn'),
+            requestId: $('#requestId'),
+            hints: $('#hints'),
+            additionalText: $('#additionalText'),
+            explicitFields: $('#explicitFields'),
+            confirmBtn: $('#confirmBtn'),
+            cancelBtn: $('#cancelBtn'),
+            fetchRequestBtn: $('#fetchRequestBtn'),
+            responseJson: $('#responseJson'),
+            wsEventJson: $('#wsEventJson'),
+            speechBox: $('#speechBox'),
+            previewBox: $('#previewBox'),
+            missingBox: $('#missingBox'),
+            extractedBox: $('#extractedBox'),
+            requestDetails: $('#requestDetailsOutput'),
+            serviceBtn: $('#serviceBtn'),
+            wsConnect: $('#wsConnect'),
+            wsDisconnect: $('#wsDisconnect'),
+            wsSubscribe: $('#wsSubscribe'),
+            wsClear: $('#wsClear'),
+            wsLog: $('#wsLog'),
+            wsStatus: $('#wsStatus'),
+            autoSubscribe: $('#autoSubscribe'),
+            globalLog: $('#globalLog')
+        };
+
+        const state = {
+            requestId: '',
+            mediaRecorder: null,
+            mediaStream: null,
+            audioChunks: [],
+            audioBlob: null,
+            audioUrl: null,
+            audioFileName: 'voice-recording.webm',
+            wsClient: null,
+            wsSubscriptions: new Map(),
+            wsErrorSubscription: null,
+            wsInterceptorCleanup: null
+        };
+        let wsManuallyEdited = false;
+
+        const inferDefaultApiBase = () => {
+            const protocol = window.location.protocol;
+            if (protocol === 'http:' || protocol === 'https:') {
+                return window.location.origin;
+            }
+            return 'http://localhost:8080';
+        };
+
+        const inferDefaultWsEndpoint = (apiBase) => {
+            const normalized = (apiBase || 'http://localhost:8080').replace(/\/+$/, '');
+            return `${normalized}/ws/voice-booking`;
+        };
+
+        const autoPopulateBaseUrls = () => {
+            const inferredApi = inferDefaultApiBase();
+            if (!ui.baseUrl.value || ui.baseUrl.value === 'http://localhost:8080') {
+                ui.baseUrl.value = inferredApi;
+            }
+            if (!ui.wsEndpoint.value || ui.wsEndpoint.value === 'http://localhost:8080/ws/voice-booking') {
+                ui.wsEndpoint.value = inferDefaultWsEndpoint(ui.baseUrl.value);
+            }
+            wsManuallyEdited = false;
+        };
+
+        autoPopulateBaseUrls();
+
+        const syncWsEndpointWithApi = () => {
+            if (wsManuallyEdited) {
+                return;
+            }
+            ui.wsEndpoint.value = inferDefaultWsEndpoint(ui.baseUrl.value);
+        };
+
+        const normalizeBase = (value) => {
+            const trimmed = value && value.trim() ? value.trim() : 'http://localhost:8080';
+            return trimmed.replace(/\/+$/, '');
+        };
+
+        const voiceUrl = (path = '') => `${normalizeBase(ui.baseUrl.value)}/api/v1/customer/bookings/voice${path}`;
+
+        const requireToken = () => {
+            const token = ui.token.value.trim();
+            if (!token) {
+                throw new Error('Vui long nhap JWT token cua customer (Bearer).');
+            }
+            return token;
+        };
+
+        const ensureRequestId = () => {
+            const value = (ui.requestId.value || state.requestId || '').trim();
+            if (!value) {
+                throw new Error('Chua co requestId. Hay tao request hoac nhap thu cong.');
+            }
+            return value;
+        };
+
+        const appendLog = (target, message, level = 'info') => {
+            const line = document.createElement('div');
+            line.className = `log-line ${level}`;
+            const time = new Date().toLocaleTimeString();
+            line.textContent = `[${time}] ${message}`;
+            target.prepend(line);
+        };
+
+        const logInfo = (msg) => appendLog(ui.globalLog, msg, 'info');
+        const logError = (msg) => appendLog(ui.globalLog, msg, 'error');
+        const logSuccess = (msg) => appendLog(ui.globalLog, msg, 'success');
+
+        const setRequestId = (id) => {
+            if (!id) {
+                return;
+            }
+            state.requestId = id;
+            ui.requestId.value = id;
+            logInfo(`Dang theo doi requestId: ${id}`);
+            if (ui.autoSubscribe.checked) {
+                subscribeTopic(id);
+            }
+        };
+
+        const renderJson = (element, data, fallback) => {
+            if (!data) {
+                element.textContent = fallback || 'Khong co du lieu.';
+                return;
+            }
+            element.textContent = JSON.stringify(data, null, 2);
+        };
+
+        const renderSpeech = (speech) => {
+            ui.speechBox.innerHTML = '';
+            const renderPart = (part, label) => {
+                if (!part || !part.audioUrl) return null;
+                const wrap = document.createElement('div');
+                wrap.style.marginBottom = '10px';
+                const title = document.createElement('p');
+                title.innerHTML = `<strong>${label}</strong> ${(part.provider || 'fpt.ai')}`;
+                const meta = document.createElement('p');
+                meta.innerHTML = `<small>${part.processingTimeMs ? part.processingTimeMs + ' ms' : ''}</small>`;
+                const audio = document.createElement('audio');
+                audio.controls = true;
+                audio.src = part.audioUrl;
+                const text = document.createElement('p');
+                text.textContent = part.text || '(khong co transcript text)';
+                [title, meta, audio, text].forEach(n => wrap.appendChild(n));
+                return wrap;
+            };
+
+            const blocks = [];
+            if (speech?.message) blocks.push(renderPart(speech.message, 'Message'));
+            if (speech?.clarification) blocks.push(renderPart(speech.clarification, 'Clarification'));
+
+            const hasAudio = blocks.filter(Boolean).length > 0;
+            if (!hasAudio) {
+                ui.speechBox.textContent = 'Chua co audio TTS tu FPT.AI.';
+                return;
+            }
+            blocks.filter(Boolean).forEach(block => ui.speechBox.appendChild(block));
+        };
+
+        const createMetaRow = (label, value) => {
+            if (!value && value !== 0) {
+                return null;
+            }
+            const row = document.createElement('p');
+            const strong = document.createElement('strong');
+            strong.textContent = `${label}: `;
+            const span = document.createElement('span');
+            span.textContent = value;
+            row.append(strong, span);
+            return row;
+        };
+
+        const renderPreview = (preview) => {
+            ui.previewBox.innerHTML = '';
+            if (!preview) {
+                ui.previewBox.textContent = 'Chua co preview nao.';
+                return;
+            }
+            const meta = [
+                ['Dia chi', preview.fullAddress || preview.addressId],
+                ['Thoi gian', preview.bookingTime],
+                ['Ghi chu', preview.note],
+                ['Promo', preview.promoCode],
+                ['Thanh toan', preview.paymentMethodId],
+                ['Tong chi phi', preview.formattedTotalAmount || preview.totalAmount],
+                ['Auto assign?', preview.autoAssignedEmployees ? 'Co' : 'Khong']
+            ];
+            meta.forEach(([label, value]) => {
+                const row = createMetaRow(label, value);
+                if (row) {
+                    ui.previewBox.appendChild(row);
+                }
+            });
+
+            if (Array.isArray(preview.services) && preview.services.length) {
+                const table = document.createElement('table');
+                table.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th>Dich vu</th>
+                            <th>SL</th>
+                            <th>Don gia</th>
+                            <th>Tam tinh</th>
+                        </tr>
+                    </thead>
+                `;
+                const tbody = document.createElement('tbody');
+                preview.services.forEach((service) => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${service.serviceName || service.serviceId}</td>
+                        <td>${service.quantity ?? '-'}</td>
+                        <td>${service.formattedUnitPrice || service.unitPrice || '-'}</td>
+                        <td>${service.formattedSubtotal || service.subtotal || '-'}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+                table.appendChild(tbody);
+                ui.previewBox.appendChild(table);
+            }
+
+            if (Array.isArray(preview.employees) && preview.employees.length) {
+                const table = document.createElement('table');
+                table.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th>Nhan vien</th>
+                            <th>Dich vu dam nhan</th>
+                            <th>Auto assigned?</th>
+                        </tr>
+                    </thead>
+                `;
+                const tbody = document.createElement('tbody');
+                preview.employees.forEach((emp) => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${emp.fullName || emp.employeeId}</td>
+                        <td>${Array.isArray(emp.serviceIds) ? emp.serviceIds.join(', ') : '-'}</td>
+                        <td>${emp.autoAssigned ? 'Co' : 'Khong'}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+                table.appendChild(tbody);
+                ui.previewBox.appendChild(table);
+            }
+        };
+
+        const renderListPanel = (element, values) => {
+            element.innerHTML = '';
+            if (!values || (Array.isArray(values) && values.length === 0)) {
+                element.textContent = 'Khong co du lieu.';
+                return;
+            }
+            if (Array.isArray(values)) {
+                const ul = document.createElement('ul');
+                values.forEach((item) => {
+                    const li = document.createElement('li');
+                    li.textContent = item;
+                    ul.appendChild(li);
+                });
+                element.appendChild(ul);
+                return;
+            }
+            const list = document.createElement('ul');
+            Object.entries(values).forEach(([key, value]) => {
+                const li = document.createElement('li');
+                li.textContent = `${key}: ${JSON.stringify(value)}`;
+                list.appendChild(li);
+            });
+            element.appendChild(list);
+        };
+
+        const hasOwn = (obj, prop) => Object.prototype.hasOwnProperty.call(obj ?? {}, prop);
+
+        const shouldClearPreview = (status) => {
+            if (!status) {
+                return false;
+            }
+            const normalized = status.toUpperCase();
+            return normalized === 'FAILED'
+                    || normalized === 'PARTIAL'
+                    || normalized === 'CANCELLED'
+                    || normalized === 'PROCESSING';
+        };
+
+        const applyRealtimePayload = (payload) => {
+            renderJson(ui.wsEventJson, payload, 'Chua nhan duoc su kien nao.');
+            if (!payload || typeof payload !== 'object') {
+                return;
+            }
+            if (payload.requestId) {
+                setRequestId(payload.requestId);
+            }
+            if (payload.speech && (payload.speech.message?.audioUrl || payload.speech.clarification?.audioUrl)) {
+                renderSpeech(payload.speech);
+            } else if (shouldClearPreview(payload.status)) {
+                renderSpeech(null);
+            }
+            if (payload.preview) {
+                renderPreview(payload.preview);
+            } else if (shouldClearPreview(payload.status)) {
+                renderPreview(null);
+            }
+
+            if (hasOwn(payload, 'missingFields')) {
+                renderListPanel(ui.missingBox, payload.missingFields);
+            } else if (payload.status && payload.status.toUpperCase() !== 'PARTIAL') {
+                renderListPanel(ui.missingBox, null);
+            }
+
+            if (hasOwn(payload, 'extractedInfo')) {
+                renderListPanel(ui.extractedBox, payload.extractedInfo);
+            } else if (payload.status && payload.status.toUpperCase() !== 'PARTIAL') {
+                renderListPanel(ui.extractedBox, null);
+            }
+        };
+
+        const describeWsEvent = (payload) => {
+            if (!payload || typeof payload !== 'object') {
+                return 'Nhan payload khong hop le';
+            }
+            const parts = [];
+            if (payload.eventType) {
+                parts.push(`event=${payload.eventType}`);
+            }
+            if (payload.status) {
+                parts.push(`status=${payload.status}`);
+            }
+            if (payload.bookingId) {
+                parts.push(`booking=${payload.bookingId}`);
+            }
+            if (typeof payload.progress === 'number') {
+                parts.push(`progress=${Math.round(payload.progress * 100)}%`);
+            }
+            if (payload.processingTimeMs != null) {
+                parts.push(`processing=${payload.processingTimeMs}ms`);
+            }
+            if (payload.errorMessage) {
+                parts.push(`error=${payload.errorMessage}`);
+            }
+            if (payload.speech && (payload.speech.message?.audioUrl || payload.speech.clarification?.audioUrl)) {
+                parts.push('speech=ready');
+            }
+            return parts.length ? parts.join(' | ') : 'Nhan payload';
+        };
+
+        const handleVoiceResponse = (label, status, payload) => {
+            logSuccess(`${label} → HTTP ${status} (${payload?.status || payload?.message || 'unknown'})`);
+            renderJson(ui.responseJson, payload, 'Khong co phan hoi.');
+            renderSpeech(payload?.speech);
+            renderPreview(payload?.preview);
+            renderListPanel(ui.missingBox, payload?.missingFields);
+            renderListPanel(ui.extractedBox, payload?.extractedInfo);
+            if (payload?.requestId) {
+                setRequestId(payload.requestId);
+            }
+        };
+
+        const handleError = (label, error) => {
+            const message = `${label} that bai${error?.status ? ` (HTTP ${error.status})` : ''}: ${error?.message || ''}`;
+            logError(message);
+            renderJson(ui.responseJson, error?.payload || { error: error?.message || 'Unknown error' }, 'Khong co du lieu loi.');
+            if (error?.payload?.speech) {
+                renderSpeech(error.payload.speech);
+            }
+            if (error?.payload?.requestId) {
+                setRequestId(error.payload.requestId);
+            }
+        };
+
+        const parseJsonResponse = async (response) => {
+            const text = await response.text();
+            let payload = null;
+            if (text) {
+                try {
+                    payload = JSON.parse(text);
+                } catch (err) {
+                    payload = { raw: text };
+                }
+            }
+            if (!response.ok) {
+                const error = new Error(payload?.message || 'Voice API tra ve loi');
+                error.status = response.status;
+                error.payload = payload;
+                throw error;
+            }
+            return { status: response.status, payload };
+        };
+
+        const sendForm = async (path, formData) => {
+            const token = requireToken();
+            const response = await fetch(voiceUrl(path), {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData
+            });
+            return parseJsonResponse(response);
+        };
+
+        const sendJson = async (path, method, body) => {
+            const token = requireToken();
+            const response = await fetch(voiceUrl(path), {
+                method,
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(body)
+            });
+            return parseJsonResponse(response);
+        };
+
+        const fetchVoice = async (path, method = 'GET') => {
+            const token = requireToken();
+            const response = await fetch(voiceUrl(path), {
+                method,
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            });
+            return parseJsonResponse(response);
+        };
+
+        const getAudioFile = (inputEl, fallbackName) => {
+            if (inputEl && inputEl.files && inputEl.files[0]) {
+                return inputEl.files[0];
+            }
+            if (state.audioBlob) {
+                return new File([state.audioBlob], fallbackName || state.audioFileName, {
+                    type: state.audioBlob.type || 'audio/webm'
+                });
+            }
+            return null;
+        };
+
+        const startRecording = async () => {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                alert('Trinh duyet khong ho tro MediaRecorder.');
+                return;
+            }
+            if (state.mediaRecorder && state.mediaRecorder.state === 'recording') {
+                return;
+            }
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const recorder = new MediaRecorder(stream);
+                state.mediaStream = stream;
+                state.mediaRecorder = recorder;
+                state.audioChunks = [];
+                ui.recordState.textContent = 'Dang ghi am...';
+
+                recorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        state.audioChunks.push(event.data);
+                    }
+                };
+                recorder.onstop = () => {
+                    state.audioBlob = new Blob(state.audioChunks, { type: recorder.mimeType || 'audio/webm' });
+                    state.audioFileName = `recording-${Date.now()}.webm`;
+                    if (state.audioUrl) {
+                        URL.revokeObjectURL(state.audioUrl);
+                    }
+                    state.audioUrl = URL.createObjectURL(state.audioBlob);
+                    ui.audioPreview.src = state.audioUrl;
+                    ui.audioPreview.closest('.panel').style.display = 'block';
+                    ui.recordState.textContent = 'Da ghi xong.';
+                    if (state.mediaStream) {
+                        state.mediaStream.getTracks().forEach((track) => track.stop());
+                        state.mediaStream = null;
+                    }
+                };
+                recorder.start();
+            } catch (err) {
+                ui.recordState.textContent = 'Khong the ghi am.';
+                console.error(err);
+            }
+        };
+
+        const stopRecording = () => {
+            if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
+                state.mediaRecorder.stop();
+            }
+        };
+
+        const resetRecording = () => {
+            if (state.mediaRecorder && state.mediaRecorder.state === 'recording') {
+                state.mediaRecorder.stop();
+            }
+            if (state.mediaStream) {
+                state.mediaStream.getTracks().forEach((track) => track.stop());
+                state.mediaStream = null;
+            }
+            if (state.audioUrl) {
+                URL.revokeObjectURL(state.audioUrl);
+                state.audioUrl = null;
+            }
+            state.audioBlob = null;
+            ui.audioPreview.removeAttribute('src');
+            ui.audioPreview.load();
+            ui.recordState.textContent = 'Chua ghi am';
+            ui.audioFile.value = '';
+            ui.continueAudio.value = '';
+        };
+
+        const parseJsonInput = (raw, label) => {
+            if (!raw || !raw.trim()) {
+                return null;
+            }
+            try {
+                return JSON.parse(raw);
+            } catch (err) {
+                throw new Error(`${label} khong phai JSON hop le: ${err.message}`);
+            }
+        };
+
+        const checkStatus = async () => {
+            const response = await fetch(voiceUrl('/status'));
+            const result = await parseJsonResponse(response);
+            renderJson(ui.statusResult, result.payload, 'Khong co du lieu.');
+            logInfo(`/status → HTTP ${result.status}`);
+        };
+
+        const createVoiceBooking = async () => {
+            const form = new FormData();
+            const audio = getAudioFile(ui.audioFile, 'voice-create.webm');
+            if (!audio) {
+                throw new Error('Vui long ghi am hoac chon file audio truoc khi tao request.');
+            }
+            form.append('audio', audio);
+            if (ui.hints.value.trim()) {
+                const parsed = parseJsonInput(ui.hints.value, 'Hints');
+                form.append('hints', JSON.stringify(parsed));
+            }
+            const result = await sendForm('', form);
+            handleVoiceResponse('Tao request', result.status, result.payload);
+        };
+
+        const continueVoiceBooking = async () => {
+            const id = ensureRequestId();
+            const hasText = ui.additionalText.value.trim().length > 0;
+            const hasExplicit = ui.explicitFields.value.trim().length > 0;
+            const form = new FormData();
+            form.append('requestId', id);
+            const audio = getAudioFile(ui.continueAudio, 'voice-continue.webm');
+            if (audio) {
+                form.append('audio', audio);
+            }
+            if (hasText) {
+                form.append('additionalText', ui.additionalText.value.trim());
+            }
+            if (hasExplicit) {
+                const parsed = parseJsonInput(ui.explicitFields.value, 'explicitFields');
+                form.append('explicitFields', JSON.stringify(parsed));
+            }
+            if (!audio && !hasText && !hasExplicit) {
+                throw new Error('Can it nhat audio, additionalText hoac explicitFields.');
+            }
+            const result = await sendForm('/continue', form);
+            handleVoiceResponse('Tiep tuc request', result.status, result.payload);
+        };
+
+        const confirmVoiceBooking = async () => {
+            const id = ensureRequestId();
+            const result = await sendJson('/confirm', 'POST', { requestId: id });
+            handleVoiceResponse('Confirm', result.status, result.payload);
+        };
+
+        const cancelVoiceBooking = async () => {
+            const id = ensureRequestId();
+            const result = await sendJson('/cancel', 'POST', { requestId: id });
+            handleVoiceResponse('Cancel', result.status, result.payload);
+        };
+
+        const fetchRequestDetails = async () => {
+            const id = ensureRequestId();
+            const result = await fetchVoice(`/${encodeURIComponent(id)}`, 'GET');
+            renderJson(ui.requestDetails, result.payload, 'Khong co du lieu.');
+            logInfo(`GET /${id} → HTTP ${result.status}`);
+        };
+
+        const wrapAction = async (button, label, action) => {
+            if (button) {
+                button.disabled = true;
+            }
+            try {
+                await action();
+            } catch (err) {
+                handleError(label, err);
+            } finally {
+                if (button) {
+                    button.disabled = false;
+                }
+            }
+        };
+
+        const toHttpUrl = (value) => {
+            if (value.startsWith('ws://')) {
+                return 'http://' + value.substring(5);
+            }
+            if (value.startsWith('wss://')) {
+                return 'https://' + value.substring(6);
+            }
+            return value;
+        };
+
+        const installXhrAuthInterceptor = (token, wsBaseUrl) => {
+            const httpBase = normalizeBase(toHttpUrl(wsBaseUrl));
+            const originalOpen = XMLHttpRequest.prototype.open;
+            const originalSend = XMLHttpRequest.prototype.send;
+
+            XMLHttpRequest.prototype.open = function(method, url) {
+                this._voiceWsShouldAttachAuth = typeof url === 'string' && url.startsWith(httpBase);
+                return originalOpen.apply(this, arguments);
+            };
+
+            XMLHttpRequest.prototype.send = function(body) {
+                if (this._voiceWsShouldAttachAuth) {
+                    this.setRequestHeader('Authorization', `Bearer ${token}`);
+                }
+                return originalSend.apply(this, arguments);
+            };
+
+            return () => {
+                XMLHttpRequest.prototype.open = originalOpen;
+                XMLHttpRequest.prototype.send = originalSend;
+            };
+        };
+
+        const setWsStatus = (connected) => {
+            ui.wsStatus.textContent = connected ? 'Connected' : 'Disconnected';
+            ui.wsStatus.classList.toggle('connected', connected);
+            ui.wsStatus.classList.toggle('disconnected', !connected);
+        };
+
+        const appendWsLog = (message, level = 'info') => appendLog(ui.wsLog, message, level);
+
+        const subscribeTopic = (requestId) => {
+            const id = (requestId || '').trim();
+            if (!id) {
+                return;
+            }
+            if (!state.wsClient || !state.wsClient.connected) {
+                return;
+            }
+            if (state.wsSubscriptions.has(id)) {
+                return;
+            }
+            const destination = `/topic/voice-booking/${id}`;
+            const subscription = state.wsClient.subscribe(destination, (message) => {
+                let parsed = null;
+                try {
+                    parsed = JSON.parse(message.body);
+                } catch (err) {
+                    appendWsLog(`[${id}] ${message.body}`);
+                    return;
+                }
+                applyRealtimePayload(parsed);
+                const level = parsed.status === 'FAILED'
+                        ? 'error'
+                        : (parsed.status === 'COMPLETED' ? 'success' : 'info');
+                appendWsLog(`[${id}] ${describeWsEvent(parsed)}`, level);
+            });
+            state.wsSubscriptions.set(id, subscription);
+            appendWsLog(`Subscribed ${destination}`, 'success');
+        };
+
+        const connectWs = async () => {
+            if (state.wsClient && state.wsClient.connected) {
+                appendWsLog('Da ket noi WebSocket.', 'warn');
+                return;
+            }
+            let token;
+            try {
+                token = requireToken();
+            } catch (err) {
+                appendWsLog(err.message, 'error');
+                return;
+            }
+            const wsUrl = (ui.wsEndpoint.value && ui.wsEndpoint.value.trim())
+                ? ui.wsEndpoint.value.trim()
+                : `${normalizeBase(ui.baseUrl.value)}/ws/voice-booking`;
+
+            if (state.wsInterceptorCleanup) {
+                state.wsInterceptorCleanup();
+            }
+            state.wsInterceptorCleanup = installXhrAuthInterceptor(token, wsUrl);
+
+            const sock = new SockJS(wsUrl, null, {
+                transports: ['xhr-streaming', 'xhr-polling']
+            });
+            const client = Stomp.over(sock);
+            client.debug = (msg) => appendWsLog(msg);
+
+            client.connect(
+                { Authorization: `Bearer ${token}` },
+                () => {
+                    appendWsLog('Da ket noi /ws/voice-booking', 'success');
+                    state.wsClient = client;
+                    setWsStatus(true);
+                    state.wsErrorSubscription = client.subscribe('/user/queue/voice-booking/errors', (message) => {
+                        appendWsLog(`ERROR: ${message.body}`, 'error');
+                    });
+                    if (ui.autoSubscribe.checked && state.requestId) {
+                        subscribeTopic(state.requestId);
+                    }
+                },
+                (error) => {
+                    appendWsLog(`Ket noi WS loi: ${error}`, 'error');
+                    disconnectWs();
+                }
+            );
+        };
+
+        const disconnectWs = () => {
+            if (state.wsSubscriptions.size) {
+                state.wsSubscriptions.forEach((sub) => sub.unsubscribe());
+                state.wsSubscriptions.clear();
+            }
+            if (state.wsErrorSubscription) {
+                state.wsErrorSubscription.unsubscribe();
+                state.wsErrorSubscription = null;
+            }
+            if (state.wsInterceptorCleanup) {
+                state.wsInterceptorCleanup();
+                state.wsInterceptorCleanup = null;
+            }
+            if (state.wsClient) {
+                state.wsClient.disconnect(() => appendWsLog('Da ngat ket noi WS.'));
+                state.wsClient = null;
+            }
+            setWsStatus(false);
+        };
+
+        const clearWsLog = () => {
+            ui.wsLog.innerHTML = '';
+        };
+
+        ui.serviceBtn.addEventListener('click', () => wrapAction(ui.serviceBtn, 'Goi /status', checkStatus));
+        ui.createBtn.addEventListener('click', () => wrapAction(ui.createBtn, 'Tao voice booking', createVoiceBooking));
+        ui.continueBtn.addEventListener('click', () => wrapAction(ui.continueBtn, 'Tiep tuc voice booking', continueVoiceBooking));
+        ui.confirmBtn.addEventListener('click', () => wrapAction(ui.confirmBtn, 'Confirm voice booking', confirmVoiceBooking));
+        ui.cancelBtn.addEventListener('click', () => wrapAction(ui.cancelBtn, 'Cancel voice booking', cancelVoiceBooking));
+        ui.fetchRequestBtn.addEventListener('click', () => wrapAction(ui.fetchRequestBtn, 'Fetch request', fetchRequestDetails));
+
+        ui.recordStart.addEventListener('click', startRecording);
+        ui.recordStop.addEventListener('click', stopRecording);
+        ui.recordReset.addEventListener('click', resetRecording);
+
+        ui.baseUrl.addEventListener('input', syncWsEndpointWithApi);
+        ui.wsEndpoint.addEventListener('input', () => {
+            wsManuallyEdited = true;
+        });
+
+        ui.wsConnect.addEventListener('click', connectWs);
+        ui.wsDisconnect.addEventListener('click', disconnectWs);
+        ui.wsSubscribe.addEventListener('click', () => subscribeTopic(ensureRequestId()));
+        ui.wsClear.addEventListener('click', clearWsLog);
+
+        ui.requestId.addEventListener('input', (event) => {
+            state.requestId = event.target.value.trim();
+        });
+
+        window.addEventListener('beforeunload', () => {
+            disconnectWs();
+            resetRecording();
+        });
+
+        checkStatus().catch(() => {
+            // ignore first-run error
+        });
+    })();
+</script>
+</body>
+</html>

@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Voice Booking Tester</title>
+  <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+  <script src="https://unpkg.com/@stomp/stompjs@7.0.0/umd/stomp.umd.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.5; }
+    fieldset { margin-bottom: 14px; padding: 12px; }
+    legend { font-weight: bold; }
+    label { display: block; margin-top: 6px; }
+    input[type="text"], input[type="url"], textarea { width: 100%; padding: 6px; box-sizing: border-box; }
+    button { margin-top: 8px; padding: 6px 12px; }
+    .row { display: flex; gap: 12px; }
+    .row > div { flex: 1; }
+    #logs { height: 240px; overflow: auto; background: #0d1117; color: #c9d1d9; padding: 10px; border-radius: 4px; }
+    #events { height: 240px; overflow: auto; background: #f6f8fa; padding: 10px; border-radius: 4px; }
+    .pill { display: inline-block; padding: 2px 8px; border-radius: 12px; background: #eaecef; margin-right: 6px; font-size: 12px; }
+    audio { margin-top: 6px; display: block; }
+  </style>
+</head>
+<body>
+  <h1>Voice Booking Tester</h1>
+
+  <fieldset>
+    <legend>Config</legend>
+    <label>API Base URL
+      <input id="apiUrl" type="url" value="http://localhost" placeholder="http://localhost">
+    </label>
+    <label>WebSocket URL
+      <input id="wsUrl" type="url" value="ws://localhost/ws/voice-booking" placeholder="ws://localhost/ws/voice-booking">
+    </label>
+    <label>JWT (Bearer)
+      <input id="token" type="text" placeholder="Bearer token without prefix">
+    </label>
+    <div class="row">
+      <div><button onclick="connectWs()">Connect WS</button></div>
+      <div><button onclick="disconnectWs()">Disconnect WS</button></div>
+    </div>
+    <label><input type="checkbox" id="autoSubscribe" checked> Tự động subscribe topic khi có requestId</label>
+    <div id="wsStatus" class="pill">WS: disconnected</div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Create Voice Booking</legend>
+    <label>Audio file (multipart/form-data)
+      <input id="voiceFile" type="file" accept="audio/*">
+    </label>
+    <label>Hints JSON (optional)
+      <textarea id="hints" rows="3" placeholder='{"serviceId":1,"bookingTime":"2025-12-01T09:00:00"}'></textarea>
+    </label>
+    <button onclick="createVoiceBooking()">Send /api/v1/customer/bookings/voice</button>
+  </fieldset>
+
+  <fieldset>
+    <legend>Continue Voice Booking</legend>
+    <label>Request ID
+      <input id="continueRequestId" type="text" placeholder="voice_request_id">
+    </label>
+    <label>Additional audio
+      <input id="continueFile" type="file" accept="audio/*">
+    </label>
+    <label>Additional text</label>
+    <textarea id="additionalText" rows="2" placeholder="Bổ sung thông tin thiếu..."></textarea>
+    <label>Explicit fields JSON (optional)</label>
+    <textarea id="explicitFields" rows="2" placeholder='{"address":"123 Lê Lợi"}'></textarea>
+    <button onclick="continueVoice()">Send /api/v1/customer/bookings/voice/continue</button>
+  </fieldset>
+
+  <fieldset>
+    <legend>Confirm / Cancel</legend>
+    <label>Request ID
+      <input id="actionRequestId" type="text" placeholder="voice_request_id">
+    </label>
+    <div class="row">
+      <div><button onclick="confirmVoice()">POST /voice/confirm</button></div>
+      <div><button onclick="cancelVoice()">POST /voice/cancel</button></div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Status</legend>
+    <label>Request ID
+      <input id="statusRequestId" type="text" placeholder="voice_request_id">
+    </label>
+    <button onclick="getStatus()">GET /voice/{id}</button>
+  </fieldset>
+
+  <fieldset>
+    <legend>Events</legend>
+    <div id="events"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Logs</legend>
+    <pre id="logs"></pre>
+  </fieldset>
+
+  <script>
+    const state = {
+      client: null,
+      subscriptions: {},
+      currentRequestId: null,
+      wsInterceptorCleanup: null,
+      wsManuallyEdited: false
+    };
+
+    const logEl = document.getElementById('logs');
+    const eventsEl = document.getElementById('events');
+    const wsStatus = document.getElementById('wsStatus');
+
+    function log(message, data) {
+      const time = new Date().toISOString();
+      logEl.textContent += `[${time}] ${message}${data ? ' ' + JSON.stringify(data, null, 2) : ''}\n`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function appendEvent(payload) {
+      const div = document.createElement('div');
+      div.style.borderBottom = '1px solid #e1e4e8';
+      div.style.padding = '6px 0';
+      const meta = document.createElement('div');
+      meta.innerHTML = `<span class="pill">${payload.eventType || '-'}</span><span class="pill">${payload.status || '-'}</span><span class="pill">${payload.requestId || ''}</span>`;
+      div.appendChild(meta);
+      const pre = document.createElement('pre');
+      pre.textContent = JSON.stringify(payload, null, 2);
+      div.appendChild(pre);
+      appendSpeech(div, payload.speech);
+      eventsEl.appendChild(div);
+      eventsEl.scrollTop = eventsEl.scrollHeight;
+    }
+
+    function appendSpeech(container, speech) {
+      if (!speech || (!speech.message && !speech.clarification)) return;
+      const section = document.createElement('div');
+      section.innerHTML = '<strong>TTS</strong>';
+      ['message', 'clarification'].forEach(key => {
+        const part = speech[key];
+        if (part && part.audioUrl) {
+          const wrap = document.createElement('div');
+          wrap.textContent = `${key}: `;
+          const audio = document.createElement('audio');
+          audio.controls = true;
+          audio.src = part.audioUrl;
+          wrap.appendChild(audio);
+          section.appendChild(wrap);
+        }
+      });
+      container.appendChild(section);
+    }
+
+    function bearer() {
+      const token = document.getElementById('token').value.trim();
+      return token ? `Bearer ${token}` : '';
+    }
+
+    function setField(id, value) {
+      const el = document.getElementById(id);
+      if (el && value !== undefined && value !== null && value !== '') {
+        el.value = value;
+      }
+    }
+
+    function persistField(id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.addEventListener('change', () => {
+        localStorage.setItem(`voiceTester.${id}`, el.value);
+      });
+    }
+
+    function loadPersisted() {
+      ['apiUrl', 'wsUrl', 'token', 'hints', 'additionalText', 'explicitFields'].forEach(id => {
+        const val = localStorage.getItem(`voiceTester.${id}`);
+        if (val) setField(id, val);
+        persistField(id);
+      });
+      const lastId = localStorage.getItem('voiceTester.lastRequestId');
+      if (lastId) {
+        setCurrentRequestId(lastId, false);
+      }
+      const autoSub = localStorage.getItem('voiceTester.autoSubscribe');
+      if (autoSub !== null) {
+        document.getElementById('autoSubscribe').checked = autoSub === 'true';
+      }
+      document.getElementById('autoSubscribe').addEventListener('change', (e) => {
+        localStorage.setItem('voiceTester.autoSubscribe', e.target.checked);
+      });
+    }
+
+    function normalizeBase(value) {
+        const fallback = 'http://localhost';
+        if (!value || !value.trim()) return fallback;
+        const trimmed = value.trim();
+        const withProtocol = trimmed.startsWith('http://') || trimmed.startsWith('https://')
+            ? trimmed
+            : `http://${trimmed}`;
+        return withProtocol.replace(/\/+$/, '') || fallback;
+    }
+
+    function normalizeWsUrl(value) {
+        const base = normalizeBase(value || '');
+        if (base.startsWith('ws://') || base.startsWith('wss://')) {
+            return base;
+        }
+        return base;
+    }
+
+    function syncWsFromApi() {
+        const api = normalizeBase(document.getElementById('apiUrl').value);
+        const wsInput = document.getElementById('wsUrl');
+        if (!state.wsManuallyEdited) {
+            wsInput.value = `${api}/ws/voice-booking`;
+            localStorage.setItem('voiceTester.wsUrl', wsInput.value);
+        }
+    }
+
+    function installXhrAuthInterceptor(token, wsBaseUrl) {
+        const httpBase = normalizeBase(wsBaseUrl);
+        const originalOpen = XMLHttpRequest.prototype.open;
+        const originalSend = XMLHttpRequest.prototype.send;
+
+        XMLHttpRequest.prototype.open = function(method, url) {
+            this._voiceWsShouldAttachAuth = typeof url === 'string' && url.startsWith(httpBase);
+            return originalOpen.apply(this, arguments);
+        };
+
+        XMLHttpRequest.prototype.send = function(body) {
+            if (this._voiceWsShouldAttachAuth && token) {
+                this.setRequestHeader('Authorization', token);
+            }
+            return originalSend.apply(this, arguments);
+        };
+
+        state.wsInterceptorCleanup = () => {
+            XMLHttpRequest.prototype.open = originalOpen;
+            XMLHttpRequest.prototype.send = originalSend;
+        };
+    }
+
+    function connectWs() {
+      const token = bearer();
+      const wsUrl = normalizeWsUrl(document.getElementById('wsUrl').value.trim());
+      if (!wsUrl) {
+        alert('WS URL required');
+        return;
+      }
+      disconnectWs();
+      installXhrAuthInterceptor(token, wsUrl);
+      state.client = new StompJs.Client({
+        webSocketFactory: () => new SockJS(wsUrl),
+        connectHeaders: { Authorization: token },
+        reconnectDelay: 4000,
+        debug: (msg) => log(msg),
+        onConnect: () => {
+          wsStatus.textContent = 'WS: connected';
+          wsStatus.style.background = '#d1fae5';
+          log('WS connected');
+          subscribeErrors();
+          resubscribe();
+        },
+        onStompError: frame => {
+          log('WS stomp error', frame.headers);
+        },
+        onWebSocketError: err => {
+          log('WS socket error', err.message);
+        },
+        onDisconnect: () => {
+          wsStatus.textContent = 'WS: disconnected';
+          wsStatus.style.background = '#eaecef';
+          log('WS disconnected');
+        }
+      });
+      state.client.activate();
+    }
+
+    function disconnectWs() {
+      if (state.subscriptions.errors) {
+        state.subscriptions.errors.unsubscribe();
+      }
+      if (state.client) {
+        state.client.deactivate();
+        state.client = null;
+      }
+      if (state.wsInterceptorCleanup) {
+        state.wsInterceptorCleanup();
+        state.wsInterceptorCleanup = null;
+      }
+      state.subscriptions = {};
+      wsStatus.textContent = 'WS: disconnected';
+      wsStatus.style.background = '#eaecef';
+    }
+
+    function resubscribe() {
+      if (!state.client || state.client.connected === false) return;
+      if (state.currentRequestId && document.getElementById('autoSubscribe').checked) {
+        subscribeRequest(state.currentRequestId);
+      }
+      subscribeErrors();
+    }
+
+    function subscribeRequest(requestId) {
+      if (!state.client || !state.client.connected) return;
+      if (state.subscriptions.request) {
+        state.subscriptions.request.unsubscribe();
+      }
+      const destination = `/topic/voice-booking/${requestId}`;
+      state.subscriptions.request = state.client.subscribe(destination, message => {
+        try {
+          appendEvent(JSON.parse(message.body));
+        } catch {
+          log('Invalid event payload', message.body);
+        }
+      });
+      log('Subscribed to', destination);
+    }
+
+    function subscribeErrors() {
+      if (!state.client || !state.client.connected) return;
+      if (state.subscriptions.errors) {
+        state.subscriptions.errors.unsubscribe();
+      }
+      const destination = '/user/queue/voice-booking/errors';
+      state.subscriptions.errors = state.client.subscribe(destination, message => {
+        try {
+          appendEvent({ eventType: 'ERROR', ...JSON.parse(message.body) });
+        } catch {
+          log('Invalid error event', message.body);
+        }
+      });
+      log('Subscribed to', destination);
+    }
+
+    function setCurrentRequestId(id, subscribe = true) {
+      if (!id) return;
+      state.currentRequestId = id;
+      document.getElementById('continueRequestId').value = id;
+      document.getElementById('actionRequestId').value = id;
+      document.getElementById('statusRequestId').value = id;
+      localStorage.setItem('voiceTester.lastRequestId', id);
+      const shouldSub = subscribe && document.getElementById('autoSubscribe').checked;
+      if (shouldSub && state.client && state.client.connected) {
+        subscribeRequest(id);
+      }
+    }
+
+    async function createVoiceBooking() {
+      const api = normalizeBase(document.getElementById('apiUrl').value);
+      const file = document.getElementById('voiceFile').files[0];
+      const hints = document.getElementById('hints').value.trim();
+      if (!file) {
+        alert('Audio file is required');
+        return;
+      }
+      const form = new FormData();
+      form.append('audio', file);
+      if (hints) form.append('hints', hints);
+      await sendRequest(`${api}/api/v1/customer/bookings/voice`, {
+        method: 'POST',
+        headers: { Authorization: bearer() },
+        body: form
+      });
+    }
+
+    async function continueVoice() {
+      const api = normalizeBase(document.getElementById('apiUrl').value);
+      const requestId = document.getElementById('continueRequestId').value.trim();
+      const file = document.getElementById('continueFile').files[0];
+      const additionalText = document.getElementById('additionalText').value.trim();
+      const explicitFields = document.getElementById('explicitFields').value.trim();
+      if (!requestId) {
+        alert('Request ID required');
+        return;
+      }
+      const form = new FormData();
+      form.append('requestId', requestId);
+      if (file) form.append('audio', file);
+      if (additionalText) form.append('additionalText', additionalText);
+      if (explicitFields) form.append('explicitFields', explicitFields);
+      await sendRequest(`${api}/api/v1/customer/bookings/voice/continue`, {
+        method: 'POST',
+        headers: { Authorization: bearer() },
+        body: form
+      });
+    }
+
+    async function confirmVoice() {
+      await actionRequest('/confirm');
+    }
+
+    async function cancelVoice() {
+      await actionRequest('/cancel');
+    }
+
+    async function actionRequest(path) {
+      const api = normalizeBase(document.getElementById('apiUrl').value);
+      const requestId = document.getElementById('actionRequestId').value.trim();
+      if (!requestId) {
+        alert('Request ID required');
+        return;
+      }
+      await sendRequest(`${api}/api/v1/customer/bookings/voice${path}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: bearer()
+        },
+        body: JSON.stringify({ requestId })
+      });
+    }
+
+    async function getStatus() {
+      const api = normalizeBase(document.getElementById('apiUrl').value);
+      const requestId = document.getElementById('statusRequestId').value.trim();
+      if (!requestId) {
+        alert('Request ID required');
+        return;
+      }
+      await sendRequest(`${api}/api/v1/customer/bookings/voice/${requestId}`, {
+        method: 'GET',
+        headers: { Authorization: bearer() }
+      });
+    }
+
+    async function sendRequest(url, options) {
+      log(`Request -> ${options.method || 'GET'} ${url}`);
+      try {
+        const res = await fetch(url, options);
+        const text = await res.text();
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch {
+          json = text;
+        }
+        log(`Response ${res.status}`, json);
+        if (json && json.requestId) {
+          setCurrentRequestId(json.requestId);
+          appendSpeech(eventsEl, json.speech);
+        }
+      } catch (err) {
+        log('HTTP error', err.message);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadPersisted();
+      if (!localStorage.getItem('voiceTester.wsUrl')) {
+        state.wsManuallyEdited = false;
+        syncWsFromApi();
+      } else {
+        state.wsManuallyEdited = true;
+      }
+      document.getElementById('apiUrl').addEventListener('input', () => {
+        state.wsManuallyEdited = false;
+        syncWsFromApi();
+      });
+      document.getElementById('wsUrl').addEventListener('input', () => {
+        state.wsManuallyEdited = true;
+      });
+    });
+  </script>
+</body>
+</html>

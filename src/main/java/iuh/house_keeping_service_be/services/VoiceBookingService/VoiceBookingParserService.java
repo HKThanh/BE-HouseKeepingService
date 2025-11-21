@@ -7,11 +7,15 @@ import iuh.house_keeping_service_be.dtos.VoiceBooking.ParsedBookingInfo;
 import iuh.house_keeping_service_be.models.Service;
 import iuh.house_keeping_service_be.repositories.ServiceRepository;
 import lombok.RequiredArgsConstructor;
+import java.text.Normalizer;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.DayOfWeek;
+import java.time.temporal.TemporalAdjusters;
+import java.time.DayOfWeek;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -37,7 +41,7 @@ public class VoiceBookingParserService {
 
     // Pattern for extracting date information
     private static final Pattern DATE_PATTERN = Pattern.compile(
-            "(hôm nay|ngày mai|ngày kia|(\\d{1,2})/(\\d{1,2})/(\\d{4}|\\d{2}))",
+            "(hôm nay|ngày mai|ngày kia|ngày mốt|ngày này tuần sau|ngày mai tuần sau|ngày mốt tuần sau|(thứ\\s+[2-7]|thứ\\s+(hai|ba|tư|năm|sáu|bảy|bay)|chủ nhật|chu nhat)(\\s+tuần sau)?|(\\d{1,2})/(\\d{1,2})/(\\d{4}|\\d{2}))",
             Pattern.CASE_INSENSITIVE
     );
 
@@ -174,6 +178,7 @@ public class VoiceBookingParserService {
     private List<Service> extractServices(String transcript, Map<String, Object> hints) {
         List<Service> matchedServices = new ArrayList<>();
         String lowerTranscript = transcript.toLowerCase();
+        String normalizedTranscript = normalizeText(lowerTranscript);
 
         // Check hints first
         if (hints.containsKey("serviceId")) {
@@ -195,6 +200,29 @@ public class VoiceBookingParserService {
                 .filter(Service::getIsActive)
                 .toList();
 
+        // Try explicit service name from hints (e.g., user typed it in FE)
+        if (hints != null && hints.containsKey("explicitFields")) {
+            Object explicit = hints.get("explicitFields");
+            if (explicit instanceof Map<?, ?> explicitMap) {
+                Object serviceNameObj = explicitMap.get("service") != null ? explicitMap.get("service") : explicitMap.get("services");
+                if (serviceNameObj != null) {
+                    String serviceNameHint = String.valueOf(serviceNameObj).trim();
+                    String normalizedHint = normalizeText(serviceNameHint.toLowerCase());
+                    for (Service svc : allServices) {
+                        String svcNameLower = svc.getName().toLowerCase();
+                        String svcNormalized = normalizeText(svcNameLower);
+                        if (svcNameLower.equalsIgnoreCase(serviceNameHint)
+                                || svcNormalized.equals(normalizedHint)
+                                || normalizedHint.contains(svcNormalized)) {
+                            matchedServices.add(svc);
+                            log.info("Service matched from explicitFields hint: {}", svc.getName());
+                            return matchedServices;
+                        }
+                    }
+                }
+            }
+        }
+
         if (allServices.isEmpty()) {
             log.warn("No active services found in database");
             return matchedServices;
@@ -202,12 +230,16 @@ public class VoiceBookingParserService {
 
         // Remove common Vietnamese filler words and generic terms before matching
         String cleanedTranscript = removeGenericServiceWords(lowerTranscript);
+        String normalizedCleanedTranscript = normalizeText(cleanedTranscript);
         
         // Try exact name match first (case-insensitive)
         for (Service service : allServices) {
             String serviceName = service.getName().toLowerCase();
+            String serviceNameNormalized = normalizeText(serviceName);
             // Check if the service name is present and is not just part of a generic phrase
-            if (cleanedTranscript.contains(serviceName)) {
+            if (cleanedTranscript.contains(serviceName)
+                    || normalizedCleanedTranscript.contains(serviceNameNormalized)
+                    || normalizedTranscript.contains(serviceNameNormalized)) {
                 matchedServices.add(service);
                 log.info("Service matched exactly by name: {}", service.getName());
             }
@@ -396,6 +428,12 @@ public class VoiceBookingParserService {
         return (wordCoverage * 0.5) + (avgSimilarity * 0.5);
     }
 
+    private String normalizeText(String input) {
+        if (input == null) return "";
+        String normalized = Normalizer.normalize(input, Normalizer.Form.NFD);
+        return normalized.replaceAll("\\p{M}", "");
+    }
+
     /**
      * Calculate Levenshtein distance between two strings
      */
@@ -464,36 +502,85 @@ public class VoiceBookingParserService {
      * Extract date from transcript
      */
     private LocalDate extractDate(String transcript) {
-        Matcher matcher = DATE_PATTERN.matcher(transcript);
-        
+        String lower = transcript.toLowerCase();
+        Matcher matcher = DATE_PATTERN.matcher(lower);
+
         if (matcher.find()) {
             String dateStr = matcher.group(1).toLowerCase();
-            
+
             if (dateStr.contains("hôm nay")) {
                 return LocalDate.now();
+            } else if (dateStr.contains("ngày mai tuần sau")) {
+                return LocalDate.now().plusWeeks(1).plusDays(1);
+            } else if (dateStr.contains("ngày mốt tuần sau") || dateStr.contains("ngày kia tuần sau")) {
+                return LocalDate.now().plusWeeks(1).plusDays(2);
+            } else if (dateStr.contains("ngày này tuần sau")) {
+                return LocalDate.now().plusWeeks(1);
             } else if (dateStr.contains("ngày mai")) {
                 return LocalDate.now().plusDays(1);
-            } else if (dateStr.contains("ngày kia")) {
+            } else if (dateStr.contains("ngày mốt") || dateStr.contains("ngày kia")) {
                 return LocalDate.now().plusDays(2);
-            } else {
-                // Parse DD/MM/YYYY format
-                try {
-                    String day = matcher.group(2);
-                    String month = matcher.group(3);
-                    String year = matcher.group(4);
-                    
+            }
+
+            LocalDate weekday = parseWeekdayDate(dateStr);
+            if (weekday != null) {
+                return weekday;
+            }
+
+            // Parse DD/MM/YYYY format (groups 6,7,8 in DATE_PATTERN)
+            try {
+                String day = matcher.group(6);
+                String month = matcher.group(7);
+                String year = matcher.group(8);
+
+                if (day != null && month != null && year != null) {
                     if (year.length() == 2) {
                         year = "20" + year;
                     }
-                    
                     return LocalDate.of(Integer.parseInt(year), Integer.parseInt(month), Integer.parseInt(day));
-                } catch (Exception e) {
-                    log.warn("Failed to parse date: {}", dateStr);
                 }
+            } catch (Exception e) {
+                log.warn("Failed to parse date: {}", dateStr);
             }
         }
-        
+
         return null;
+    }
+
+    private LocalDate parseWeekdayDate(String dateStr) {
+        boolean nextWeek = dateStr.contains("tuần sau");
+        int targetDow = resolveWeekday(dateStr);
+        if (targetDow == -1) {
+            return null;
+        }
+
+        LocalDate today = LocalDate.now();
+
+        if (nextWeek) {
+            // start from next Monday then move to target weekday
+            LocalDate nextMonday = today.with(TemporalAdjusters.next(DayOfWeek.MONDAY));
+            int deltaFromMonday = (targetDow - DayOfWeek.MONDAY.getValue() + 7) % 7;
+            return nextMonday.plusDays(deltaFromMonday);
+        }
+
+        int todayDow = today.getDayOfWeek().getValue(); // Monday=1 ... Sunday=7
+        int delta = (targetDow - todayDow + 7) % 7;
+        if (delta == 0) {
+            delta = 7; // move to next occurrence to avoid past date
+        }
+        return today.plusDays(delta);
+    }
+
+    private int resolveWeekday(String text) {
+        String normalized = text.toLowerCase();
+        if (normalized.contains("chủ nhật") || normalized.contains("chu nhat") || normalized.contains("cn")) return DayOfWeek.SUNDAY.getValue();
+        if (normalized.contains("thứ hai") || normalized.contains("thứ 2") || normalized.contains("thu hai")) return DayOfWeek.MONDAY.getValue();
+        if (normalized.contains("thứ ba") || normalized.contains("thứ 3") || normalized.contains("thu ba")) return DayOfWeek.TUESDAY.getValue();
+        if (normalized.contains("thứ tư") || normalized.contains("thứ 4") || normalized.contains("thu tu")) return DayOfWeek.WEDNESDAY.getValue();
+        if (normalized.contains("thứ năm") || normalized.contains("thứ 5") || normalized.contains("thu nam")) return DayOfWeek.THURSDAY.getValue();
+        if (normalized.contains("thứ sáu") || normalized.contains("thứ 6") || normalized.contains("thu sau")) return DayOfWeek.FRIDAY.getValue();
+        if (normalized.contains("thứ bảy") || normalized.contains("thứ 7") || normalized.contains("bay") || normalized.contains("bảy")) return DayOfWeek.SATURDAY.getValue();
+        return -1;
     }
 
     /**
@@ -752,39 +839,14 @@ public class VoiceBookingParserService {
         // Check if service is missing (highest priority)
         boolean serviceMissing = missingFields.contains("service");
         
-        if (serviceMissing && extractedFields.containsKey("availableServices")) {
-            // CRITICAL: Service is missing - this is the most important field
-            message.append("Xin lỗi, tôi không thể xác định được dịch vụ bạn muốn đặt.\n\n");
-            message.append("📋 Các dịch vụ hiện có:\n");
-            message.append(extractedFields.get("availableServices"));
-            message.append("\n\n💡 Vui lòng nói lại và chỉ rõ dịch vụ bạn cần.");
-            
-            // Show what was understood (if any)
-            Map<String, String> otherFields = new HashMap<>(extractedFields);
-            otherFields.remove("availableServices");
-            
-            if (!otherFields.isEmpty()) {
-                message.append("\n\n✓ Thông tin tôi đã hiểu:\n");
-                for (Map.Entry<String, String> entry : otherFields.entrySet()) {
-                    message.append("  • ").append(formatFieldName(entry.getKey()))
-                           .append(": ").append(entry.getValue()).append("\n");
-                }
-            }
+            if (serviceMissing && extractedFields.containsKey("availableServices")) {
+                // CRITICAL: Service is missing - this is the most important field
+                message.append("Xin lỗi, tôi không thể xác định được dịch vụ bạn muốn đặt.\n\n");
+                message.append("📋 Các dịch vụ hiện có:\n");
+                message.append(extractedFields.get("availableServices"));
+                message.append("\n\n💡 Vui lòng nói lại và chỉ rõ dịch vụ bạn cần.");
         } else {
-            // Standard handling for other missing fields (when service is already identified)
-            if (!extractedFields.isEmpty()) {
-                message.append("✓ Tôi đã hiểu được:\n");
-                
-                Map<String, String> displayFields = new HashMap<>(extractedFields);
-                displayFields.remove("availableServices"); // Don't show in standard format
-                
-                for (Map.Entry<String, String> entry : displayFields.entrySet()) {
-                    message.append("  • ").append(formatFieldName(entry.getKey()))
-                           .append(": ").append(entry.getValue()).append("\n");
-                }
-                message.append("\n");
-            }
-
+            // Standard handling for other missing fields without echoing understood fields
             if (!missingFields.isEmpty()) {
                 message.append("⚠️ Tôi cần thêm thông tin về:\n");
                 for (String field : missingFields) {

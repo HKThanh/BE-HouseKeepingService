@@ -85,6 +85,10 @@ services:
       - FPT_TTS_VERIFY_DELAY=${FPT_TTS_VERIFY_DELAY:-1200}
       - FPT_TTS_VERIFY_TIMEOUT=${FPT_TTS_VERIFY_TIMEOUT:-45000}
       - FPT_TTS_CLOUDINARY_FOLDER=${FPT_TTS_CLOUDINARY_FOLDER:-voice_booking/tts}
+      - GEMINI_ENABLED=${GEMINI_ENABLED:-true}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - GEMINI_PROMPT_PREFIX=${GEMINI_PROMPT_PREFIX}
       - SPRING_APPLICATION_JSON={"logging":{"level":{"iuh.house_keeping_service_be":"DEBUG"}}}
     networks:
       - house_keeping_network
