@@ -216,11 +216,43 @@ public class ServiceServiceImpl implements ServiceService {
     }
 
     private ServiceOptionChoiceData convertToServiceOptionChoiceData(ServiceOptionChoice choice) {
+        // Lấy pricing rules cho choice này
+        List<PricingRule> pricingRules = pricingRuleRepository.findPricingRulesByChoiceId(choice.getId());
+        
+        BigDecimal priceAdjustment = BigDecimal.ZERO;
+        Integer staffAdjustment = 0;
+        BigDecimal durationAdjustment = BigDecimal.ZERO;
+        
+        // Tính tổng các adjustment từ pricing rules (trường hợp 1 choice có thể thuộc nhiều rules)
+        for (PricingRule rule : pricingRules) {
+            if (rule.getPriceAdjustment() != null) {
+                priceAdjustment = priceAdjustment.add(rule.getPriceAdjustment());
+            }
+            if (rule.getStaffAdjustment() != null) {
+                staffAdjustment += rule.getStaffAdjustment();
+            }
+            if (rule.getDurationAdjustmentHours() != null) {
+                durationAdjustment = durationAdjustment.add(rule.getDurationAdjustmentHours());
+            }
+        }
+        
+        // Format giá cộng thêm
+        String formattedPriceAdjustment = null;
+        if (priceAdjustment.compareTo(BigDecimal.ZERO) > 0) {
+            formattedPriceAdjustment = "+" + String.format("%,.0f", priceAdjustment) + "đ";
+        } else if (priceAdjustment.compareTo(BigDecimal.ZERO) < 0) {
+            formattedPriceAdjustment = String.format("%,.0f", priceAdjustment) + "đ";
+        }
+        
         return new ServiceOptionChoiceData(
                 choice.getId(),
                 choice.getLabel(),
                 choice.getDisplayOrder(),
-                choice.getIsDefault()
+                choice.getIsDefault(),
+                priceAdjustment,
+                staffAdjustment,
+                durationAdjustment,
+                formattedPriceAdjustment
         );
     }
 

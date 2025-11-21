@@ -12,4 +12,9 @@ import java.util.List;
 public interface PricingRuleRepository extends JpaRepository<PricingRule, Integer> {
     @Query("SELECT pr FROM PricingRule pr WHERE pr.service.serviceId = :serviceId ORDER BY pr.priority DESC")
     List<PricingRule> findByServiceIdOrderByPriorityDesc(@Param("serviceId") Integer serviceId);
+    
+    @Query("SELECT pr FROM PricingRule pr " +
+           "JOIN RuleCondition rc ON rc.rule.id = pr.id " +
+           "WHERE rc.choice.id = :choiceId AND pr.isActive = true")
+    List<PricingRule> findPricingRulesByChoiceId(@Param("choiceId") Integer choiceId);
 }

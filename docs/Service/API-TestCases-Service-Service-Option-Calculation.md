@@ -107,19 +107,31 @@ Based on `housekeeping_service_v8.sql`:
                         "choiceId": 5,
                         "choiceName": "Giặt chăn ga",
                         "displayOrder": 1,
-                        "isDefault": false
+                        "isDefault": false,
+                        "priceAdjustment": 30000.00,
+                        "staffAdjustment": 0,
+                        "durationAdjustmentHours": 0.50,
+                        "formattedPriceAdjustment": "+30,000đ"
                     },
                     {
                         "choiceId": 6,
                         "choiceName": "Rửa chén",
                         "displayOrder": 2,
-                        "isDefault": false
+                        "isDefault": false,
+                        "priceAdjustment": 15000.00,
+                        "staffAdjustment": 0,
+                        "durationAdjustmentHours": 0.50,
+                        "formattedPriceAdjustment": "+15,000đ"
                     },
                     {
                         "choiceId": 7,
                         "choiceName": "Lau cửa kính",
                         "displayOrder": 3,
-                        "isDefault": false
+                        "isDefault": false,
+                        "priceAdjustment": 40000.00,
+                        "staffAdjustment": 0,
+                        "durationAdjustmentHours": 1.00,
+                        "formattedPriceAdjustment": "+40,000đ"
                     }
                 ]
             }
@@ -219,8 +231,8 @@ Based on `housekeeping_service_v8.sql`:
           "displayOrder": 1,
           "isRequired": true,
           "choices": [
-            {"choiceId": 1, "choiceName": "Căn hộ", "displayOrder": 1, "isDefault": false},
-            {"choiceId": 2, "choiceName": "Nhà phố", "displayOrder": 2, "isDefault": false}
+            {"choiceId": 1, "choiceName": "Căn hộ", "displayOrder": 1, "isDefault": false, "priceAdjustment": 0, "staffAdjustment": 0, "durationAdjustmentHours": 0, "formattedPriceAdjustment": null},
+            {"choiceId": 2, "choiceName": "Nhà phố", "displayOrder": 2, "isDefault": false, "priceAdjustment": 0, "staffAdjustment": 0, "durationAdjustmentHours": 0, "formattedPriceAdjustment": null}
           ]
         },
         {
@@ -239,8 +251,8 @@ Based on `housekeeping_service_v8.sql`:
           "displayOrder": 3,
           "isRequired": true,
           "choices": [
-            {"choiceId": 3, "choiceName": "Dưới 80m²", "displayOrder": 1, "isDefault": false},
-            {"choiceId": 4, "choiceName": "Trên 80m²", "displayOrder": 2, "isDefault": false}
+            {"choiceId": 3, "choiceName": "Dưới 80m²", "displayOrder": 1, "isDefault": false, "priceAdjustment": 0, "staffAdjustment": 0, "durationAdjustmentHours": 0, "formattedPriceAdjustment": null},
+            {"choiceId": 4, "choiceName": "Trên 80m²", "displayOrder": 2, "isDefault": false, "priceAdjustment": 250000.00, "staffAdjustment": 1, "durationAdjustmentHours": 2.00, "formattedPriceAdjustment": "+250,000đ"}
           ]
         }
       ]
@@ -700,9 +712,9 @@ Based on `housekeeping_service_v8.sql`:
         "serviceName": "Tổng vệ sinh",
         "recommendedStaff": 3,
         "options": [
-          {"optionId": 1, "optionName": "Loại hình nhà ở?", "choices": [{"choiceId":1,"choiceName":"Căn hộ"},{"choiceId":2,"choiceName":"Nhà phố"}]},
+          {"optionId": 1, "optionName": "Loại hình nhà ở?", "choices": [{"choiceId":1,"choiceName":"Căn hộ","priceAdjustment":0,"staffAdjustment":0,"durationAdjustmentHours":0,"formattedPriceAdjustment":null},{"choiceId":2,"choiceName":"Nhà phố","priceAdjustment":0,"staffAdjustment":0,"durationAdjustmentHours":0,"formattedPriceAdjustment":null}]},
           {"optionId": 2, "optionName": "Nhà bạn có mấy tầng (bao gồm trệt)?", "choices": []},
-          {"optionId": 3, "optionName": "Diện tích dọn dẹp?", "choices": [{"choiceId":3,"choiceName":"Dưới 80m²"},{"choiceId":4,"choiceName":"Trên 80m²"}]}
+          {"optionId": 3, "optionName": "Diện tích dọn dẹp?", "choices": [{"choiceId":3,"choiceName":"Dưới 80m²","priceAdjustment":0,"staffAdjustment":0,"durationAdjustmentHours":0,"formattedPriceAdjustment":null},{"choiceId":4,"choiceName":"Trên 80m²","priceAdjustment":250000.00,"staffAdjustment":1,"durationAdjustmentHours":2.00,"formattedPriceAdjustment":"+250,000đ"}]}
         ]
       }
     }
