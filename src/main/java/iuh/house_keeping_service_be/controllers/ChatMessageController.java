@@ -2,7 +2,10 @@ package iuh.house_keeping_service_be.controllers;
 
 import iuh.house_keeping_service_be.dtos.Chat.ChatMessageResponse;
 import iuh.house_keeping_service_be.dtos.Chat.ChatMessageWebSocketDTO;
+import iuh.house_keeping_service_be.dtos.Chat.ConversationResponse;
+import iuh.house_keeping_service_be.dtos.Chat.ConversationWebSocketDTO;
 import iuh.house_keeping_service_be.services.ChatService.ChatMessageService;
+import iuh.house_keeping_service_be.services.ChatService.ConversationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -28,6 +31,7 @@ import java.util.Map;
 public class ChatMessageController {
 
     private final ChatMessageService chatMessageService;
+    private final ConversationService conversationService;
     private final SimpMessagingTemplate messagingTemplate;
 
     @PostMapping("/send/text")
@@ -39,19 +43,9 @@ public class ChatMessageController {
         try {
             ChatMessageResponse response = chatMessageService.sendTextMessage(conversationId, senderId, content);
             
-            // Send WebSocket notification
-            ChatMessageWebSocketDTO wsMessage = ChatMessageWebSocketDTO.builder()
-                    .messageId(response.getMessageId())
-                    .conversationId(response.getConversationId())
-                    .senderId(response.getSenderId())
-                    .senderName(response.getSenderName())
-                    .senderAvatar(response.getSenderAvatar())
-                    .messageType(response.getMessageType())
-                    .content(response.getContent())
-                    .timestamp(response.getCreatedAt())
-                    .build();
-            
+            ChatMessageWebSocketDTO wsMessage = buildWebSocketMessage(response);
             messagingTemplate.convertAndSend("/topic/conversation/" + conversationId, wsMessage);
+            broadcastConversationSummary(conversationId, response.getSenderId());
             
             return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                     "success", true,
@@ -77,20 +71,9 @@ public class ChatMessageController {
         try {
             ChatMessageResponse response = chatMessageService.sendImageMessage(conversationId, senderId, imageFile);
             
-            // Send WebSocket notification
-            ChatMessageWebSocketDTO wsMessage = ChatMessageWebSocketDTO.builder()
-                    .messageId(response.getMessageId())
-                    .conversationId(response.getConversationId())
-                    .senderId(response.getSenderId())
-                    .senderName(response.getSenderName())
-                    .senderAvatar(response.getSenderAvatar())
-                    .messageType(response.getMessageType())
-                    .imageUrl(response.getImageUrl())
-                    .content(caption)
-                    .timestamp(response.getCreatedAt())
-                    .build();
-            
+            ChatMessageWebSocketDTO wsMessage = buildWebSocketMessage(response, caption);
             messagingTemplate.convertAndSend("/topic/conversation/" + conversationId, wsMessage);
+            broadcastConversationSummary(conversationId, response.getSenderId());
             
             return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                     "success", true,
@@ -248,10 +231,65 @@ public class ChatMessageController {
     @MessageMapping("/chat.send")
     public void sendMessageViaWebSocket(@Payload ChatMessageWebSocketDTO message) {
         try {
-            // Broadcast to the conversation topic
-            messagingTemplate.convertAndSend("/topic/conversation/" + message.getConversationId(), message);
+            ChatMessageResponse savedMessage = chatMessageService.saveMessageFromWebSocket(message);
+            ChatMessageWebSocketDTO wsMessage = buildWebSocketMessage(savedMessage, message.getContent());
+
+            messagingTemplate.convertAndSend("/topic/conversation/" + wsMessage.getConversationId(), wsMessage);
+            broadcastConversationSummary(wsMessage.getConversationId(), wsMessage.getSenderId());
         } catch (Exception e) {
             log.error("Error sending WebSocket message: ", e);
         }
+    }
+
+    private ChatMessageWebSocketDTO buildWebSocketMessage(ChatMessageResponse response) {
+        return buildWebSocketMessage(response, response.getContent());
+    }
+
+    private ChatMessageWebSocketDTO buildWebSocketMessage(ChatMessageResponse response, String overrideContent) {
+        return ChatMessageWebSocketDTO.builder()
+                .messageId(response.getMessageId())
+                .conversationId(response.getConversationId())
+                .senderId(response.getSenderId())
+                .senderName(response.getSenderName())
+                .senderAvatar(response.getSenderAvatar())
+                .messageType(response.getMessageType())
+                .content(overrideContent != null ? overrideContent : response.getContent())
+                .imageUrl(response.getImageUrl())
+                .timestamp(response.getCreatedAt())
+                .build();
+    }
+
+    private void broadcastConversationSummary(String conversationId, String senderId) {
+        try {
+            ConversationResponse conversation = conversationService.getConversationById(conversationId);
+            sendConversationSummaryToParticipant(conversation.getCustomerId(), conversation, senderId);
+            if (conversation.getEmployeeId() != null) {
+                sendConversationSummaryToParticipant(conversation.getEmployeeId(), conversation, senderId);
+            }
+        } catch (Exception e) {
+            log.error("Failed to broadcast conversation summary for {}: {}", conversationId, e.getMessage());
+        }
+    }
+
+    private void sendConversationSummaryToParticipant(
+            String participantId,
+            ConversationResponse conversation,
+            String senderId
+    ) {
+        if (participantId == null) {
+            return;
+        }
+
+        Long unreadCount = chatMessageService.getUnreadMessageCountBySenderId(participantId);
+        ConversationWebSocketDTO payload = ConversationWebSocketDTO.builder()
+                .conversationId(conversation.getConversationId())
+                .participantId(participantId)
+                .senderId(senderId)
+                .lastMessage(conversation.getLastMessage())
+                .lastMessageTime(conversation.getLastMessageTime())
+                .unreadCount(unreadCount)
+                .build();
+
+        messagingTemplate.convertAndSend("/topic/conversation/summary/" + participantId, payload);
     }
 }

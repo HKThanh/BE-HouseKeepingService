@@ -3,6 +3,7 @@ package iuh.house_keeping_service_be.services.ChatService.impl;
 import com.cloudinary.Cloudinary;
 import iuh.house_keeping_service_be.dtos.Chat.ChatMessageRequest;
 import iuh.house_keeping_service_be.dtos.Chat.ChatMessageResponse;
+import iuh.house_keeping_service_be.dtos.Chat.ChatMessageWebSocketDTO;
 import iuh.house_keeping_service_be.enums.MessageType;
 import iuh.house_keeping_service_be.models.Account;
 import iuh.house_keeping_service_be.models.ChatMessage;
@@ -222,5 +223,46 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     @Transactional
     public int markAllMessagesAsReadBySenderId(String senderId) {
         return chatMessageRepository.markAllAsReadBySenderId(senderId);
+    }
+
+    @Override
+    @Transactional
+    public ChatMessageResponse saveMessageFromWebSocket(ChatMessageWebSocketDTO message) {
+        Conversation conversation = conversationRepository.findById(message.getConversationId())
+                .orElseThrow(() -> new RuntimeException("Conversation not found"));
+
+        Account sender = accountRepository.findById(message.getSenderId())
+                .orElseThrow(() -> new RuntimeException("Sender not found"));
+
+        MessageType messageType = message.getMessageType() != null
+                ? message.getMessageType()
+                : MessageType.TEXT;
+
+        ChatMessage chatMessage = new ChatMessage();
+        chatMessage.setConversation(conversation);
+        chatMessage.setSender(sender);
+        chatMessage.setMessageType(messageType);
+
+        if (messageType == MessageType.TEXT) {
+            if (message.getContent() == null || message.getContent().trim().isEmpty()) {
+                throw new IllegalArgumentException("Content is required for text messages");
+            }
+            chatMessage.setContent(message.getContent());
+        } else if (messageType == MessageType.IMAGE) {
+            if (message.getImageUrl() == null || message.getImageUrl().isBlank()) {
+                throw new IllegalArgumentException("Image URL is required for image messages sent via WebSocket");
+            }
+            chatMessage.setImageUrl(message.getImageUrl());
+            chatMessage.setContent(message.getContent());
+        }
+
+        ChatMessage savedMessage = chatMessageRepository.save(chatMessage);
+
+        String lastMessagePreview = messageType == MessageType.TEXT
+                ? chatMessage.getContent()
+                : "[Image]";
+        conversationService.updateLastMessage(conversation.getConversationId(), lastMessagePreview);
+
+        return mapToResponse(savedMessage);
     }
 }

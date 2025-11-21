@@ -2,6 +2,7 @@ package iuh.house_keeping_service_be.services.ChatService;
 
 import iuh.house_keeping_service_be.dtos.Chat.ChatMessageRequest;
 import iuh.house_keeping_service_be.dtos.Chat.ChatMessageResponse;
+import iuh.house_keeping_service_be.dtos.Chat.ChatMessageWebSocketDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
@@ -29,4 +30,6 @@ public interface ChatMessageService {
     int markMessagesAsReadBySenderIdAndConversation(String senderId, String conversationId);
     
     int markAllMessagesAsReadBySenderId(String senderId);
+
+    ChatMessageResponse saveMessageFromWebSocket(ChatMessageWebSocketDTO message);
 }
