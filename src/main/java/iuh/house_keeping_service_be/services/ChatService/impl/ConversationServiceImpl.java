@@ -59,7 +59,7 @@ public class ConversationServiceImpl implements ConversationService {
         Conversation savedConversation = conversationRepository.save(conversation);
 
         // Create automatic welcome message from employee
-        String welcomeMessage = "Cảm ơn bạn đã chọn tôi thực hiện dịch vụ cho bạn";
+        String welcomeMessage = "Xin chào. Tôi là nhân viên được chọn để làm việc cho bạn trong đơn đặt dịch vụ " + booking.getBookingDetails().get(0).getService().getName() + " vào lúc " + booking.getBookingTime() + ", tại địa chỉ: " + booking.getAddress().getFullAddress() + ". Nếu bạn có bất kỳ câu hỏi nào, xin vui lòng liên hệ với tôi qua cuộc trò chuyện này.";
         
         ChatMessage welcomeChatMessage = new ChatMessage();
         welcomeChatMessage.setConversation(savedConversation);
