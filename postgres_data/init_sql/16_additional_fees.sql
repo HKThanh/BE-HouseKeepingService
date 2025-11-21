@@ -40,7 +40,7 @@ CREATE TRIGGER tg_update_additional_fee_timestamp
 
 -- Booking applied fees (snapshot)
 CREATE TABLE IF NOT EXISTS booking_additional_fee (
-    id SERIAL PRIMARY KEY,
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     booking_id VARCHAR(36) NOT NULL REFERENCES bookings(booking_id) ON DELETE CASCADE,
     fee_name VARCHAR(255) NOT NULL,
     fee_type VARCHAR(20) NOT NULL,

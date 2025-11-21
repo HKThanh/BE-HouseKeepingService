@@ -229,7 +229,9 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
     long countByEmployeeIdAndDateRange(@Param("employeeId") String employeeId,
                                         @Param("startDate") LocalDateTime startDate,
                                         @Param("endDate") LocalDateTime endDate);
-    
+
+    List<Assignment> findByBookingDetail_Booking_BookingId(String bookingId);
+
     // Count distinct bookings by employee and booking status within date range
     @Query("SELECT COUNT(DISTINCT b.bookingId) FROM Assignment a " +
             "JOIN a.bookingDetail bd " +

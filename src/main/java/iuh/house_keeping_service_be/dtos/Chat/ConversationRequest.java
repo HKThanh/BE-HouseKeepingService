@@ -11,4 +11,5 @@ public class ConversationRequest {
     private String customerId;
     private String employeeId;
     private String bookingId;
+    private String recurringBookingId;
 }

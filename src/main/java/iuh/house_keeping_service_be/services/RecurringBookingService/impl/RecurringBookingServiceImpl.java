@@ -7,6 +7,8 @@ import iuh.house_keeping_service_be.dtos.RecurringBooking.request.RecurringBooki
 import iuh.house_keeping_service_be.dtos.RecurringBooking.request.RecurringBookingDetailRequest;
 import iuh.house_keeping_service_be.dtos.RecurringBooking.response.RecurringBookingCreationSummary;
 import iuh.house_keeping_service_be.dtos.RecurringBooking.response.RecurringBookingResponse;
+import iuh.house_keeping_service_be.dtos.Chat.ConversationRequest;
+import iuh.house_keeping_service_be.dtos.Chat.ConversationResponse;
 import iuh.house_keeping_service_be.enums.BookingStatus;
 import iuh.house_keeping_service_be.enums.RecurrenceType;
 import iuh.house_keeping_service_be.enums.RecurringBookingStatus;
@@ -15,6 +17,7 @@ import iuh.house_keeping_service_be.mappers.RecurringBookingMapper;
 import iuh.house_keeping_service_be.models.*;
 import iuh.house_keeping_service_be.repositories.*;
 import iuh.house_keeping_service_be.services.BookingService.BookingService;
+import iuh.house_keeping_service_be.services.ChatService.ConversationService;
 import iuh.house_keeping_service_be.services.RecurringBookingService.RecurringBookingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,6 +50,8 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
     private final BookingRepository bookingRepository;
     private final RecurringBookingMapper recurringBookingMapper;
     private final BookingService bookingService;
+    private final ConversationService conversationService;
+    private final AssignmentRepository assignmentRepository;
 
     @Override
     @Transactional
@@ -119,6 +124,7 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
             summary.setRecurringBooking(response);
             summary.setGeneratedBookingIds(generatedBookingIds);
             summary.setTotalBookingsToBeCreated(calculateTotalBookings(request));
+            summary.setConversation(createRecurringConversation(savedRecurringBooking, generatedBookingIds));
 
             return summary;
 
@@ -382,13 +388,59 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
     }
 
     private List<String> generateInitialBookings(
-            RecurringBooking recurringBooking,
-            RecurringBookingCreateRequest request
+        RecurringBooking recurringBooking,
+        RecurringBookingCreateRequest request
     ) {
         LocalDate today = LocalDate.now();
         LocalDate futureDate = today.plusDays(30); // Generate for next 30 days
 
         return generateBookingsForPeriod(recurringBooking, today, futureDate);
+    }
+
+    private ConversationResponse createRecurringConversation(RecurringBooking recurringBooking, List<String> generatedBookingIds) {
+        if (recurringBooking == null || recurringBooking.getCustomer() == null) {
+            return null;
+        }
+
+        try {
+            // Try to resolve an employee from generated bookings' assignments (first non-cancelled)
+            String pickedBookingId = null;
+            String pickedEmployeeId = null;
+
+            for (String bookingId : generatedBookingIds) {
+                List<Assignment> assignments = assignmentRepository.findByBookingDetail_Booking_BookingId(bookingId);
+                if (assignments == null || assignments.isEmpty()) {
+                    continue;
+                }
+                for (Assignment assignment : assignments) {
+                    if (assignment.getEmployee() != null && assignment.getEmployee().getEmployeeId() != null) {
+                        pickedBookingId = bookingId;
+                        pickedEmployeeId = assignment.getEmployee().getEmployeeId();
+                        break;
+                    }
+                }
+                if (pickedEmployeeId != null) {
+                    break;
+                }
+            }
+
+            if (pickedEmployeeId == null) {
+                log.warn("Could not resolve employee for recurring conversation {}", recurringBooking.getRecurringBookingId());
+                return null;
+            }
+
+            ConversationRequest conversationRequest = new ConversationRequest(
+                    recurringBooking.getCustomer().getCustomerId(),
+                    pickedEmployeeId,
+                    pickedBookingId,
+                    recurringBooking.getRecurringBookingId()
+            );
+
+            return conversationService.createConversation(conversationRequest);
+        } catch (Exception e) {
+            log.error("Failed to create recurring conversation for {}: {}", recurringBooking.getRecurringBookingId(), e.getMessage());
+            return null;
+        }
     }
 
     private List<String> generateBookingsForPeriod(

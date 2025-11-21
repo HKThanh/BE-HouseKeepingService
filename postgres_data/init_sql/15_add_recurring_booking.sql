@@ -42,6 +42,22 @@ ALTER TABLE bookings
 ADD COLUMN recurring_booking_id VARCHAR(36),
 ADD FOREIGN KEY (recurring_booking_id) REFERENCES recurring_bookings(recurring_booking_id) ON DELETE SET NULL;
 
+-- 3b. Add FK from conversations to recurring_bookings (column exists from chat schema)
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints
+        WHERE constraint_name = 'fk_conversation_recurring_booking'
+          AND table_name = 'conversations'
+    ) THEN
+        ALTER TABLE conversations
+        ADD CONSTRAINT fk_conversation_recurring_booking
+        FOREIGN KEY (recurring_booking_id)
+        REFERENCES recurring_bookings(recurring_booking_id)
+        ON DELETE SET NULL;
+    END IF;
+END$$;
+
 -- 4. Create indexes for better performance
 CREATE INDEX idx_recurring_bookings_customer ON recurring_bookings(customer_id);
 CREATE INDEX idx_recurring_bookings_status ON recurring_bookings(status);
@@ -57,3 +73,4 @@ COMMENT ON COLUMN recurring_bookings.recurrence_type IS 'WEEKLY or MONTHLY';
 COMMENT ON COLUMN recurring_bookings.recurrence_days IS 'Comma-separated values: For WEEKLY: 1-7 (Mon-Sun), For MONTHLY: 1-31';
 COMMENT ON COLUMN recurring_bookings.status IS 'ACTIVE, CANCELLED, or COMPLETED';
 COMMENT ON COLUMN bookings.recurring_booking_id IS 'Links to the parent recurring booking if this booking was auto-generated';
+COMMENT ON COLUMN conversations.recurring_booking_id IS 'Conversation tied to the recurring booking (single thread per recurring series)';

@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS conversations (
     customer_id VARCHAR(36) NOT NULL,
     employee_id VARCHAR(36),
     booking_id VARCHAR(36),
+    recurring_booking_id VARCHAR(36),
     last_message TEXT,
     last_message_time TIMESTAMP,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -37,6 +38,7 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 CREATE INDEX IF NOT EXISTS idx_conversations_customer ON conversations(customer_id);
 CREATE INDEX IF NOT EXISTS idx_conversations_employee ON conversations(employee_id);
 CREATE INDEX IF NOT EXISTS idx_conversations_booking ON conversations(booking_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_recurring_booking ON conversations(recurring_booking_id);
 CREATE INDEX IF NOT EXISTS idx_conversations_last_message_time ON conversations(last_message_time DESC);
 CREATE INDEX IF NOT EXISTS idx_conversations_is_active ON conversations(is_active);
 
