@@ -971,7 +971,8 @@ public class VoiceBookingService {
                 original.promoCode(),
                 original.bookingDetails(),
                 normalizedAssignments,
-                original.paymentMethodId()
+                original.paymentMethodId(),
+                original.additionalFeeIds()
         );
     }
 

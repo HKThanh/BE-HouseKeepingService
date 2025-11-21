@@ -7,6 +7,7 @@ import iuh.house_keeping_service_be.dtos.Booking.summary.*;
 import iuh.house_keeping_service_be.dtos.EmployeeSchedule.ApiResponse;
 import iuh.house_keeping_service_be.dtos.EmployeeSchedule.SuitableEmployeeRequest;
 import iuh.house_keeping_service_be.dtos.EmployeeSchedule.SuitableEmployeeResponse;
+import iuh.house_keeping_service_be.enums.AdditionalFeeType;
 import iuh.house_keeping_service_be.dtos.Service.*;
 import iuh.house_keeping_service_be.enums.*;
 import iuh.house_keeping_service_be.exceptions.*;
@@ -17,6 +18,7 @@ import iuh.house_keeping_service_be.services.BookingService.BookingService;
 import iuh.house_keeping_service_be.services.EmployeeScheduleService.EmployeeScheduleService;
 import iuh.house_keeping_service_be.services.NotificationService.NotificationService;
 import iuh.house_keeping_service_be.services.ServiceService.ServiceService;
+import iuh.house_keeping_service_be.services.AdditionalFeeService.AdditionalFeeService;
 import iuh.house_keeping_service_be.utils.BookingDTOFormatter;
 
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,9 @@ import java.time.LocalDateTime;
 import java.text.Normalizer;
 import java.util.*;
 import java.util.stream.Collectors;
+import iuh.house_keeping_service_be.dtos.Booking.response.FeeBreakdownResponse;
+import iuh.house_keeping_service_be.models.AdditionalFee;
+import iuh.house_keeping_service_be.dtos.Booking.internal.FeeBreakdownInfo;
 
 @org.springframework.stereotype.Service
 @RequiredArgsConstructor
@@ -53,12 +58,14 @@ public class BookingServiceImpl implements BookingService {
     private final ServiceOptionChoiceRepository serviceOptionChoiceRepository;
     private final PricingRuleRepository pricingRuleRepository;
     private final RuleConditionRepository ruleConditionRepository;
+    private final BookingAdditionalFeeRepository bookingAdditionalFeeRepository;
 
     // Other Services
     private final ServiceService serviceService;
     private final BookingMapper bookingMapper;
     private final EmployeeScheduleService employeeScheduleService;
     private final NotificationService notificationService;
+    private final AdditionalFeeService additionalFeeService;
 
     @Override
     @Transactional
@@ -162,7 +169,8 @@ public class BookingServiceImpl implements BookingService {
                         request.promoCode(),
                         request.bookingDetails(),
                         autoAssignments,
-                        request.paymentMethodId()
+                        request.paymentMethodId(),
+                        request.additionalFeeIds()
                     );
                     hasAssignments = true;
                     log.info("Auto-assigned {} employees to booking", autoAssignments.size());
@@ -199,6 +207,8 @@ public class BookingServiceImpl implements BookingService {
 
             // Step 4: Create booking details
             List<BookingDetail> bookingDetails = createBookingDetails(booking, finalRequest, validation);
+            // Step 4.1: Create additional fee snapshots
+            List<BookingAdditionalFee> appliedFees = createBookingAdditionalFees(booking, validation);
 
             // Step 5: Create assignments if provided
             List<Assignment> assignments = hasAssignments
@@ -215,6 +225,7 @@ public class BookingServiceImpl implements BookingService {
                     ? assignmentRepository.saveAll(assignments)
                     : Collections.emptyList();
             Payment savedPayment = paymentRepository.save(payment);
+            bookingAdditionalFeeRepository.saveAll(appliedFees);
 
             log.info("Booking created successfully with ID: {}", savedBooking.getBookingId());
             notifyCustomerBookingCreated(savedBooking);
@@ -288,6 +299,10 @@ public class BookingServiceImpl implements BookingService {
             // Apply promotion if provided
             BigDecimal finalAmount = applyPromotion(request.promoCode(), calculatedTotalAmount, customer, errors);
 
+            // Apply system surcharge + other fees
+            FeeCalculationResult feeResult = calculateFees(finalAmount, request.additionalFeeIds());
+            BigDecimal totalWithFees = finalAmount.add(feeResult.totalFees());
+
             if (!errors.isEmpty()) {
                 return new ValidationOutcome(BookingValidationResult.error(errors), addressContext);
             }
@@ -314,7 +329,15 @@ public class BookingServiceImpl implements BookingService {
                 }
             }
 
-            BookingValidationResult successResult = BookingValidationResult.success(finalAmount, serviceValidations, customer, addressContext.address(), addressContext.isNewAddress());
+            BookingValidationResult successResult = BookingValidationResult.success(
+                    totalWithFees,
+                    finalAmount,
+                    feeResult.totalFees(),
+                    feeResult.breakdowns(),
+                    serviceValidations,
+                    customer,
+                    addressContext.address(),
+                    addressContext.isNewAddress());
             return new ValidationOutcome(successResult, addressContext);
 
         } catch (Exception e) {
@@ -785,6 +808,25 @@ public class BookingServiceImpl implements BookingService {
         return details;
     }
 
+    private List<BookingAdditionalFee> createBookingAdditionalFees(Booking booking, BookingValidationResult validation) {
+        List<BookingAdditionalFee> fees = new ArrayList<>();
+        if (validation.getFeeBreakdowns() == null || validation.getFeeBreakdowns().isEmpty()) {
+            return fees;
+        }
+        for (FeeBreakdownInfo info : validation.getFeeBreakdowns()) {
+            BookingAdditionalFee applied = new BookingAdditionalFee();
+            applied.setBooking(booking);
+            applied.setFeeName(info.getName());
+            applied.setFeeType(info.getType());
+            applied.setFeeValue(info.getValue());
+            applied.setFeeAmount(info.getAmount());
+            applied.setSystemSurcharge(info.isSystemSurcharge());
+            booking.addAdditionalFee(applied);
+            fees.add(applied);
+        }
+        return fees;
+    }
+
     private List<Assignment> createAssignments(List<BookingDetail> bookingDetails,
                                                BookingCreateRequest request) {
         List<Assignment> assignments = new ArrayList<>();
@@ -855,6 +897,26 @@ public class BookingServiceImpl implements BookingService {
         PromotionInfo promotionInfo = booking.getPromotion() != null ?
                 bookingMapper.toPromotionInfo(booking.getPromotion()) : null;
 
+        BigDecimal feeTotal = booking.getAdditionalFees() != null
+                ? booking.getAdditionalFees().stream()
+                    .map(BookingAdditionalFee::getFeeAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add)
+                : BigDecimal.ZERO;
+        BigDecimal baseAmount = booking.getTotalAmount() != null
+                ? booking.getTotalAmount().subtract(feeTotal)
+                : null;
+        List<FeeBreakdownResponse> fees = booking.getAdditionalFees() != null
+                ? booking.getAdditionalFees().stream()
+                    .map(f -> FeeBreakdownResponse.builder()
+                            .name(f.getFeeName())
+                            .type(f.getFeeType())
+                            .value(f.getFeeValue())
+                            .amount(f.getFeeAmount())
+                            .systemSurcharge(f.isSystemSurcharge())
+                            .build())
+                    .toList()
+                : List.of();
+
         // Create summary
         BookingCreationSummary summary = BookingCreationSummary.builder()
                 .bookingId(booking.getBookingId())
@@ -862,6 +924,9 @@ public class BookingServiceImpl implements BookingService {
                 .status(booking.getStatus().toString())
                 .totalAmount(booking.getTotalAmount())
                 .formattedTotalAmount(BookingDTOFormatter.formatPrice(booking.getTotalAmount()))
+                .baseAmount(baseAmount)
+                .totalFees(feeTotal)
+                .fees(fees)
                 .bookingTime(booking.getBookingTime())
                 .title(booking.getTitle())
                 .imageUrls(booking.getImageUrls())
@@ -1043,6 +1108,26 @@ public class BookingServiceImpl implements BookingService {
                     .distinct()
                     .toList();
 
+            BigDecimal feeTotal = booking.getAdditionalFees() != null
+                    ? booking.getAdditionalFees().stream()
+                        .map(BookingAdditionalFee::getFeeAmount)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add)
+                    : BigDecimal.ZERO;
+            BigDecimal baseAmount = booking.getTotalAmount() != null
+                    ? booking.getTotalAmount().subtract(feeTotal)
+                    : null;
+            List<FeeBreakdownResponse> fees = booking.getAdditionalFees() != null
+                    ? booking.getAdditionalFees().stream()
+                        .map(f -> FeeBreakdownResponse.builder()
+                                .name(f.getFeeName())
+                                .type(f.getFeeType())
+                                .value(f.getFeeValue())
+                                .amount(f.getFeeAmount())
+                                .systemSurcharge(f.isSystemSurcharge())
+                                .build())
+                        .toList()
+                    : List.of();
+
             return new BookingHistoryResponse(
                     booking.getBookingId(),
                     booking.getBookingCode(),
@@ -1051,6 +1136,7 @@ public class BookingServiceImpl implements BookingService {
                     addressInfo,
                     booking.getBookingTime().toString(),
                     booking.getNote(),
+                    booking.getTotalAmount(),
                     BookingDTOFormatter.formatPrice(booking.getTotalAmount()),
                     booking.getStatus().toString(),
                     promotionInfo,
@@ -1059,7 +1145,10 @@ public class BookingServiceImpl implements BookingService {
                     booking.getImageUrls(),
                     booking.getIsVerified(),
                     assignedEmployees,
-                    services
+                    services,
+                    baseAmount,
+                    feeTotal,
+                    fees
             );
         });
 
@@ -1113,6 +1202,26 @@ public class BookingServiceImpl implements BookingService {
                     .distinct()
                     .toList();
 
+            BigDecimal feeTotal = booking.getAdditionalFees() != null
+                    ? booking.getAdditionalFees().stream()
+                        .map(BookingAdditionalFee::getFeeAmount)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add)
+                    : BigDecimal.ZERO;
+            BigDecimal baseAmount = booking.getTotalAmount() != null
+                    ? booking.getTotalAmount().subtract(feeTotal)
+                    : null;
+            List<FeeBreakdownResponse> fees = booking.getAdditionalFees() != null
+                    ? booking.getAdditionalFees().stream()
+                        .map(f -> FeeBreakdownResponse.builder()
+                                .name(f.getFeeName())
+                                .type(f.getFeeType())
+                                .value(f.getFeeValue())
+                                .amount(f.getFeeAmount())
+                                .systemSurcharge(f.isSystemSurcharge())
+                                .build())
+                        .toList()
+                    : List.of();
+
             return new BookingHistoryResponse(
                     booking.getBookingId(),
                     booking.getBookingCode(),
@@ -1121,6 +1230,7 @@ public class BookingServiceImpl implements BookingService {
                     addressInfo,
                     booking.getBookingTime().toString(),
                     booking.getNote(),
+                    booking.getTotalAmount(),
                     BookingDTOFormatter.formatPrice(booking.getTotalAmount()),
                     booking.getStatus().toString(),
                     promotionInfo,
@@ -1129,7 +1239,10 @@ public class BookingServiceImpl implements BookingService {
                     booking.getImageUrls(),
                     booking.getIsVerified(),
                     assignedEmployees,
-                    services
+                    services,
+                    baseAmount,
+                    feeTotal,
+                    fees
             );
         });
 
@@ -1707,7 +1820,8 @@ public class BookingServiceImpl implements BookingService {
                     request.promoCode(),
                     request.bookingDetails(),
                     request.assignments() != null ? request.assignments() : new ArrayList<>(),
-                    request.paymentMethodId()
+                    request.paymentMethodId(),
+                    request.additionalFeeIds()
                 );
 
                 // Create the booking
@@ -1830,5 +1944,52 @@ public class BookingServiceImpl implements BookingService {
             .totalBookings(totalBookings)
             .countByStatus(countByStatus)
             .build();
+    }
+
+    private FeeCalculationResult calculateFees(BigDecimal baseAmount, List<String> selectedFeeIds) {
+        BigDecimal safeBase = baseAmount != null ? baseAmount : BigDecimal.ZERO;
+        List<FeeBreakdownInfo> breakdowns = new ArrayList<>();
+        BigDecimal totalFees = BigDecimal.ZERO;
+
+        AdditionalFee system = additionalFeeService.getActiveSystemSurcharge();
+        if (system == null) {
+            system = new AdditionalFee();
+            system.setName("Phí hệ thống");
+            system.setFeeType(AdditionalFeeType.PERCENT);
+            system.setValue(new BigDecimal("0.20"));
+            system.setSystemSurcharge(true);
+            system.setActive(true);
+        }
+
+        List<AdditionalFee> fees = new ArrayList<>();
+        fees.add(system);
+        if (selectedFeeIds != null && !selectedFeeIds.isEmpty()) {
+            fees.addAll(additionalFeeService.getActiveFeesByIds(selectedFeeIds));
+        }
+
+        for (AdditionalFee fee : fees) {
+            if (!fee.isActive()) continue;
+            BigDecimal amount = calculateFeeAmount(safeBase, fee.getFeeType(), fee.getValue());
+            totalFees = totalFees.add(amount);
+            breakdowns.add(FeeBreakdownInfo.builder()
+                    .name(fee.getName())
+                    .type(fee.getFeeType())
+                    .value(fee.getValue())
+                    .amount(amount)
+                    .systemSurcharge(fee.isSystemSurcharge())
+                    .build());
+        }
+
+        return new FeeCalculationResult(totalFees, breakdowns);
+    }
+
+    private BigDecimal calculateFeeAmount(BigDecimal base, AdditionalFeeType type, BigDecimal value) {
+        if (type == AdditionalFeeType.FLAT) {
+            return value.setScale(0, RoundingMode.HALF_UP);
+        }
+        return base.multiply(value).setScale(0, RoundingMode.HALF_UP);
+    }
+
+    private record FeeCalculationResult(BigDecimal totalFees, List<FeeBreakdownInfo> breakdowns) {
     }
 }

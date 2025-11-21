@@ -826,7 +826,8 @@ public class VoiceBookingParserService {
                 null, // promoCode
                 bookingDetails,
                 null, // assignments
-                1 // Default payment method
+                1, // Default payment method
+                null // additionalFeeIds
         );
     }
 

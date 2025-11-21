@@ -10,6 +10,8 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.util.List;
 
+import iuh.house_keeping_service_be.dtos.Booking.internal.FeeBreakdownInfo;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -19,12 +21,18 @@ public class BookingValidationResult {
     private List<String> errors;
     private List<ConflictInfo> conflicts;
     private BigDecimal calculatedTotalAmount;
+    private BigDecimal baseAmount;
+    private BigDecimal totalFees;
+    private List<FeeBreakdownInfo> feeBreakdowns;
     private List<ServiceValidationInfo> serviceValidations;
     private Customer customer;
     private Address address;
     private boolean usingNewAddress;
     
     public static BookingValidationResult success(BigDecimal totalAmount,
+                                                  BigDecimal baseAmount,
+                                                  BigDecimal totalFees,
+                                                  List<FeeBreakdownInfo> feeBreakdowns,
                                                   List<ServiceValidationInfo> validations,
                                                   Customer customer,
                                                   Address address,
@@ -34,6 +42,9 @@ public class BookingValidationResult {
             .errors(List.of())
             .conflicts(List.of())
             .calculatedTotalAmount(totalAmount)
+            .baseAmount(baseAmount)
+            .totalFees(totalFees)
+            .feeBreakdowns(feeBreakdowns)
             .serviceValidations(validations)
             .customer(customer)
             .address(address)
@@ -47,6 +58,9 @@ public class BookingValidationResult {
             .errors(errors)
             .conflicts(List.of())
             .calculatedTotalAmount(BigDecimal.ZERO)
+            .baseAmount(BigDecimal.ZERO)
+            .totalFees(BigDecimal.ZERO)
+            .feeBreakdowns(List.of())
             .serviceValidations(List.of())
             .customer(null)
             .address(null)
@@ -60,6 +74,9 @@ public class BookingValidationResult {
             .errors(List.of())
             .conflicts(conflicts)
             .calculatedTotalAmount(BigDecimal.ZERO)
+            .baseAmount(BigDecimal.ZERO)
+            .totalFees(BigDecimal.ZERO)
+            .feeBreakdowns(List.of())
             .serviceValidations(List.of())
             .customer(null)
             .address(null)

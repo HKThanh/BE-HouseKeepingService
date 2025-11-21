@@ -34,7 +34,9 @@ public record MultipleBookingCreateRequest(
         @Valid
         List<AssignmentRequest> assignments,
 
-        int paymentMethodId
+        int paymentMethodId,
+
+        List<String> additionalFeeIds
 ) {
         @AssertTrue(message = "Either addressId or newAddress must be provided")
         public boolean isAddressSelectionValid() {

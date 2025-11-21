@@ -513,7 +513,8 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
                     recurringBookingWithDetails.getPromotion() != null ? recurringBookingWithDetails.getPromotion().getPromoCode() : null,
                     serviceDetails,
                     null, // assignments (will be auto-assigned)
-                    1 // default payment method
+                    1, // default payment method
+                    null // additionalFeeIds
             );
 
             var summary = bookingService.createBooking(bookingRequest);

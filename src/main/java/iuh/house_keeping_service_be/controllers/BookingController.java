@@ -186,7 +186,8 @@ public class BookingController {
                     request.promoCode(),
                     request.bookingDetails(),
                     request.assignments(),
-                    request.paymentMethodId()
+                    request.paymentMethodId(),
+                    request.additionalFeeIds()
                 );
             }
             
@@ -299,7 +300,8 @@ public class BookingController {
                     request.promoCode(),
                     request.bookingDetails(),
                     request.assignments(),
-                    request.paymentMethodId()
+                    request.paymentMethodId(),
+                    request.additionalFeeIds()
                 );
             }
             
@@ -335,6 +337,14 @@ public class BookingController {
         
         BookingResponse response = bookingService.getBookingDetails(bookingId);
 
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{bookingId}/charges")
+    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_ADMIN', 'ROLE_EMPLOYEE')")
+    public ResponseEntity<BookingResponse> getBookingCharges(@PathVariable String bookingId) {
+        log.info("Getting booking charge breakdown: {}", bookingId);
+        BookingResponse response = bookingService.getBookingDetails(bookingId);
         return ResponseEntity.ok(response);
     }
 

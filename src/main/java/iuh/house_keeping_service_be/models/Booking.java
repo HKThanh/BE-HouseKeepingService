@@ -90,6 +90,9 @@ public class Booking {
     @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Payment> payments;
 
+    @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private List<BookingAdditionalFee> additionalFees = new ArrayList<>();
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -119,5 +122,10 @@ public class Booking {
     public void addPayment(Payment payment) {
         payments.add(payment);
         payment.setBooking(this);
+    }
+
+    public void addAdditionalFee(BookingAdditionalFee fee) {
+        additionalFees.add(fee);
+        fee.setBooking(this);
     }
 }
