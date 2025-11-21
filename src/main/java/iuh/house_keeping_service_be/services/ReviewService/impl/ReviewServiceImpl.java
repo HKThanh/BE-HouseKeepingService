@@ -1,6 +1,8 @@
 package iuh.house_keeping_service_be.services.ReviewService.impl;
 
 import iuh.house_keeping_service_be.dtos.Review.CriteriaRatingRequest;
+import iuh.house_keeping_service_be.dtos.Review.PendingReviewResponse;
+import iuh.house_keeping_service_be.dtos.Review.PendingReviewWebSocketEvent;
 import iuh.house_keeping_service_be.dtos.Review.ReviewCreateRequest;
 import iuh.house_keeping_service_be.dtos.Review.ReviewDetailResponse;
 import iuh.house_keeping_service_be.dtos.Review.ReviewResponse;
@@ -18,10 +20,12 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -42,6 +46,7 @@ public class ReviewServiceImpl implements ReviewService {
     private final ReviewCriteriaRepository reviewCriteriaRepository;
     private final EmployeeRepository employeeRepository;
     private final NotificationService notificationService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Override
     public ReviewResponse createReview(String authorizationHeader, ReviewCreateRequest request) {
@@ -116,6 +121,22 @@ public class ReviewServiceImpl implements ReviewService {
         employeeRepository.save(employee);
 
         notifyEmployeeReviewReceived(savedReview, employee, request.criteriaRatings());
+        sendPendingReviewEventToCustomer(
+                booking.getCustomer(),
+                PendingReviewWebSocketEvent.builder()
+                        .action(PendingReviewWebSocketEvent.Action.REMOVE)
+                        .payload(PendingReviewResponse.builder()
+                                .bookingId(booking.getBookingId())
+                                .bookingCode(booking.getBookingCode())
+                                .bookingTime(booking.getBookingTime())
+                                .employeeId(employee.getEmployeeId())
+                                .employeeName(employee.getFullName())
+                                .employeeAvatar(employee.getAvatar())
+                                .build())
+                        .bookingId(booking.getBookingId())
+                        .employeeId(employee.getEmployeeId())
+                        .build()
+        );
         return toReviewResponse(savedReview);
     }
 
@@ -143,6 +164,60 @@ public class ReviewServiceImpl implements ReviewService {
         return new ReviewSummaryResponse(employeeId, totalReviews, average, ratingTier);
     }
 
+    @Override
+    public List<PendingReviewResponse> getPendingReviewsForCustomer(String authorizationHeader) {
+        String username = authorizationService.getCurrentUserId(authorizationHeader);
+        Customer customer = customerRepository.findByAccount_Username(username)
+                .orElseThrow(() -> CustomerNotFoundException.withCustomMessage(
+                        "Không tìm thấy khách hàng cho tài khoản: " + username
+                ));
+
+        List<Assignment> completedAssignments = assignmentRepository
+                .findCompletedAssignmentsByCustomer(customer.getCustomerId());
+
+        Map<String, PendingReviewResponse> pendingMap = new LinkedHashMap<>();
+
+        for (Assignment assignment : completedAssignments) {
+            Booking booking = assignment.getBookingDetail() != null
+                    ? assignment.getBookingDetail().getBooking()
+                    : null;
+            Employee employee = assignment.getEmployee();
+
+            if (booking == null || employee == null || employee.getEmployeeId() == null) {
+                continue;
+            }
+
+            boolean alreadyReviewed = reviewRepository.existsByBooking_BookingIdAndEmployee_EmployeeId(
+                    booking.getBookingId(), employee.getEmployeeId());
+            if (alreadyReviewed) {
+                continue;
+            }
+
+            String key = booking.getBookingId() + "|" + employee.getEmployeeId();
+            if (pendingMap.containsKey(key)) {
+                continue;
+            }
+
+            String serviceName = null;
+            if (assignment.getBookingDetail() != null && assignment.getBookingDetail().getService() != null) {
+                serviceName = assignment.getBookingDetail().getService().getName();
+            }
+
+            pendingMap.put(key, PendingReviewResponse.builder()
+                    .bookingId(booking.getBookingId())
+                    .bookingCode(booking.getBookingCode())
+                    .bookingTime(booking.getBookingTime())
+                    .assignmentId(assignment.getAssignmentId())
+                    .serviceName(serviceName)
+                    .employeeId(employee.getEmployeeId())
+                    .employeeName(employee.getFullName())
+                    .employeeAvatar(employee.getAvatar())
+                    .build());
+        }
+
+        return pendingMap.values().stream().toList();
+    }
+
     private void notifyEmployeeReviewReceived(Review review,
                                               Employee employee,
                                               List<CriteriaRatingRequest> criteriaRatings) {
@@ -162,6 +237,14 @@ public class ReviewServiceImpl implements ReviewService {
                 review.getReviewId() != null ? String.valueOf(review.getReviewId()) : null,
                 roundedRating
         );
+    }
+
+    private void sendPendingReviewEventToCustomer(Customer customer, PendingReviewWebSocketEvent event) {
+        if (customer == null || customer.getAccount() == null || event == null) {
+            return;
+        }
+        String accountId = customer.getAccount().getAccountId();
+        messagingTemplate.convertAndSend("/topic/reviews/pending/" + accountId, event);
     }
 
     private ReviewResponse toReviewResponse(Review review) {

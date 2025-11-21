@@ -3,6 +3,7 @@ package iuh.house_keeping_service_be.controllers;
 import iuh.house_keeping_service_be.dtos.Review.ReviewCreateRequest;
 import iuh.house_keeping_service_be.dtos.Review.ReviewResponse;
 import iuh.house_keeping_service_be.dtos.Review.ReviewSummaryResponse;
+import iuh.house_keeping_service_be.dtos.Review.PendingReviewResponse;
 import iuh.house_keeping_service_be.models.ReviewCriteria;
 import iuh.house_keeping_service_be.services.ReviewService.ReviewService;
 import jakarta.validation.Valid;
@@ -17,6 +18,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/reviews")
@@ -56,5 +58,18 @@ public class ReviewController {
     @GetMapping("/employees/{employeeId}/reviews/summary")
     public ResponseEntity<ReviewSummaryResponse> getEmployeeReviewSummary(@PathVariable String employeeId) {
         return ResponseEntity.ok(reviewService.getEmployeeSummary(employeeId));
+    }
+
+    @GetMapping("/pending")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    public ResponseEntity<?> getPendingReviewsForCustomer(
+            @RequestHeader("Authorization") String authorizationHeader
+    ) {
+        List<PendingReviewResponse> pending = reviewService.getPendingReviewsForCustomer(authorizationHeader);
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "data", pending,
+                "total", pending.size()
+        ));
     }
 }
