@@ -332,6 +332,32 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
     
     // Count bookings by recurring booking ID
     long countByRecurringBooking_RecurringBookingId(String recurringBookingId);
+
+    @Query("SELECT b.bookingTime FROM Booking b " +
+           "WHERE b.recurringBooking.recurringBookingId = :recurringBookingId " +
+           "AND b.bookingTime BETWEEN :startDate AND :endDate")
+    List<LocalDateTime> findBookingTimesByRecurringBooking(
+            @Param("recurringBookingId") String recurringBookingId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
+    @Query("SELECT b FROM Booking b " +
+           "WHERE b.recurringBooking.recurringBookingId = :recurringBookingId " +
+           "AND b.bookingTime > :after " +
+           "AND b.status IN :statuses")
+    List<Booking> findFutureByRecurringAndStatuses(
+            @Param("recurringBookingId") String recurringBookingId,
+            @Param("after") LocalDateTime after,
+            @Param("statuses") List<BookingStatus> statuses);
+
+    @Query("SELECT COUNT(b) FROM Booking b " +
+           "WHERE b.recurringBooking.recurringBookingId = :recurringBookingId " +
+           "AND b.bookingTime > :after " +
+           "AND b.status IN :statuses")
+    long countUpcomingByRecurringAndStatuses(
+            @Param("recurringBookingId") String recurringBookingId,
+            @Param("after") LocalDateTime after,
+            @Param("statuses") List<BookingStatus> statuses);
     
     // Count bookings by customer and status within date range
     @Query("SELECT COUNT(b) FROM Booking b " +
