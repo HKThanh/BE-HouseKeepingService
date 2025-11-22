@@ -65,6 +65,10 @@ public class RecurringBookingMapper {
         response.setCancellationReason(recurringBooking.getCancellationReason());
         response.setCreatedAt(recurringBooking.getCreatedAt());
         response.setUpdatedAt(recurringBooking.getUpdatedAt());
+        if (recurringBooking.getAssignedEmployee() != null) {
+            response.setAssignedEmployeeId(recurringBooking.getAssignedEmployee().getEmployeeId());
+            response.setAssignedEmployeeName(recurringBooking.getAssignedEmployee().getFullName());
+        }
 
         // Statistics - safely handle lazy loading
         try {
@@ -147,7 +151,7 @@ public class RecurringBookingMapper {
         );
     }
 
-    private List<Integer> parseRecurrenceDays(String recurrenceDays) {
+    public List<Integer> parseRecurrenceDays(String recurrenceDays) {
         if (recurrenceDays == null || recurrenceDays.isEmpty()) {
             return List.of();
         }
@@ -166,7 +170,7 @@ public class RecurringBookingMapper {
         };
     }
 
-    private String getRecurrenceDaysDisplay(RecurrenceType type, List<Integer> days) {
+    public String getRecurrenceDaysDisplay(RecurrenceType type, List<Integer> days) {
         if (days.isEmpty()) {
             return "";
         }

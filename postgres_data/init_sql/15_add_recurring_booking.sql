@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS recurring_bookings (
     note TEXT,
     title VARCHAR(255),
     promotion_id INT,
+    assigned_employee_id VARCHAR(36),
     status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'CANCELLED', 'COMPLETED')),
     cancelled_at TIMESTAMP,
     cancellation_reason TEXT,
@@ -22,7 +23,8 @@ CREATE TABLE IF NOT EXISTS recurring_bookings (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (customer_id) REFERENCES customer(customer_id) ON DELETE CASCADE,
     FOREIGN KEY (address_id) REFERENCES address(address_id) ON DELETE CASCADE,
-    FOREIGN KEY (promotion_id) REFERENCES promotions(promotion_id) ON DELETE SET NULL
+    FOREIGN KEY (promotion_id) REFERENCES promotions(promotion_id) ON DELETE SET NULL,
+    FOREIGN KEY (assigned_employee_id) REFERENCES employee(employee_id) ON DELETE SET NULL
 );
 
 -- 2. Create recurring_booking_details table

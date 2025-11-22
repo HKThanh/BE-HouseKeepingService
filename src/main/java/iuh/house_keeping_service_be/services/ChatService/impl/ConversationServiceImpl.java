@@ -5,6 +5,8 @@ import iuh.house_keeping_service_be.dtos.Chat.ConversationResponse;
 import iuh.house_keeping_service_be.enums.BookingStatus;
 import iuh.house_keeping_service_be.enums.AssignmentStatus;
 import iuh.house_keeping_service_be.enums.MessageType;
+import iuh.house_keeping_service_be.enums.RecurrenceType;
+import iuh.house_keeping_service_be.mappers.RecurringBookingMapper;
 import iuh.house_keeping_service_be.models.*;
 import iuh.house_keeping_service_be.repositories.*;
 import iuh.house_keeping_service_be.services.ChatService.ConversationService;
@@ -27,6 +29,7 @@ public class ConversationServiceImpl implements ConversationService {
     private final BookingRepository bookingRepository;
     private final RecurringBookingRepository recurringBookingRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final RecurringBookingMapper recurringBookingMapper;
 
     @Override
     @Transactional
@@ -56,32 +59,45 @@ public class ConversationServiceImpl implements ConversationService {
             booking = bookingRepository.findById(request.getBookingId())
                     .orElseThrow(() -> new RuntimeException("Booking not found"));
 
-            if (booking.getRecurringBooking() != null) {
-                String recurringId = booking.getRecurringBooking().getRecurringBookingId();
-                recurringBooking = booking.getRecurringBooking();
+            // Reuse conversation if one already exists for this booking
+            Optional<Conversation> existingByBooking = conversationRepository.findByBooking_BookingId(booking.getBookingId());
+            if (existingByBooking.isPresent()) {
+                return mapToResponse(existingByBooking.get());
+            }
 
-                // Reuse conversation if one already exists for this recurring booking
-                Optional<Conversation> existing = conversationRepository.findByBooking_RecurringBooking_RecurringBookingId(recurringId);
-                if (existing.isPresent()) {
-                    return mapToResponse(existing.get());
-                }
-                return createConversationEntity(customer, employee, booking, recurringBooking);
+            if (booking.getRecurringBooking() != null) {
+                recurringBooking = booking.getRecurringBooking();
             }
         }
 
         if (request.getRecurringBookingId() != null) {
-            recurringBooking = recurringBookingRepository.findById(request.getRecurringBookingId())
+            RecurringBooking requestedRecurring = recurringBookingRepository.findById(request.getRecurringBookingId())
                     .orElseThrow(() -> new RuntimeException("Recurring booking not found"));
 
-            Optional<Conversation> existing = conversationRepository.findByRecurringBooking_RecurringBookingId(request.getRecurringBookingId());
+            if (recurringBooking != null
+                    && !recurringBooking.getRecurringBookingId().equals(requestedRecurring.getRecurringBookingId())) {
+                throw new IllegalArgumentException("Booking và recurring booking không khớp");
+            }
+            recurringBooking = requestedRecurring;
+        }
+
+        if (recurringBooking != null) {
+            Optional<Conversation> existing = conversationRepository.findByRecurringBooking_RecurringBookingId(
+                    recurringBooking.getRecurringBookingId());
             if (existing.isPresent()) {
                 return mapToResponse(existing.get());
             }
-            return createConversationEntity(customer, employee, booking, recurringBooking);
+
+            // Không tạo conversation riêng cho từng booking được sinh từ recurring booking
+            return createConversationEntity(customer, employee, null, recurringBooking);
         }
 
-        // Fallback create when booking provided but not recurring
-        return createConversationEntity(customer, employee, booking, recurringBooking);
+        if (booking != null) {
+            return createConversationEntity(customer, employee, booking, null);
+        }
+
+        // Fallback create when no booking/recurring context is provided
+        return createConversationEntity(customer, employee, null, null);
     }
 
     @Override
@@ -125,40 +141,64 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public ConversationResponse getConversationByBooking(String bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
                 .orElseThrow(() -> new RuntimeException("Booking not found"));
 
         // 1. Direct conversation by booking
         Optional<Conversation> conversationOpt = conversationRepository.findByBooking_BookingId(bookingId);
-
-        // 2. If booking belongs to recurring, reuse conversation of that recurring booking
-        if (conversationOpt.isEmpty() && booking.getRecurringBooking() != null) {
-            String recurringId = booking.getRecurringBooking().getRecurringBookingId();
-            conversationOpt = conversationRepository.findByBooking_RecurringBooking_RecurringBookingId(recurringId);
-
-            // 2a. If still not found, create one using this booking
-            if (conversationOpt.isEmpty()) {
-                Employee resolvedEmployee = resolveEmployeeFromBooking(booking);
-                if (resolvedEmployee == null) {
-                    throw new RuntimeException("Không tìm thấy nhân viên được phân công cho booking này");
-                }
-
-                ConversationRequest request = new ConversationRequest(
-                        booking.getCustomer().getCustomerId(),
-                        resolvedEmployee.getEmployeeId(),
-                        bookingId,
-                        recurringId
-                );
-
-                return createConversation(request);
-            }
+        if (conversationOpt.isPresent()) {
+            return mapToResponse(conversationOpt.get());
         }
 
-        return conversationOpt
-                .map(this::mapToResponse)
-                .orElseThrow(() -> new RuntimeException("Conversation not found for booking"));
+        RecurringBooking recurringBooking = booking.getRecurringBooking();
+
+        // 2. If booking belongs to recurring, reuse conversation of that recurring booking
+        if (recurringBooking != null) {
+            conversationOpt = conversationRepository.findByRecurringBooking_RecurringBookingId(
+                    recurringBooking.getRecurringBookingId());
+            if (conversationOpt.isEmpty()) {
+                conversationOpt = conversationRepository.findByBooking_RecurringBooking_RecurringBookingId(
+                        recurringBooking.getRecurringBookingId());
+            }
+            if (conversationOpt.isPresent()) {
+                return mapToResponse(conversationOpt.get());
+            }
+
+            // Không tạo conversation riêng cho từng booking được sinh từ recurring booking
+            Employee resolvedEmployee = recurringBooking.getAssignedEmployee();
+            if (resolvedEmployee == null) {
+                resolvedEmployee = resolveEmployeeFromBooking(booking);
+            }
+            if (resolvedEmployee == null) {
+                throw new RuntimeException("Không tìm thấy nhân viên được phân công cho lịch định kỳ này");
+            }
+
+            ConversationRequest request = new ConversationRequest(
+                    booking.getCustomer().getCustomerId(),
+                    resolvedEmployee.getEmployeeId(),
+                    null,
+                    recurringBooking.getRecurringBookingId()
+            );
+
+            return createConversation(request);
+        }
+
+        // 3. Booking without recurring booking -> create conversation for this booking
+        Employee resolvedEmployee = resolveEmployeeFromBooking(booking);
+        if (resolvedEmployee == null) {
+            throw new RuntimeException("Không tìm thấy nhân viên được phân công cho booking này");
+        }
+
+        ConversationRequest request = new ConversationRequest(
+                booking.getCustomer().getCustomerId(),
+                resolvedEmployee.getEmployeeId(),
+                bookingId,
+                null
+        );
+
+        return createConversation(request);
     }
 
     @Override
@@ -238,9 +278,11 @@ public class ConversationServiceImpl implements ConversationService {
         }
 
         if (recurringBooking != null) {
+            String daysDisplay = recurringBookingMapper.getRecurrenceDaysDisplay(RecurrenceType.WEEKLY, recurringBookingMapper.parseRecurrenceDays(recurringBooking.getRecurrenceDays()));
+
             String address = recurringBooking.getAddress() != null ? recurringBooking.getAddress().getFullAddress() : "địa chỉ đã đặt";
-            return "Xin chào. Tôi là " + employeeName + " sẽ đồng hành cùng lịch dọn định kỳ của bạn tại "
-                    + address + ". Nếu bạn có câu hỏi, hãy nhắn tin tại đây.";
+            return "Xin chào. Tôi là " + employeeName + " sẽ đồng hành cùng lịch sử dụng dịch vụ " + recurringBooking.getRecurringBookingDetails().get(0).getService().getName() + " định kỳ của bạn tại "
+                    + address + " vào lúc " + recurringBooking.getBookingTime() + " " + daysDisplay + " mỗi tuần" + ". Nếu bạn có câu hỏi, hãy nhắn tin tại đây.";
         }
 
         return "Xin chào. Tôi là " + employeeName + ". Hãy nhắn nếu bạn cần hỗ trợ.";
