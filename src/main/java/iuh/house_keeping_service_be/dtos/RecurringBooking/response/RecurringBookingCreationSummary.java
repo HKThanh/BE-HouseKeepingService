@@ -3,6 +3,7 @@ package iuh.house_keeping_service_be.dtos.RecurringBooking.response;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import iuh.house_keeping_service_be.dtos.Chat.ConversationResponse;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,4 +20,5 @@ public class RecurringBookingCreationSummary {
     private RecurringBookingResponse recurringBooking;
     private List<String> generatedBookingIds = new ArrayList<>();
     private Integer totalBookingsToBeCreated; // Estimated number of bookings
+    private ConversationResponse conversation;
 }

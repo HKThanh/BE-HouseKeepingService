@@ -3,7 +3,10 @@ package iuh.house_keeping_service_be.services.ChatService.impl;
 import iuh.house_keeping_service_be.dtos.Chat.ConversationRequest;
 import iuh.house_keeping_service_be.dtos.Chat.ConversationResponse;
 import iuh.house_keeping_service_be.enums.BookingStatus;
+import iuh.house_keeping_service_be.enums.AssignmentStatus;
 import iuh.house_keeping_service_be.enums.MessageType;
+import iuh.house_keeping_service_be.enums.RecurrenceType;
+import iuh.house_keeping_service_be.mappers.RecurringBookingMapper;
 import iuh.house_keeping_service_be.models.*;
 import iuh.house_keeping_service_be.repositories.*;
 import iuh.house_keeping_service_be.services.ChatService.ConversationService;
@@ -14,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -23,7 +27,9 @@ public class ConversationServiceImpl implements ConversationService {
     private final CustomerRepository customerRepository;
     private final EmployeeRepository employeeRepository;
     private final BookingRepository bookingRepository;
+    private final RecurringBookingRepository recurringBookingRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final RecurringBookingMapper recurringBookingMapper;
 
     @Override
     @Transactional
@@ -35,8 +41,8 @@ public class ConversationServiceImpl implements ConversationService {
         if (request.getCustomerId() == null) {
             throw new IllegalArgumentException("Customer ID is required");
         }
-        if (request.getBookingId() == null) {
-            throw new IllegalArgumentException("Booking ID is required");
+        if (request.getBookingId() == null && request.getRecurringBookingId() == null) {
+            throw new IllegalArgumentException("Booking ID hoặc Recurring Booking ID is required");
         }
 
         // Fetch entities
@@ -46,36 +52,52 @@ public class ConversationServiceImpl implements ConversationService {
         Employee employee = employeeRepository.findById(request.getEmployeeId())
                 .orElseThrow(() -> new RuntimeException("Employee not found"));
 
-        Booking booking = bookingRepository.findById(request.getBookingId())
-                .orElseThrow(() -> new RuntimeException("Booking not found"));
+        Booking booking = null;
+        RecurringBooking recurringBooking = null;
 
-        // Create conversation
-        Conversation conversation = new Conversation();
-        conversation.setCustomer(customer);
-        conversation.setEmployee(employee);
-        conversation.setBooking(booking);
-        conversation.setIsActive(true);
+        if (request.getBookingId() != null) {
+            booking = bookingRepository.findById(request.getBookingId())
+                    .orElseThrow(() -> new RuntimeException("Booking not found"));
 
-        Conversation savedConversation = conversationRepository.save(conversation);
+            // Reuse conversation if one already exists for this booking
+            Optional<Conversation> existingByBooking = conversationRepository.findByBooking_BookingId(booking.getBookingId());
+            if (existingByBooking.isPresent()) {
+                return mapToResponse(existingByBooking.get());
+            }
 
-        // Create automatic welcome message from employee
-        String welcomeMessage = "Xin chào. Tôi là nhân viên được chọn để làm việc cho bạn trong đơn đặt dịch vụ " + booking.getBookingDetails().get(0).getService().getName() + " vào lúc " + booking.getBookingTime() + ", tại địa chỉ: " + booking.getAddress().getFullAddress() + ". Nếu bạn có bất kỳ câu hỏi nào, xin vui lòng liên hệ với tôi qua cuộc trò chuyện này.";
-        
-        ChatMessage welcomeChatMessage = new ChatMessage();
-        welcomeChatMessage.setConversation(savedConversation);
-        welcomeChatMessage.setSender(employee.getAccount());
-        welcomeChatMessage.setMessageType(MessageType.TEXT);
-        welcomeChatMessage.setContent(welcomeMessage);
-        welcomeChatMessage.setIsRead(false);
-        
-        chatMessageRepository.save(welcomeChatMessage);
+            if (booking.getRecurringBooking() != null) {
+                recurringBooking = booking.getRecurringBooking();
+            }
+        }
 
-        // Update conversation's last message
-        savedConversation.setLastMessage(welcomeMessage);
-        savedConversation.setLastMessageTime(LocalDateTime.now());
-        conversationRepository.save(savedConversation);
+        if (request.getRecurringBookingId() != null) {
+            RecurringBooking requestedRecurring = recurringBookingRepository.findById(request.getRecurringBookingId())
+                    .orElseThrow(() -> new RuntimeException("Recurring booking not found"));
 
-        return mapToResponse(savedConversation);
+            if (recurringBooking != null
+                    && !recurringBooking.getRecurringBookingId().equals(requestedRecurring.getRecurringBookingId())) {
+                throw new IllegalArgumentException("Booking và recurring booking không khớp");
+            }
+            recurringBooking = requestedRecurring;
+        }
+
+        if (recurringBooking != null) {
+            Optional<Conversation> existing = conversationRepository.findByRecurringBooking_RecurringBookingId(
+                    recurringBooking.getRecurringBookingId());
+            if (existing.isPresent()) {
+                return mapToResponse(existing.get());
+            }
+
+            // Không tạo conversation riêng cho từng booking được sinh từ recurring booking
+            return createConversationEntity(customer, employee, null, recurringBooking);
+        }
+
+        if (booking != null) {
+            return createConversationEntity(customer, employee, booking, null);
+        }
+
+        // Fallback create when no booking/recurring context is provided
+        return createConversationEntity(customer, employee, null, null);
     }
 
     @Override
@@ -119,11 +141,64 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public ConversationResponse getConversationByBooking(String bookingId) {
-        Conversation conversation = conversationRepository.findByBooking_BookingId(bookingId)
-                .orElseThrow(() -> new RuntimeException("Conversation not found for booking"));
-        return mapToResponse(conversation);
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new RuntimeException("Booking not found"));
+
+        // 1. Direct conversation by booking
+        Optional<Conversation> conversationOpt = conversationRepository.findByBooking_BookingId(bookingId);
+        if (conversationOpt.isPresent()) {
+            return mapToResponse(conversationOpt.get());
+        }
+
+        RecurringBooking recurringBooking = booking.getRecurringBooking();
+
+        // 2. If booking belongs to recurring, reuse conversation of that recurring booking
+        if (recurringBooking != null) {
+            conversationOpt = conversationRepository.findByRecurringBooking_RecurringBookingId(
+                    recurringBooking.getRecurringBookingId());
+            if (conversationOpt.isEmpty()) {
+                conversationOpt = conversationRepository.findByBooking_RecurringBooking_RecurringBookingId(
+                        recurringBooking.getRecurringBookingId());
+            }
+            if (conversationOpt.isPresent()) {
+                return mapToResponse(conversationOpt.get());
+            }
+
+            // Không tạo conversation riêng cho từng booking được sinh từ recurring booking
+            Employee resolvedEmployee = recurringBooking.getAssignedEmployee();
+            if (resolvedEmployee == null) {
+                resolvedEmployee = resolveEmployeeFromBooking(booking);
+            }
+            if (resolvedEmployee == null) {
+                throw new RuntimeException("Không tìm thấy nhân viên được phân công cho lịch định kỳ này");
+            }
+
+            ConversationRequest request = new ConversationRequest(
+                    booking.getCustomer().getCustomerId(),
+                    resolvedEmployee.getEmployeeId(),
+                    null,
+                    recurringBooking.getRecurringBookingId()
+            );
+
+            return createConversation(request);
+        }
+
+        // 3. Booking without recurring booking -> create conversation for this booking
+        Employee resolvedEmployee = resolveEmployeeFromBooking(booking);
+        if (resolvedEmployee == null) {
+            throw new RuntimeException("Không tìm thấy nhân viên được phân công cho booking này");
+        }
+
+        ConversationRequest request = new ConversationRequest(
+                booking.getCustomer().getCustomerId(),
+                resolvedEmployee.getEmployeeId(),
+                bookingId,
+                null
+        );
+
+        return createConversation(request);
     }
 
     @Override
@@ -152,10 +227,86 @@ public class ConversationServiceImpl implements ConversationService {
         conversationRepository.save(conversation);
     }
 
+    private ConversationResponse createConversationEntity(
+            Customer customer,
+            Employee employee,
+            Booking booking,
+            RecurringBooking recurringBooking
+    ) {
+        if (employee == null) {
+            throw new IllegalArgumentException("Employee is required to create conversation");
+        }
+
+        Conversation conversation = new Conversation();
+        conversation.setCustomer(customer);
+        conversation.setEmployee(employee);
+        conversation.setBooking(booking);
+        conversation.setRecurringBooking(recurringBooking != null ? recurringBooking : (booking != null ? booking.getRecurringBooking() : null));
+        conversation.setIsActive(true);
+
+        Conversation savedConversation = conversationRepository.save(conversation);
+
+        String welcomeMessage = buildWelcomeMessage(employee, booking, recurringBooking);
+
+        ChatMessage welcomeChatMessage = new ChatMessage();
+        welcomeChatMessage.setConversation(savedConversation);
+        welcomeChatMessage.setSender(employee.getAccount());
+        welcomeChatMessage.setMessageType(MessageType.TEXT);
+        welcomeChatMessage.setContent(welcomeMessage);
+        welcomeChatMessage.setIsRead(false);
+
+        chatMessageRepository.save(welcomeChatMessage);
+
+        savedConversation.setLastMessage(welcomeMessage);
+        savedConversation.setLastMessageTime(LocalDateTime.now());
+        conversationRepository.save(savedConversation);
+
+        return mapToResponse(savedConversation);
+    }
+
+    private String buildWelcomeMessage(Employee employee, Booking booking, RecurringBooking recurringBooking) {
+        String employeeName = employee.getFullName() != null ? employee.getFullName() : "nhân viên";
+
+        if (booking != null && booking.getBookingDetails() != null && !booking.getBookingDetails().isEmpty()) {
+            String serviceName = booking.getBookingDetails().get(0).getService() != null
+                    ? booking.getBookingDetails().get(0).getService().getName()
+                    : "dịch vụ";
+            String address = booking.getAddress() != null ? booking.getAddress().getFullAddress() : "địa chỉ đã đặt";
+            return "Xin chào. Tôi là " + employeeName + " sẽ làm việc cho bạn trong đơn dịch vụ "
+                    + serviceName + " vào " + booking.getBookingTime() + " tại " + address
+                    + ". Nếu bạn có câu hỏi, hãy nhắn tin tại đây.";
+        }
+
+        if (recurringBooking != null) {
+            String daysDisplay = recurringBookingMapper.getRecurrenceDaysDisplay(RecurrenceType.WEEKLY, recurringBookingMapper.parseRecurrenceDays(recurringBooking.getRecurrenceDays()));
+
+            String address = recurringBooking.getAddress() != null ? recurringBooking.getAddress().getFullAddress() : "địa chỉ đã đặt";
+            return "Xin chào. Tôi là " + employeeName + " sẽ đồng hành cùng lịch sử dụng dịch vụ " + recurringBooking.getRecurringBookingDetails().get(0).getService().getName() + " định kỳ của bạn tại "
+                    + address + " vào lúc " + recurringBooking.getBookingTime() + " " + daysDisplay + " mỗi tuần" + ". Nếu bạn có câu hỏi, hãy nhắn tin tại đây.";
+        }
+
+        return "Xin chào. Tôi là " + employeeName + ". Hãy nhắn nếu bạn cần hỗ trợ.";
+    }
+
+    private Employee resolveEmployeeFromBooking(Booking booking) {
+        if (booking == null || booking.getBookingDetails() == null) {
+            return null;
+        }
+
+        return booking.getBookingDetails().stream()
+                .filter(detail -> detail.getAssignments() != null)
+                .flatMap(detail -> detail.getAssignments().stream())
+                .filter(assign -> assign.getStatus() == null || assign.getStatus() != AssignmentStatus.CANCELLED)
+                .map(Assignment::getEmployee)
+                .filter(emp -> emp != null && emp.getEmployeeId() != null)
+                .findFirst()
+                .orElse(null);
+    }
+
     private ConversationResponse mapToResponse(Conversation conversation) {
         // Tính toán flag canChat
         Boolean canChat = true;
-        
+
         // Nếu conversation có isActive = false thì không cho phép chat
         if (conversation.getIsActive() != null && !conversation.getIsActive()) {
             canChat = false;
@@ -169,7 +320,12 @@ public class ConversationServiceImpl implements ConversationService {
                 canChat = false;
             }
         }
-        
+        if (conversation.getRecurringBooking() != null
+                && conversation.getRecurringBooking().getStatus() != null
+                && conversation.getRecurringBooking().getStatus() == iuh.house_keeping_service_be.enums.RecurringBookingStatus.CANCELLED) {
+            canChat = false;
+        }
+
         return ConversationResponse.builder()
                 .conversationId(conversation.getConversationId())
                 .customerId(conversation.getCustomer().getCustomerId())
@@ -179,6 +335,7 @@ public class ConversationServiceImpl implements ConversationService {
                 .employeeName(conversation.getEmployee() != null ? conversation.getEmployee().getFullName() : null)
                 .employeeAvatar(conversation.getEmployee() != null ? conversation.getEmployee().getAvatar() : null)
                 .bookingId(conversation.getBooking() != null ? conversation.getBooking().getBookingId() : null)
+                .recurringBookingId(conversation.getRecurringBooking() != null ? conversation.getRecurringBooking().getRecurringBookingId() : null)
                 .lastMessage(conversation.getLastMessage())
                 .lastMessageTime(conversation.getLastMessageTime())
                 .isActive(conversation.getIsActive())

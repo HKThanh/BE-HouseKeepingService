@@ -17,7 +17,6 @@ import iuh.house_keeping_service_be.models.Address;
 import iuh.house_keeping_service_be.models.Customer;
 import iuh.house_keeping_service_be.repositories.CustomerRepository;
 import iuh.house_keeping_service_be.services.AddressService.AddressService;
-import iuh.house_keeping_service_be.services.AdminService.PermissionService;
 import iuh.house_keeping_service_be.services.BookingService.BookingService;
 import iuh.house_keeping_service_be.services.CloudinaryService.CloudinaryService;
 import jakarta.validation.Valid;
@@ -45,7 +44,6 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class BookingController {
     private final AddressService addressService;
-    private final PermissionService permissionService;
     private final BookingService bookingService;
     private final CloudinaryService cloudinaryService;
     private final JwtUtil jwtUtil;

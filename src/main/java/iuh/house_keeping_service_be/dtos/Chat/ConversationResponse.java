@@ -20,6 +20,7 @@ public class ConversationResponse {
     private String employeeName;
     private String employeeAvatar;
     private String bookingId;
+    private String recurringBookingId;
     private String lastMessage;
     private LocalDateTime lastMessageTime;
     private Boolean isActive;

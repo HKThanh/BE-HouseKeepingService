@@ -104,4 +104,14 @@ public interface NotificationService {
      * Send review received notification
      */
     void sendReviewReceivedNotification(String accountId, String reviewId, int rating);
+
+    /**
+     * Send booking completed notification (work done)
+     */
+    void sendBookingCompletedNotification(String accountId, String bookingId, String bookingCode);
+
+    /**
+     * Send review request notification to customer after payment
+     */
+    void sendReviewRequestNotification(String accountId, String bookingId, String bookingCode, String employeeNames);
 }

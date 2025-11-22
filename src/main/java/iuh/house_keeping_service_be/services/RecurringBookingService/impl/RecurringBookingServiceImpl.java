@@ -7,6 +7,12 @@ import iuh.house_keeping_service_be.dtos.RecurringBooking.request.RecurringBooki
 import iuh.house_keeping_service_be.dtos.RecurringBooking.request.RecurringBookingDetailRequest;
 import iuh.house_keeping_service_be.dtos.RecurringBooking.response.RecurringBookingCreationSummary;
 import iuh.house_keeping_service_be.dtos.RecurringBooking.response.RecurringBookingResponse;
+import iuh.house_keeping_service_be.dtos.Chat.ConversationRequest;
+import iuh.house_keeping_service_be.dtos.Chat.ConversationResponse;
+import iuh.house_keeping_service_be.dtos.EmployeeSchedule.SuitableEmployeeRequest;
+import iuh.house_keeping_service_be.dtos.EmployeeSchedule.SuitableEmployeeResponse;
+import iuh.house_keeping_service_be.dtos.EmployeeSchedule.ApiResponse;
+import iuh.house_keeping_service_be.dtos.Booking.request.AssignmentRequest;
 import iuh.house_keeping_service_be.enums.BookingStatus;
 import iuh.house_keeping_service_be.enums.RecurrenceType;
 import iuh.house_keeping_service_be.enums.RecurringBookingStatus;
@@ -15,28 +21,34 @@ import iuh.house_keeping_service_be.mappers.RecurringBookingMapper;
 import iuh.house_keeping_service_be.models.*;
 import iuh.house_keeping_service_be.repositories.*;
 import iuh.house_keeping_service_be.services.BookingService.BookingService;
+import iuh.house_keeping_service_be.services.ChatService.ConversationService;
+import iuh.house_keeping_service_be.services.EmployeeScheduleService.EmployeeScheduleService;
 import iuh.house_keeping_service_be.services.RecurringBookingService.RecurringBookingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class RecurringBookingServiceImpl implements RecurringBookingService {
+
+    // Giới hạn đồng bộ nhỏ để phản hồi nhanh, tránh 504
+    private static final int MAX_INITIAL_GENERATION = 3;
 
     private final RecurringBookingRepository recurringBookingRepository;
     private final RecurringBookingDetailRepository recurringBookingDetailRepository;
@@ -47,6 +59,10 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
     private final BookingRepository bookingRepository;
     private final RecurringBookingMapper recurringBookingMapper;
     private final BookingService bookingService;
+    private final ConversationService conversationService;
+    private final AssignmentRepository assignmentRepository;
+    private final EmployeeScheduleService employeeScheduleService;
+    private final EmployeeRepository employeeRepository;
 
     @Override
     @Transactional
@@ -97,28 +113,32 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
             
             log.info("Loaded {} recurring booking details into memory", savedDetails.size());
 
-            // Generate initial bookings for the next 30 days
-            // Each booking creation will be in a separate transaction to avoid rollback-only issues
-            List<String> generatedBookingIds = generateInitialBookings(savedRecurringBooking, request);
+            // Giai đoạn mới: không tạo booking ngay. Chỉ lưu recurring booking,
+            // tìm nhân viên phù hợp bất đồng bộ và trả response nhanh.
+            assignEmployeeAsync(savedRecurringBooking.getRecurringBookingId(), request.bookingDetails());
 
             log.info("Recurring booking created successfully with ID: {}", savedRecurringBooking.getRecurringBookingId());
 
             // Build response
-            RecurringBookingResponse response = recurringBookingMapper.toResponse(
-                    recurringBookingRepository.findById(savedRecurringBooking.getRecurringBookingId())
-                            .orElseThrow()
-            );
+            RecurringBooking latestRecurringBooking = recurringBookingRepository
+                    .findByIdWithDetails(savedRecurringBooking.getRecurringBookingId())
+                    .orElse(savedRecurringBooking);
+
+            RecurringBookingResponse response = recurringBookingMapper.toResponse(latestRecurringBooking);
             
-            // Update statistics with actual generated bookings count
-            response.setTotalGeneratedBookings(generatedBookingIds.size());
-            response.setUpcomingBookings(generatedBookingIds.size());
+            // Không tạo booking ngay, nên statistics tính sau
+            response.setTotalGeneratedBookings(0);
+            response.setUpcomingBookings(0);
+
+            ConversationResponse conversation = createRecurringConversation(latestRecurringBooking, List.of());
 
             RecurringBookingCreationSummary summary = new RecurringBookingCreationSummary();
             summary.setSuccess(true);
             summary.setMessage("Đặt lịch định kỳ thành công");
             summary.setRecurringBooking(response);
-            summary.setGeneratedBookingIds(generatedBookingIds);
+            summary.setGeneratedBookingIds(List.of());
             summary.setTotalBookingsToBeCreated(calculateTotalBookings(request));
+            summary.setConversation(conversation);
 
             return summary;
 
@@ -158,18 +178,15 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
 
             // Delete all future bookings (bookings with status PENDING or AWAITING_EMPLOYEE)
             LocalDateTime now = LocalDateTime.now();
-            List<Booking> futureBookings = bookingRepository
-                    .findAll()
-                    .stream()
-                    .filter(b -> b.getRecurringBooking() != null 
-                            && b.getRecurringBooking().getRecurringBookingId().equals(recurringBookingId)
-                            && b.getBookingTime().isAfter(now)
-                            && (b.getStatus() == BookingStatus.PENDING 
-                                || b.getStatus() == BookingStatus.AWAITING_EMPLOYEE))
-                    .collect(Collectors.toList());
+            List<BookingStatus> cancellableStatuses = List.of(BookingStatus.PENDING, BookingStatus.AWAITING_EMPLOYEE);
+            List<Booking> futureBookings = bookingRepository.findFutureByRecurringAndStatuses(
+                    recurringBookingId,
+                    now,
+                    cancellableStatuses
+            );
 
             log.info("Deleting {} future bookings", futureBookings.size());
-            bookingRepository.deleteAll(futureBookings);
+            bookingRepository.deleteAllInBatch(futureBookings);
 
             RecurringBooking saved = recurringBookingRepository.save(recurringBooking);
 
@@ -227,7 +244,51 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
 
             for (RecurringBooking recurringBooking : activeRecurringBookings) {
                 try {
-                    generateBookingsForPeriod(recurringBooking, today, futureDate);
+                    Set<LocalDateTime> existingTimes = getExistingBookingTimes(
+                            recurringBooking.getRecurringBookingId(),
+                            today,
+                            futureDate
+                    );
+
+                    List<LocalDateTime> plannedBookingTimes = collectPlannedBookingTimes(
+                            recurringBooking,
+                            today,
+                            futureDate,
+                            existingTimes
+                    ).stream().sorted().toList();
+
+                    if (plannedBookingTimes.isEmpty()) {
+                        continue;
+                    }
+
+                    List<LocalDateTime> assignmentWindow = plannedBookingTimes.stream()
+                            .limit(MAX_INITIAL_GENERATION)
+                            .toList();
+
+                    List<RecurringBookingDetailRequest> detailRequests = recurringBooking.getRecurringBookingDetails().stream()
+                            .map(d -> new RecurringBookingDetailRequest(
+                                    d.getService().getServiceId(),
+                                    d.getQuantity(),
+                                    d.getPricePerUnit() != null && d.getQuantity() != null
+                                            ? d.getPricePerUnit().multiply(BigDecimal.valueOf(d.getQuantity()))
+                                            : null,
+                                    d.getPricePerUnit(),
+                                    parseChoiceIds(d.getSelectedChoiceIds())
+                            ))
+                            .toList();
+
+                    List<AssignmentRequest> recurringAssignments = buildRecurringAssignments(
+                            recurringBooking, assignmentWindow, detailRequests);
+
+                    List<String> generatedIds = generateBookingsForTimes(
+                            recurringBooking,
+                            plannedBookingTimes,
+                            recurringAssignments,
+                            existingTimes
+                    );
+                    if (!generatedIds.isEmpty()) {
+                        createRecurringConversation(recurringBooking, generatedIds);
+                    }
                 } catch (Exception e) {
                     log.error("Error generating bookings for recurring booking {}: {}", 
                             recurringBooking.getRecurringBookingId(), e.getMessage(), e);
@@ -327,6 +388,7 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
 
         recurringBooking.setCustomer(customer);
         recurringBooking.setAddress(address);
+        recurringBooking.setAssignedEmployee(null);
         recurringBooking.setRecurrenceType(request.recurrenceType());
         recurringBooking.setRecurrenceDays(
                 request.recurrenceDays().stream()
@@ -381,71 +443,236 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
         return details;
     }
 
-    private List<String> generateInitialBookings(
-            RecurringBooking recurringBooking,
-            RecurringBookingCreateRequest request
-    ) {
-        LocalDate today = LocalDate.now();
-        LocalDate futureDate = today.plusDays(30); // Generate for next 30 days
+    private ConversationResponse createRecurringConversation(RecurringBooking recurringBooking, List<String> generatedBookingIds) {
+        if (recurringBooking == null || recurringBooking.getCustomer() == null) {
+            return null;
+        }
 
-        return generateBookingsForPeriod(recurringBooking, today, futureDate);
-    }
+        try {
+            // Prefer an already assigned employee on the recurring booking
+            String pickedEmployeeId = recurringBooking.getAssignedEmployee() != null
+                    ? recurringBooking.getAssignedEmployee().getEmployeeId()
+                    : null;
 
-    private List<String> generateBookingsForPeriod(
-            RecurringBooking recurringBooking,
-            LocalDate startDate,
-            LocalDate endDate
-    ) {
-        List<String> generatedBookingIds = new ArrayList<>();
-        List<Integer> recurrenceDays = parseRecurrenceDays(recurringBooking.getRecurrenceDays());
-        
-        log.info("Generating bookings from {} to {} for recurring booking {}, recurrence days: {}, type: {}", 
-                startDate, endDate, recurringBooking.getRecurringBookingId(), 
-                recurrenceDays, recurringBooking.getRecurrenceType());
-
-        LocalDate currentDate = startDate.isAfter(recurringBooking.getStartDate()) 
-                ? startDate 
-                : recurringBooking.getStartDate();
-        
-        log.info("Starting from date: {}, recurring booking start date: {}", 
-                currentDate, recurringBooking.getStartDate());
-
-        while (currentDate.isBefore(endDate) || currentDate.isEqual(endDate)) {
-            if (recurringBooking.getEndDate() != null && currentDate.isAfter(recurringBooking.getEndDate())) {
-                break;
-            }
-
-            if (shouldGenerateBookingForDate(recurringBooking.getRecurrenceType(), recurrenceDays, currentDate)) {
-                LocalDateTime bookingDateTime = LocalDateTime.of(currentDate, recurringBooking.getBookingTime());
-
-                // Check if booking already exists for this date
-                if (!bookingExistsForDateTime(recurringBooking, bookingDateTime)) {
-                    try {
-                        log.info("Creating booking for recurring booking {} on date {}", 
-                                recurringBooking.getRecurringBookingId(), bookingDateTime);
-                        String bookingId = createBookingFromRecurring(recurringBooking, bookingDateTime);
-                        if (bookingId != null) {
-                            generatedBookingIds.add(bookingId);
-                            log.info("Successfully created booking {} for date {}", bookingId, bookingDateTime);
-                        } else {
-                            log.warn("createBookingFromRecurring returned null for date {}", bookingDateTime);
-                        }
-                    } catch (Exception e) {
-                        log.error("Error creating booking for date {}: {}", currentDate, e.getMessage(), e);
-                        // Don't throw, continue with next dates
+            // If none, try to resolve an employee from generated bookings' assignments (first non-cancelled)
+            if (pickedEmployeeId == null && generatedBookingIds != null) {
+                for (String bookingId : generatedBookingIds) {
+                    List<Assignment> assignments = assignmentRepository.findByBookingDetail_Booking_BookingId(bookingId);
+                    if (assignments == null || assignments.isEmpty()) {
+                        continue;
                     }
-                } else {
-                    log.debug("Booking already exists for date {}", bookingDateTime);
+                    for (Assignment assignment : assignments) {
+                        if (assignment.getEmployee() != null && assignment.getEmployee().getEmployeeId() != null) {
+                            pickedEmployeeId = assignment.getEmployee().getEmployeeId();
+                            break;
+                        }
+                    }
+                    if (pickedEmployeeId != null) {
+                        break;
+                    }
                 }
             }
 
-            currentDate = currentDate.plusDays(1);
+            if (pickedEmployeeId == null) {
+                log.warn("Could not resolve employee for recurring conversation {}", recurringBooking.getRecurringBookingId());
+                return null;
+            }
+
+            ConversationRequest conversationRequest = new ConversationRequest(
+                    recurringBooking.getCustomer().getCustomerId(),
+                    pickedEmployeeId,
+                    null,
+                    recurringBooking.getRecurringBookingId()
+            );
+
+            return conversationService.createConversation(conversationRequest);
+        } catch (Exception e) {
+            log.error("Failed to create recurring conversation for {}: {}", recurringBooking.getRecurringBookingId(), e.getMessage());
+            return null;
+        }
+    }
+
+    @Async
+    public void assignEmployeeAsync(String recurringBookingId, List<RecurringBookingDetailRequest> detailRequests) {
+        if (recurringBookingId == null || detailRequests == null || detailRequests.isEmpty()) {
+            return;
         }
 
-        log.info("Generated {} bookings for recurring booking {}", 
-                generatedBookingIds.size(), recurringBooking.getRecurringBookingId());
+        try {
+            RecurringBooking recurringBooking = recurringBookingRepository.findByIdWithDetails(recurringBookingId)
+                    .orElse(null);
+            if (recurringBooking == null) {
+                return;
+            }
+
+            LocalDate startDate = LocalDate.now();
+            LocalDate endDate = startDate.plusDays(30);
+            Set<LocalDateTime> existing = getExistingBookingTimes(recurringBookingId, startDate, endDate);
+            List<LocalDateTime> plannedBookingTimes = collectPlannedBookingTimes(
+                    recurringBooking,
+                    startDate,
+                    endDate,
+                    existing
+            );
+
+            if (plannedBookingTimes.isEmpty()) {
+                return;
+            }
+
+            // Chỉ cần 1 nhân viên phù hợp cho tất cả slot -> chọn người đầu tiên
+            List<LocalDateTime> assignmentWindow = plannedBookingTimes.stream().limit(10).toList();
+
+            List<AssignmentRequest> assignments = buildRecurringAssignments(recurringBooking, assignmentWindow, detailRequests);
+            if (assignments.isEmpty()) {
+                log.warn("No suitable employee found for recurring booking {}", recurringBookingId);
+                return;
+            }
+
+            String employeeId = assignments.get(0).employeeId();
+            Employee employee = employeeRepository.findById(employeeId).orElse(null);
+            if (employee == null) {
+                return;
+            }
+
+            recurringBooking.setAssignedEmployee(employee);
+            recurringBookingRepository.save(recurringBooking);
+            log.info("Assigned employee {} to recurring booking {}", employeeId, recurringBookingId);
+
+            // Create or reuse conversation for this recurring booking once employee is known
+            ConversationResponse conversation = createRecurringConversation(recurringBooking, List.of());
+            if (conversation != null) {
+                log.info("Created recurring conversation {} for {}", conversation.getConversationId(), recurringBookingId);
+            }
+        } catch (Exception e) {
+            log.error("Failed to assign employee for recurring booking {}: {}", recurringBookingId, e.getMessage());
+        }
+    }
+
+    // Tạo booking cho tuần tiếp theo (chạy 5h sáng thứ 2 hàng tuần)
+    @Scheduled(cron = "0 0 5 ? * MON")
+    @Transactional
+    public void generateWeeklyBookings() {
+        log.info("Starting weekly generation for recurring bookings (next 7 days)");
+        LocalDate today = LocalDate.now();
+        LocalDate endDate = today.plusDays(7);
+
+        List<RecurringBooking> active = recurringBookingRepository
+                .findActiveRecurringBookingsForGeneration(RecurringBookingStatus.ACTIVE, today);
+
+        for (RecurringBooking rb : active) {
+            try {
+                if (rb.getAssignedEmployee() == null) {
+                    continue; // chưa có nhân viên phù hợp
+                }
+
+                Set<LocalDateTime> existingTimes = getExistingBookingTimes(
+                        rb.getRecurringBookingId(),
+                        today,
+                        endDate
+                );
+
+                List<LocalDateTime> plannedTimes = collectPlannedBookingTimes(
+                        rb,
+                        today,
+                        endDate,
+                        existingTimes
+                ).stream().sorted().toList();
+
+                if (plannedTimes.isEmpty()) {
+                    continue;
+                }
+
+                List<RecurringBookingDetailRequest> detailRequests = rb.getRecurringBookingDetails().stream()
+                        .map(d -> new RecurringBookingDetailRequest(
+                                d.getService().getServiceId(),
+                                d.getQuantity(),
+                                d.getPricePerUnit() != null && d.getQuantity() != null
+                                        ? d.getPricePerUnit().multiply(BigDecimal.valueOf(d.getQuantity()))
+                                        : null,
+                                d.getPricePerUnit(),
+                                parseChoiceIds(d.getSelectedChoiceIds())
+                        ))
+                        .toList();
+
+                List<AssignmentRequest> assignments = detailRequests.stream()
+                        .map(dr -> new AssignmentRequest(rb.getAssignedEmployee().getEmployeeId(), dr.serviceId()))
+                        .toList();
+
+                List<String> generatedIds = generateBookingsForTimes(rb, plannedTimes, assignments, existingTimes);
+                if (!generatedIds.isEmpty()) {
+                    createRecurringConversation(rb, generatedIds);
+                }
+            } catch (Exception e) {
+                log.error("Weekly generation failed for recurring {}: {}", rb.getRecurringBookingId(), e.getMessage());
+            }
+        }
+        log.info("Weekly generation completed");
+    }
+
+    private List<String> generateBookingsForTimes(
+            RecurringBooking recurringBooking,
+            List<LocalDateTime> bookingTimes,
+            List<AssignmentRequest> recurringAssignments,
+            Set<LocalDateTime> existingTimes
+    ) {
+        if (bookingTimes == null || bookingTimes.isEmpty()) {
+            return List.of();
+        }
+
+        Set<LocalDateTime> cache = existingTimes != null ? existingTimes : new HashSet<>();
+        List<String> generatedBookingIds = new ArrayList<>();
+
+        for (LocalDateTime bookingTime : bookingTimes.stream().sorted().toList()) {
+            if (cache.contains(bookingTime)) {
+                continue;
+            }
+
+            try {
+                String bookingId = createBookingFromRecurring(recurringBooking, bookingTime, recurringAssignments);
+                if (bookingId != null) {
+                    generatedBookingIds.add(bookingId);
+                    cache.add(bookingTime);
+                }
+            } catch (Exception e) {
+                log.error("Error creating booking for recurring {} at {}: {}", recurringBooking.getRecurringBookingId(), bookingTime, e.getMessage());
+            }
+        }
 
         return generatedBookingIds;
+    }
+
+    @Async
+    public void generateBookingsAsync(
+            String recurringBookingId,
+            List<LocalDateTime> bookingTimes,
+            List<AssignmentRequest> recurringAssignments
+    ) {
+        if (bookingTimes == null || bookingTimes.isEmpty() || recurringBookingId == null) {
+            return;
+        }
+
+        try {
+            RecurringBooking recurringBooking = recurringBookingRepository
+                    .findByIdWithDetails(recurringBookingId)
+                    .orElseThrow(() -> new RuntimeException("Recurring booking not found: " + recurringBookingId));
+
+            LocalDate minDate = bookingTimes.stream().map(LocalDateTime::toLocalDate).min(LocalDate::compareTo).orElse(LocalDate.now());
+            LocalDate maxDate = bookingTimes.stream().map(LocalDateTime::toLocalDate).max(LocalDate::compareTo).orElse(minDate);
+
+            Set<LocalDateTime> existingTimes = getExistingBookingTimes(recurringBookingId, minDate, maxDate);
+
+            List<String> generatedIds = generateBookingsForTimes(
+                    recurringBooking,
+                    bookingTimes,
+                    recurringAssignments,
+                    existingTimes
+            );
+            if (!generatedIds.isEmpty()) {
+                createRecurringConversation(recurringBooking, generatedIds);
+            }
+        } catch (Exception e) {
+            log.error("Async generation failed for recurring booking {}: {}", recurringBookingId, e.getMessage());
+        }
     }
 
     private boolean shouldGenerateBookingForDate(
@@ -469,16 +696,8 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
         return false;
     }
 
-    private boolean bookingExistsForDateTime(RecurringBooking recurringBooking, LocalDateTime bookingDateTime) {
-        // Query database instead of relying on lazy-loaded collection
-        return bookingRepository.existsByRecurringBooking_RecurringBookingIdAndBookingTime(
-                recurringBooking.getRecurringBookingId(), 
-                bookingDateTime
-        );
-    }
-
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
-    private String createBookingFromRecurring(RecurringBooking recurringBooking, LocalDateTime bookingDateTime) {
+    private String createBookingFromRecurring(RecurringBooking recurringBooking, LocalDateTime bookingDateTime, List<AssignmentRequest> recurringAssignments) {
         try {
             // Always fetch from database to ensure we have the latest data in a new transaction
             log.info("Fetching RecurringBooking with details for ID: {}", recurringBooking.getRecurringBookingId());
@@ -508,11 +727,11 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
                     null, // newAddress
                     bookingDateTime,
                     recurringBookingWithDetails.getNote(),
-                    recurringBookingWithDetails.getTitle(),
+                    null, // title - keep empty to allow auto-assign employees
                     null, // imageUrls
                     recurringBookingWithDetails.getPromotion() != null ? recurringBookingWithDetails.getPromotion().getPromoCode() : null,
                     serviceDetails,
-                    null, // assignments (will be auto-assigned)
+                    (recurringAssignments != null && !recurringAssignments.isEmpty()) ? recurringAssignments : null,
                     1, // default payment method
                     null // additionalFeeIds
             );
@@ -567,6 +786,93 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
                 .collect(Collectors.toList());
     }
 
+    private Set<LocalDateTime> getExistingBookingTimes(
+            String recurringBookingId,
+            LocalDate startDate,
+            LocalDate endDate
+    ) {
+        if (recurringBookingId == null) {
+            return new HashSet<>();
+        }
+        LocalDateTime start = startDate.atStartOfDay();
+        LocalDateTime end = endDate.plusDays(1).atStartOfDay();
+        List<LocalDateTime> times = bookingRepository.findBookingTimesByRecurringBooking(
+                recurringBookingId, start, end);
+        return new HashSet<>(times);
+    }
+
+    private List<LocalDateTime> collectPlannedBookingTimes(
+            RecurringBooking recurringBooking,
+            LocalDate startDate,
+            LocalDate endDate,
+            Set<LocalDateTime> existingTimes
+    ) {
+        List<LocalDateTime> times = new ArrayList<>();
+        List<Integer> recurrenceDays = parseRecurrenceDays(recurringBooking.getRecurrenceDays());
+        Set<LocalDateTime> cached = existingTimes != null ? existingTimes : new HashSet<>();
+
+        LocalDate currentDate = startDate.isAfter(recurringBooking.getStartDate())
+                ? startDate
+                : recurringBooking.getStartDate();
+
+        while (currentDate.isBefore(endDate) || currentDate.isEqual(endDate)) {
+            if (recurringBooking.getEndDate() != null && currentDate.isAfter(recurringBooking.getEndDate())) {
+                break;
+            }
+            if (shouldGenerateBookingForDate(recurringBooking.getRecurrenceType(), recurrenceDays, currentDate)) {
+                LocalDateTime bookingDateTime = LocalDateTime.of(currentDate, recurringBooking.getBookingTime());
+                if (!cached.contains(bookingDateTime)) {
+                    times.add(bookingDateTime);
+                }
+            }
+            currentDate = currentDate.plusDays(1);
+        }
+
+        return times;
+    }
+
+    private List<AssignmentRequest> buildRecurringAssignments(
+            RecurringBooking recurringBooking,
+            List<LocalDateTime> bookingTimes,
+            List<RecurringBookingDetailRequest> detailRequests
+    ) {
+        if (bookingTimes == null || bookingTimes.isEmpty() || detailRequests == null || detailRequests.isEmpty()) {
+            log.warn("No planned booking times or details; skip pre-assign employees for recurring booking {}", recurringBooking.getRecurringBookingId());
+            return List.of();
+        }
+
+        Address address = recurringBooking.getAddress();
+        String ward = address != null ? address.getWard() : null;
+        String city = address != null ? address.getCity() : null;
+        String customerId = recurringBooking.getCustomer() != null ? recurringBooking.getCustomer().getCustomerId() : null;
+
+        List<AssignmentRequest> assignments = new ArrayList<>();
+
+        // Chỉ cần kiểm tra trên tập thời gian nhỏ (đã giới hạn từ caller) để giảm tải
+        for (RecurringBookingDetailRequest detailRequest : detailRequests) {
+            SuitableEmployeeRequest suitableRequest = new SuitableEmployeeRequest(
+                    detailRequest.serviceId(),
+                    null,
+                    ward,
+                    city,
+                    customerId,
+                    bookingTimes
+            );
+
+            ApiResponse<List<SuitableEmployeeResponse>> response = employeeScheduleService.findSuitableEmployees(suitableRequest);
+            if (response == null || !response.success() || response.data() == null || response.data().isEmpty()) {
+                log.warn("No suitable employee found for service {} across {} slots; auto-assign fallback will be used per booking", detailRequest.serviceId(), bookingTimes.size());
+                continue;
+            }
+
+            String employeeId = response.data().get(0).employeeId();
+            assignments.add(new AssignmentRequest(employeeId, detailRequest.serviceId()));
+            log.info("Pre-assigned employee {} for service {} across {} recurring slots", employeeId, detailRequest.serviceId(), bookingTimes.size());
+        }
+
+        return assignments;
+    }
+
     private Integer calculateTotalBookings(RecurringBookingCreateRequest request) {
         LocalDate startDate = request.startDate();
         LocalDate endDate = request.endDate() != null ? request.endDate() : startDate.plusMonths(12); // Default 1 year
@@ -594,13 +900,16 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
             
             // Count upcoming bookings (future bookings that are PENDING or AWAITING_EMPLOYEE)
             LocalDateTime now = LocalDateTime.now();
-            long upcoming = bookingRepository.findAll().stream()
-                .filter(b -> b.getRecurringBooking() != null
-                    && b.getRecurringBooking().getRecurringBookingId().equals(recurringBooking.getRecurringBookingId())
-                    && b.getBookingTime().isAfter(now)
-                    && (b.getStatus() == BookingStatus.PENDING || b.getStatus() == BookingStatus.AWAITING_EMPLOYEE))
-                .count();
+            long upcoming = bookingRepository.countUpcomingByRecurringAndStatuses(
+                    recurringBooking.getRecurringBookingId(),
+                    now,
+                    List.of(BookingStatus.PENDING, BookingStatus.AWAITING_EMPLOYEE)
+            );
             response.setUpcomingBookings((int) upcoming);
+            if (recurringBooking.getAssignedEmployee() != null) {
+                response.setAssignedEmployeeId(recurringBooking.getAssignedEmployee().getEmployeeId());
+                response.setAssignedEmployeeName(recurringBooking.getAssignedEmployee().getFullName());
+            }
         } catch (Exception e) {
             log.warn("Error calculating statistics for recurring booking {}: {}", 
                 recurringBooking.getRecurringBookingId(), e.getMessage());

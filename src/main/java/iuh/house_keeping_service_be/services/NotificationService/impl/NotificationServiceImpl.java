@@ -336,6 +336,46 @@ public class NotificationServiceImpl implements NotificationService {
         createNotification(request);
     }
 
+    @Override
+    @Transactional
+    public void sendBookingCompletedNotification(String accountId, String bookingId, String bookingCode) {
+        NotificationRequest request = new NotificationRequest(
+                accountId,
+                "CUSTOMER",
+                Notification.NotificationType.BOOKING_COMPLETED,
+                "Công việc đã hoàn tất",
+                String.format("Nhân viên đã hoàn tất công việc cho booking %s. Vui lòng kiểm tra và tiến hành thanh toán.", bookingCode),
+                bookingId,
+                Notification.RelatedEntityType.BOOKING,
+                Notification.NotificationPriority.HIGH,
+                "/bookings/" + bookingId
+        );
+
+        createNotification(request);
+    }
+
+    @Override
+    @Transactional
+    public void sendReviewRequestNotification(String accountId, String bookingId, String bookingCode, String employeeNames) {
+        String message = (employeeNames != null && !employeeNames.isBlank())
+                ? String.format("Thanh toán thành công. Vui lòng đánh giá nhân viên (%s) cho booking %s.", employeeNames, bookingCode)
+                : String.format("Thanh toán thành công. Vui lòng đánh giá nhân viên đã làm việc cho booking %s.", bookingCode);
+
+        NotificationRequest request = new NotificationRequest(
+                accountId,
+                "CUSTOMER",
+                Notification.NotificationType.REVIEW_REQUEST,
+                "Đánh giá nhân viên",
+                message,
+                bookingId,
+                Notification.RelatedEntityType.BOOKING,
+                Notification.NotificationPriority.NORMAL,
+                "/bookings/" + bookingId + "/review"
+        );
+
+        createNotification(request);
+    }
+
     private void dispatchEmailNotification(Notification notification) {
         if (notification == null) {
             return;

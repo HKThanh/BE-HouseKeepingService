@@ -47,6 +47,8 @@ public class RecurringBookingResponse {
     private String title;
     private PromotionInfo promotion;
     private List<BookingDetailInfo> recurringBookingDetails;
+    private String assignedEmployeeId;
+    private String assignedEmployeeName;
 
     private RecurringBookingStatus status;
     private String statusDisplay; // Vietnamese display

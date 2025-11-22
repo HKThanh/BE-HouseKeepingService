@@ -38,6 +38,10 @@ public class Conversation {
     @JoinColumn(name = "booking_id")
     private Booking booking;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "recurring_booking_id")
+    private RecurringBooking recurringBooking;
+
     @Column(name = "last_message", columnDefinition = "TEXT")
     private String lastMessage;
 

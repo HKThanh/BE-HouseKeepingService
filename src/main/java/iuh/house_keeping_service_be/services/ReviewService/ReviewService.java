@@ -2,6 +2,7 @@ package iuh.house_keeping_service_be.services.ReviewService;
 
 import iuh.house_keeping_service_be.dtos.Review.ReviewCreateRequest;
 import iuh.house_keeping_service_be.dtos.Review.ReviewResponse;
+import iuh.house_keeping_service_be.dtos.Review.PendingReviewResponse;
 import iuh.house_keeping_service_be.dtos.Review.ReviewSummaryResponse;
 import iuh.house_keeping_service_be.models.ReviewCriteria;
 import org.springframework.data.domain.Page;
@@ -17,4 +18,6 @@ public interface ReviewService {
     List<ReviewCriteria> getAllCriteria();
 
     ReviewSummaryResponse getEmployeeSummary(String employeeId);
+
+    List<PendingReviewResponse> getPendingReviewsForCustomer(String authorizationHeader);
 }

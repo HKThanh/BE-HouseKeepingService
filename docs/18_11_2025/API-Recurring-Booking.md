@@ -52,7 +52,7 @@ Tính năng đặt lịch định kỳ cho phép khách hàng tạo các booking
         "success": true,
         "message": "Đặt lịch định kỳ thành công",
         "recurringBooking": {
-            "recurringBookingId": "6216b5fc-2e98-45ca-a692-af5a218c9448",
+            "recurringBookingId": "ab854ad3-5cc1-49fe-8087-8673ece2b3d2",
             "customerId": "c1000001-0000-0000-0000-000000000004",
             "customerName": "Nguyễn Văn An",
             "customer": {
@@ -83,15 +83,15 @@ Tính năng đặt lịch định kỳ cho phép khách hàng tạo các booking
                 5
             ],
             "recurrenceDaysDisplay": "Thứ 2, Thứ 4, Thứ 6",
-            "bookingTime": "14:00:00",
-            "startDate": "2025-11-20",
-            "endDate": "2026-12-30",
+            "bookingTime": "16:00:00",
+            "startDate": "2025-11-23",
+            "endDate": "2026-12-10",
             "note": "Vệ sinh định kỳ căn hộ 2 phòng ngủ",
             "title": "Dọn dẹp hàng tuần",
             "promotion": null,
             "recurringBookingDetails": [
                 {
-                    "bookingDetailId": "01105fbc-b4cc-4992-87c4-bf78dc45d2da",
+                    "bookingDetailId": "c4a78eca-aec1-493d-ad38-d7444cb46634",
                     "service": {
                         "serviceId": 2,
                         "name": "Tổng vệ sinh",
@@ -114,30 +114,36 @@ Tính năng đặt lịch định kỳ cho phép khách hàng tạo các booking
                     "formattedDuration": "2.0h"
                 }
             ],
+            "assignedEmployeeId": "e1000001-0000-0000-0000-000000000004",
+            "assignedEmployeeName": "Nguyễn Thị Mai",
             "status": "ACTIVE",
             "statusDisplay": "Đang hoạt động",
             "cancelledAt": null,
             "cancellationReason": null,
-            "createdAt": "2025-11-18T13:12:23",
-            "updatedAt": "2025-11-18T13:12:23",
-            "totalGeneratedBookings": 12,
-            "upcomingBookings": 12
+            "createdAt": "2025-11-22T22:08:06",
+            "updatedAt": "2025-11-22T22:08:07",
+            "totalGeneratedBookings": 0,
+            "upcomingBookings": 0
         },
-        "generatedBookingIds": [
-            "ae511261-30da-4ce7-9e2c-e5f52573d435",
-            "5dceacd2-8005-426a-89a3-8d768ccf4b02",
-            "e2f13f1e-bf03-462a-acdc-8676eef59e5f",
-            "4e41d105-4327-4ca0-b4b4-07a135f3bd6d",
-            "4653f922-7587-4d4b-8c9b-d6acced37e0c",
-            "9b7df1c1-7861-4a9f-b1a9-33de1fd843e8",
-            "9cecea20-28f9-4396-b113-a732cc61f02b",
-            "fa65d823-2e8d-4212-8a74-a1d4758a5e50",
-            "7b3f7141-a156-4b9c-afd3-6d47e9bcabd5",
-            "b2739bfd-7722-4d16-bf10-85d978eed57a",
-            "8c049b6f-8c07-479b-9ec4-9d06b01d3e06",
-            "3daccb6c-6e0c-4a23-b55f-a33adf7c5acb"
-        ],
-        "totalBookingsToBeCreated": 174
+        "generatedBookingIds": [],
+        "totalBookingsToBeCreated": 164,
+        "conversation": {
+            "conversationId": "6e1a222a-1e33-4744-b42c-92a72cef5254",
+            "customerId": "c1000001-0000-0000-0000-000000000004",
+            "customerName": "Nguyễn Văn An",
+            "customerAvatar": "https://i.pravatar.cc/150?img=11",
+            "employeeId": "e1000001-0000-0000-0000-000000000004",
+            "employeeName": "Nguyễn Thị Mai",
+            "employeeAvatar": "https://i.pravatar.cc/150?img=12",
+            "bookingId": null,
+            "recurringBookingId": "ab854ad3-5cc1-49fe-8087-8673ece2b3d2",
+            "lastMessage": "Xin chào. Tôi là Nguyễn Thị Mai sẽ đồng hành cùng lịch dọn định kỳ của bạn tại 45 Nguyễn Huệ, Phường Phú An, Thành phố Hồ Chí Minh. Nếu bạn có câu hỏi, hãy nhắn tin tại đây.",
+            "lastMessageTime": "2025-11-22T22:08:07",
+            "isActive": true,
+            "canChat": true,
+            "createdAt": "2025-11-22T22:08:07",
+            "updatedAt": "2025-11-22T22:08:07"
+        }
     }
 }
 ```
@@ -520,8 +526,10 @@ Tính năng đặt lịch định kỳ cho phép khách hàng tạo các booking
    - Ngày bắt đầu phải từ hôm nay
    - Dịch vụ có thể đặt
 3. Tạo bản ghi recurring booking
-4. Tự động tạo booking cho 30 ngày tới
-5. Trả về thông tin lịch định kỳ
+4. Hệ thống tìm nhân viên phù hợp (bất đồng bộ). Khi tìm được sẽ gán vào lịch định kỳ.
+5. Ngay khi có nhân viên, hệ thống tạo (hoặc tái sử dụng) 1 cuộc hội thoại giữa khách hàng và nhân viên cho toàn bộ lịch định kỳ.
+6. Scheduler/tác vụ nền sẽ tạo booking con cho các ngày phù hợp; các booking này dùng chung conversation của lịch định kỳ, không tạo conversation riêng.
+7. Trả về thông tin lịch định kỳ, thống kê booking và conversation (có thể null nếu chưa gán được nhân viên ngay lúc tạo).
 
 ### Hủy Lịch Định Kỳ
 1. Khách hàng gửi request hủy với lý do
@@ -597,3 +605,4 @@ Tính năng đặt lịch định kỳ cho phép khách hàng tạo các booking
 3. **Link booking với recurring**: Mỗi booking tự động tạo sẽ có `recurring_booking_id` để trace về lịch gốc
 4. **Promotion**: Có thể áp dụng mã giảm giá cho tất cả booking trong lịch định kỳ
 5. **Auto-assign nhân viên**: Booking tự động tạo sẽ được auto-assign nhân viên nếu có
+6. **Conversation cho lịch định kỳ**: Lịch định kỳ sử dụng một conversation duy nhất giữa khách hàng và nhân viên được gán. Các booking con được sinh ra (kể cả trong `generatedBookingIds`) sẽ không tạo conversation riêng; mọi trao đổi diễn ra trong conversation của lịch định kỳ.

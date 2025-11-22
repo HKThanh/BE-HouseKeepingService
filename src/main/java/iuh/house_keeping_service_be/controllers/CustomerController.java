@@ -1,9 +1,6 @@
 package iuh.house_keeping_service_be.controllers;
 
-import iuh.house_keeping_service_be.config.JwtUtil;
 import iuh.house_keeping_service_be.dtos.Admin.UserPermission.response.PermissionManagementResponse;
-import iuh.house_keeping_service_be.dtos.Admin.UserPermission.response.UserPermissionData;
-import iuh.house_keeping_service_be.dtos.Admin.UserPermission.response.UserPermissionsResponse;
 import iuh.house_keeping_service_be.dtos.Cloudinary.CloudinaryUploadResult;
 import iuh.house_keeping_service_be.dtos.Customer.CustomerUpdateRequest;
 import iuh.house_keeping_service_be.dtos.Service.ServiceDetailResponse;
@@ -24,7 +21,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -41,8 +37,6 @@ public class CustomerController {
 
     private final CloudinaryService cloudinaryService;
 
-    private final JwtUtil jwtUtil;
-    
     private final iuh.house_keeping_service_be.services.BookingService.BookingService bookingService;
 
     @GetMapping("/{customerId}")
@@ -98,9 +92,6 @@ public class CustomerController {
                         new ServiceDetailResponse(false, "Token không hợp lệ", null)
                 );
             }
-
-            String token = authHeader.substring(7);
-            String username = jwtUtil.extractUsername(token);
 
             Customer customer = customerService.findById(customerId);
 

@@ -1,16 +1,22 @@
 package iuh.house_keeping_service_be.services.PaymentService.impl;
 
+import iuh.house_keeping_service_be.dtos.Review.PendingReviewResponse;
+import iuh.house_keeping_service_be.dtos.Review.PendingReviewWebSocketEvent;
 import iuh.house_keeping_service_be.dtos.payment.CreatePaymentRequest;
 import iuh.house_keeping_service_be.dtos.payment.PaymentMethodResponse;
 import iuh.house_keeping_service_be.dtos.payment.PaymentResponse;
 import iuh.house_keeping_service_be.dtos.payment.UpdatePaymentStatusRequest;
 import iuh.house_keeping_service_be.models.Account;
+import iuh.house_keeping_service_be.models.Assignment;
 import iuh.house_keeping_service_be.models.Booking;
+import iuh.house_keeping_service_be.models.Employee;
 import iuh.house_keeping_service_be.models.Customer;
 import iuh.house_keeping_service_be.models.Payment;
 import iuh.house_keeping_service_be.models.PaymentMethod;
+import iuh.house_keeping_service_be.enums.AssignmentStatus;
 import iuh.house_keeping_service_be.enums.PaymentStatus;
 import iuh.house_keeping_service_be.repositories.BookingRepository;
+import iuh.house_keeping_service_be.repositories.AssignmentRepository;
 import iuh.house_keeping_service_be.repositories.PaymentMethodRepository;
 import iuh.house_keeping_service_be.repositories.PaymentRepository;
 import iuh.house_keeping_service_be.services.NotificationService.NotificationService;
@@ -20,6 +26,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,7 +43,9 @@ public class PaymentServiceImpl implements PaymentService {
     private final PaymentRepository paymentRepository;
     private final BookingRepository bookingRepository;
     private final PaymentMethodRepository paymentMethodRepository;
+    private final AssignmentRepository assignmentRepository;
     private final NotificationService notificationService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Override
     @Transactional
@@ -192,5 +201,61 @@ public class PaymentServiceImpl implements PaymentService {
                 payment.getId(),
                 amount
         );
+
+        List<Assignment> bookingAssignments = assignmentRepository.findByBookingIdWithStatus(booking.getBookingId());
+        String employeeNames = bookingAssignments.stream()
+                .filter(assignment -> assignment.getStatus() != AssignmentStatus.CANCELLED)
+                .map(Assignment::getEmployee)
+                .filter(emp -> emp != null && emp.getFullName() != null)
+                .map(Employee::getFullName)
+                .distinct()
+                .collect(Collectors.joining(", "));
+
+        notificationService.sendReviewRequestNotification(
+                accountId.get(),
+                booking.getBookingId(),
+                booking.getBookingCode(),
+                employeeNames
+        );
+
+        sendPendingReviewsAddEvent(accountId.get(), bookingAssignments, booking);
+    }
+
+    private void sendPendingReviewsAddEvent(String accountId, List<Assignment> bookingAssignments, Booking booking) {
+        if (accountId == null || bookingAssignments == null || messagingTemplate == null) {
+            return;
+        }
+
+        for (Assignment assignment : bookingAssignments) {
+            if (assignment.getStatus() == AssignmentStatus.CANCELLED) {
+                continue;
+            }
+            Employee employee = assignment.getEmployee();
+            if (employee == null || employee.getEmployeeId() == null) {
+                continue;
+            }
+
+            PendingReviewResponse payload = PendingReviewResponse.builder()
+                    .bookingId(booking.getBookingId())
+                    .bookingCode(booking.getBookingCode())
+                    .bookingTime(booking.getBookingTime())
+                    .assignmentId(assignment.getAssignmentId())
+                    .serviceName(assignment.getBookingDetail() != null && assignment.getBookingDetail().getService() != null
+                            ? assignment.getBookingDetail().getService().getName()
+                            : null)
+                    .employeeId(employee.getEmployeeId())
+                    .employeeName(employee.getFullName())
+                    .employeeAvatar(employee.getAvatar())
+                    .build();
+
+            PendingReviewWebSocketEvent event = PendingReviewWebSocketEvent.builder()
+                    .action(PendingReviewWebSocketEvent.Action.ADD)
+                    .payload(payload)
+                    .bookingId(payload.getBookingId())
+                    .employeeId(payload.getEmployeeId())
+                    .build();
+
+            messagingTemplate.convertAndSend("/topic/reviews/pending/" + accountId, event);
+        }
     }
 }

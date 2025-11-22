@@ -152,6 +152,17 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
             "WHERE a.bookingDetail.booking.bookingId = :bookingId")
     List<Assignment> findByBookingIdWithStatus(@Param("bookingId") String bookingId);
 
+    @Query("SELECT a FROM Assignment a " +
+            "LEFT JOIN FETCH a.employee e " +
+            "LEFT JOIN FETCH a.bookingDetail bd " +
+            "LEFT JOIN FETCH bd.service s " +
+            "LEFT JOIN FETCH bd.booking b " +
+            "LEFT JOIN FETCH b.customer c " +
+            "WHERE c.customerId = :customerId " +
+            "AND b.status = 'COMPLETED' " +
+            "AND a.status = 'COMPLETED'")
+    List<Assignment> findCompletedAssignmentsByCustomer(@Param("customerId") String customerId);
+
 
     @Query("SELECT a FROM Assignment a " +
             "LEFT JOIN FETCH a.bookingDetail bd " +
@@ -218,7 +229,9 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
     long countByEmployeeIdAndDateRange(@Param("employeeId") String employeeId,
                                         @Param("startDate") LocalDateTime startDate,
                                         @Param("endDate") LocalDateTime endDate);
-    
+
+    List<Assignment> findByBookingDetail_Booking_BookingId(String bookingId);
+
     // Count distinct bookings by employee and booking status within date range
     @Query("SELECT COUNT(DISTINCT b.bookingId) FROM Assignment a " +
             "JOIN a.bookingDetail bd " +

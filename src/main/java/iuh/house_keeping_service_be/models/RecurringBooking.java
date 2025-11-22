@@ -43,6 +43,10 @@ public class RecurringBooking {
     @JoinColumn(name = "address_id", nullable = false)
     private Address address;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assigned_employee_id")
+    private Employee assignedEmployee;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "recurrence_type", nullable = false)
     private RecurrenceType recurrenceType;

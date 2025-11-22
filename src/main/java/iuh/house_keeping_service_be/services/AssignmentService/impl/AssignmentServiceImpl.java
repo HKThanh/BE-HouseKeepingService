@@ -349,7 +349,20 @@ public class AssignmentServiceImpl implements AssignmentService {
         }
 
         Booking booking = assignment.getBookingDetail().getBooking();
-        updateBookingStatusToCompletedIfNeeded(booking, now);
+        boolean bookingCompleted = updateBookingStatusToCompletedIfNeeded(booking, now);
+
+        if (bookingCompleted && booking != null && booking.getCustomer() != null
+                && booking.getCustomer().getAccount() != null) {
+            try {
+                notificationService.sendBookingCompletedNotification(
+                        booking.getCustomer().getAccount().getAccountId(),
+                        booking.getBookingId(),
+                        booking.getBookingCode()
+                );
+            } catch (Exception e) {
+                log.error("Failed to send booking completed notification for booking {}: {}", booking.getBookingId(), e.getMessage());
+            }
+        }
 
         return mapToAssignmentDetailResponse(savedAssignment);
     }
@@ -719,9 +732,9 @@ public class AssignmentServiceImpl implements AssignmentService {
         }
     }
 
-    private void updateBookingStatusToCompletedIfNeeded(Booking booking, LocalDateTime referenceTime) {
+    private boolean updateBookingStatusToCompletedIfNeeded(Booking booking, LocalDateTime referenceTime) {
         if (booking == null) {
-            return;
+            return false;
         }
 
         List<Assignment> bookingAssignments = assignmentRepository.findByBookingIdWithStatus(booking.getBookingId());
@@ -734,7 +747,10 @@ public class AssignmentServiceImpl implements AssignmentService {
             booking.setStatus(BookingStatus.COMPLETED);
             booking.setUpdatedAt(referenceTime);
             bookingRepository.save(booking);
+            return true;
         }
+
+        return false;
     }
 
     @Override

@@ -101,6 +101,7 @@ public class Notification {
         ASSIGNMENT_CRISIS,
         PAYMENT_SUCCESS,
         PAYMENT_FAILED,
+        REVIEW_REQUEST,
         REVIEW_RECEIVED,
         SYSTEM_ANNOUNCEMENT,
         PROMOTION_AVAILABLE

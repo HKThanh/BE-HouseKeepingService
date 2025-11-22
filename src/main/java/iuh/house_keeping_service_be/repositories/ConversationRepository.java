@@ -18,6 +18,10 @@ public interface ConversationRepository extends JpaRepository<Conversation, Stri
 
     Optional<Conversation> findByBooking_BookingId(String bookingId);
 
+    Optional<Conversation> findByRecurringBooking_RecurringBookingId(String recurringBookingId);
+
+    Optional<Conversation> findByBooking_RecurringBooking_RecurringBookingId(String recurringBookingId);
+
     @Query("SELECT c FROM Conversation c WHERE c.customer.customerId = :customerId OR c.employee.employeeId = :employeeId ORDER BY c.lastMessageTime DESC")
     List<Conversation> findByCustomerOrEmployee(@Param("customerId") String customerId, @Param("employeeId") String employeeId);
 
