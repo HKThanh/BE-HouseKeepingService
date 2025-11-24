@@ -43,6 +43,17 @@ Tính năng đặt lịch định kỳ cho phép khách hàng tạo các booking
 }
 ```
 
+**Hành vi sinh slot ngay sau khi tạo (realtime window fill):**
+- Sau khi job 02:00 đã chạy, API vẫn sinh ngay các slot còn lại trong cửa sổ generate hiện tại (30 ngày nếu chưa cố định nhân viên, 7 ngày nếu đã cố định), miễn là `bookingTime` còn ở tương lai tính từ thời điểm gọi API.
+- Nếu `startDate` = hôm nay và hôm nay là ngày lặp, slot hôm nay sẽ được sinh nếu thời gian còn lại (>= now). Slot đã qua trong ngày sẽ bị bỏ qua.
+- Vẫn tránh trùng nhờ kiểm tra slot tồn tại trong khoảng cửa sổ.
+
+**Ràng buộc thời gian & mã lỗi:**
+- `startDate` phải từ hôm nay trở đi; `endDate` (nếu có) phải sau `startDate`.
+- `bookingTime` bắt buộc.
+- `recurrenceDays`: WEEKLY chỉ nhận 1-7, MONTHLY chỉ nhận 1-31; danh sách không được rỗng.
+- Tổng số lần lặp tối đa 365 lần (nếu không truyền `endDate`, BE kiểm tra trong 12 tháng kể từ `startDate`). Vi phạm trả về `errorCode: RECURRING_TIME_INVALID` kèm danh sách lỗi chi tiết.
+
 **Response thành công (201):**
 ```json
 {
@@ -126,7 +137,11 @@ Tính năng đặt lịch định kỳ cho phép khách hàng tạo các booking
             "upcomingBookings": 0
         },
         "generatedBookingIds": [],
-        "totalBookingsToBeCreated": 164,
+        "totalBookingsToBeCreated": 8,
+        "expectedBookingsInWindow": 8,
+        "generatedBookingsInWindow": 0,
+        "generationWindowDays": 30,
+        "generationProgressPercent": 0.0,
         "conversation": {
             "conversationId": "6e1a222a-1e33-4744-b42c-92a72cef5254",
             "customerId": "c1000001-0000-0000-0000-000000000004",
@@ -147,6 +162,10 @@ Tính năng đặt lịch định kỳ cho phép khách hàng tạo các booking
     }
 }
 ```
+
+**Ghi chú về tiến độ sinh booking tự động:**
+- `totalBookingsToBeCreated` và `expectedBookingsInWindow` đếm số slot sẽ được tạo trong cửa sổ generate hiện tại (mặc định 30 ngày; 7 ngày nếu lịch đã có nhân viên cố định).
+- `generatedBookingsInWindow` và `generationProgressPercent` cho biết trạng thái sinh booking thực tế trong cửa sổ đó, giúp FE hiển thị còn bao nhiêu slot đang chờ gán/đang tạo.
 
 ---
 

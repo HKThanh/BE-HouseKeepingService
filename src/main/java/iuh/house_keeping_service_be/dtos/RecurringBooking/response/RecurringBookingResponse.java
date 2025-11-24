@@ -66,4 +66,8 @@ public class RecurringBookingResponse {
     // Statistics
     private Integer totalGeneratedBookings;
     private Integer upcomingBookings;
+    private Integer expectedBookingsInWindow;
+    private Integer generatedBookingsInWindow;
+    private Integer generationWindowDays;
+    private Double generationProgressPercent;
 }

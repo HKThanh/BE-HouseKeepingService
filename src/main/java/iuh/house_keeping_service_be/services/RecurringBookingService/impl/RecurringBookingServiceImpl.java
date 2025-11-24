@@ -13,6 +13,7 @@ import iuh.house_keeping_service_be.dtos.EmployeeSchedule.SuitableEmployeeReques
 import iuh.house_keeping_service_be.dtos.EmployeeSchedule.SuitableEmployeeResponse;
 import iuh.house_keeping_service_be.dtos.EmployeeSchedule.ApiResponse;
 import iuh.house_keeping_service_be.dtos.Booking.request.AssignmentRequest;
+import iuh.house_keeping_service_be.events.RecurringBookingCreatedEvent;
 import iuh.house_keeping_service_be.enums.BookingStatus;
 import iuh.house_keeping_service_be.enums.RecurrenceType;
 import iuh.house_keeping_service_be.enums.RecurringBookingStatus;
@@ -26,11 +27,14 @@ import iuh.house_keeping_service_be.services.EmployeeScheduleService.EmployeeSch
 import iuh.house_keeping_service_be.services.RecurringBookingService.RecurringBookingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -49,6 +53,9 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
 
     // Giới hạn đồng bộ nhỏ để phản hồi nhanh, tránh 504
     private static final int MAX_INITIAL_GENERATION = 3;
+    private static final int DEFAULT_GENERATION_WINDOW_DAYS = 7;
+    private static final int ASSIGNED_GENERATION_WINDOW_DAYS = 7;
+    private static final int MAX_TOTAL_OCCURRENCES = 365;
 
     private final RecurringBookingRepository recurringBookingRepository;
     private final RecurringBookingDetailRepository recurringBookingDetailRepository;
@@ -63,6 +70,10 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
     private final AssignmentRepository assignmentRepository;
     private final EmployeeScheduleService employeeScheduleService;
     private final EmployeeRepository employeeRepository;
+    private final ApplicationEventPublisher eventPublisher;
+    @Lazy
+    @Autowired
+    private RecurringBookingServiceImpl self;
 
     @Override
     @Transactional
@@ -77,17 +88,19 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
             // Validate and get address
             Address address = validateAndGetAddress(request, customer);
 
-            // Validate recurrence days
-            validateRecurrenceDays(request.recurrenceType(), request.recurrenceDays());
-
-            // Validate dates
-            validateDates(request.startDate(), request.endDate());
+            // Validate recurrence timeline rules (dates, recurrence days, limits)
+            List<Integer> normalizedRecurrenceDays = validateAndNormalizeTimeRules(request);
 
             // Validate services
             List<Service> services = validateServices(request.bookingDetails());
 
             // Create recurring booking entity
-            RecurringBooking recurringBooking = createRecurringBookingEntity(request, customer, address);
+            RecurringBooking recurringBooking = createRecurringBookingEntity(
+                    request,
+                    customer,
+                    address,
+                    normalizedRecurrenceDays
+            );
 
             // Set promotion if applicable
             if (request.promoCode() != null && !request.promoCode().trim().isEmpty()) {
@@ -113,32 +126,33 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
             
             log.info("Loaded {} recurring booking details into memory", savedDetails.size());
 
-            // Giai đoạn mới: không tạo booking ngay. Chỉ lưu recurring booking,
-            // tìm nhân viên phù hợp bất đồng bộ và trả response nhanh.
-            assignEmployeeAsync(savedRecurringBooking.getRecurringBookingId(), request.bookingDetails());
+            // Enqueue background tasks (assign employee + generate window) via event to avoid blocking response
+            eventPublisher.publishEvent(new RecurringBookingCreatedEvent(
+                    savedRecurringBooking.getRecurringBookingId(),
+                    request.bookingDetails()
+            ));
 
             log.info("Recurring booking created successfully with ID: {}", savedRecurringBooking.getRecurringBookingId());
 
             // Build response
-            RecurringBooking latestRecurringBooking = recurringBookingRepository
-                    .findByIdWithDetails(savedRecurringBooking.getRecurringBookingId())
-                    .orElse(savedRecurringBooking);
-
-            RecurringBookingResponse response = recurringBookingMapper.toResponse(latestRecurringBooking);
+            RecurringBookingResponse response = recurringBookingMapper.toResponse(savedRecurringBooking);
             
-            // Không tạo booking ngay, nên statistics tính sau
-            response.setTotalGeneratedBookings(0);
-            response.setUpcomingBookings(0);
+            // Không chờ sinh booking, chỉ tính nhanh kỳ vọng trong cửa sổ (không scan DB để tránh chậm)
+            populateInitialExpectedStats(response, request, normalizedRecurrenceDays);
 
-            ConversationResponse conversation = createRecurringConversation(latestRecurringBooking, List.of());
+            ConversationResponse conversation = createRecurringConversation(savedRecurringBooking, List.of());
 
             RecurringBookingCreationSummary summary = new RecurringBookingCreationSummary();
             summary.setSuccess(true);
             summary.setMessage("Đặt lịch định kỳ thành công");
             summary.setRecurringBooking(response);
             summary.setGeneratedBookingIds(List.of());
-            summary.setTotalBookingsToBeCreated(calculateTotalBookings(request));
             summary.setConversation(conversation);
+        summary.setTotalBookingsToBeCreated(response.getExpectedBookingsInWindow());
+        summary.setExpectedBookingsInWindow(response.getExpectedBookingsInWindow());
+        summary.setGeneratedBookingsInWindow(response.getGeneratedBookingsInWindow());
+        summary.setGenerationWindowDays(response.getGenerationWindowDays());
+        summary.setGenerationProgressPercent(response.getGenerationProgressPercent());
 
             return summary;
 
@@ -332,34 +346,89 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
         }
     }
 
-    private void validateRecurrenceDays(RecurrenceType type, List<Integer> days) {
-        if (days == null || days.isEmpty()) {
-            throw new RuntimeException("Ngày lặp lại không được để trống");
+    private List<Integer> validateAndNormalizeTimeRules(RecurringBookingCreateRequest request) {
+        List<String> errors = new ArrayList<>();
+        List<Integer> normalizedDays = new ArrayList<>();
+
+        if (request.recurrenceType() == null) {
+            errors.add("RECURRENCE_TYPE_REQUIRED: Loại lặp lại là bắt buộc");
         }
 
-        for (Integer day : days) {
-            if (type == RecurrenceType.WEEKLY) {
-                if (day < 1 || day > 7) {
-                    throw new RuntimeException("Ngày trong tuần phải từ 1 (Thứ 2) đến 7 (Chủ nhật)");
-                }
-            } else if (type == RecurrenceType.MONTHLY) {
-                if (day < 1 || day > 31) {
-                    throw new RuntimeException("Ngày trong tháng phải từ 1 đến 31");
+        if (request.bookingTime() == null) {
+            errors.add("BOOKING_TIME_REQUIRED: Giờ đặt là bắt buộc");
+        }
+
+        if (request.recurrenceDays() == null || request.recurrenceDays().isEmpty()) {
+            errors.add("RECURRENCE_DAYS_MISSING: Ngày lặp lại là bắt buộc");
+        } else {
+            normalizedDays = request.recurrenceDays().stream()
+                    .filter(java.util.Objects::nonNull)
+                    .distinct()
+                    .sorted()
+                    .toList();
+
+            if (normalizedDays.isEmpty()) {
+                errors.add("RECURRENCE_DAYS_INVALID: Ngày lặp lại không hợp lệ");
+            }
+
+            for (Integer day : normalizedDays) {
+                if (request.recurrenceType() == RecurrenceType.WEEKLY) {
+                    if (day < 1 || day > 7) {
+                        errors.add("RECURRENCE_DAYS_WEEKLY_INVALID: Ngày trong tuần phải từ 1 (Thứ 2) đến 7 (Chủ nhật)");
+                    }
+                } else if (request.recurrenceType() == RecurrenceType.MONTHLY) {
+                    if (day < 1 || day > 31) {
+                        errors.add("RECURRENCE_DAYS_MONTHLY_INVALID: Ngày trong tháng phải từ 1 đến 31");
+                    }
                 }
             }
         }
+
+        LocalDate today = LocalDate.now();
+        if (request.startDate() == null) {
+            errors.add("START_DATE_REQUIRED: Ngày bắt đầu là bắt buộc");
+        } else if (request.startDate().isBefore(today)) {
+            errors.add("START_DATE_BEFORE_TODAY: Ngày bắt đầu phải từ hôm nay trở đi");
+        }
+
+        if (request.endDate() != null && request.startDate() != null && request.endDate().isBefore(request.startDate())) {
+            errors.add("END_DATE_BEFORE_START: Ngày kết thúc phải sau ngày bắt đầu");
+        }
+
+        LocalDate effectiveEnd = resolveEffectiveEndDate(request.startDate(), request.endDate());
+        if (request.startDate() != null
+                && effectiveEnd != null
+                && !normalizedDays.isEmpty()
+                && request.recurrenceType() != null) {
+            int occurrences = countOccurrences(
+                    request.recurrenceType(),
+                    normalizedDays,
+                    request.startDate(),
+                    effectiveEnd
+            );
+            if (occurrences > MAX_TOTAL_OCCURRENCES) {
+                errors.add(String.format(
+                        "OCCURRENCE_LIMIT_EXCEEDED: Lịch định kỳ tạo quá %d lần trong khoảng thời gian cho phép",
+                        MAX_TOTAL_OCCURRENCES
+                ));
+            }
+        }
+
+        if (!errors.isEmpty()) {
+            throw RecurringBookingValidationException.timeRuleViolation(errors);
+        }
+
+        return normalizedDays;
     }
 
-    private void validateDates(LocalDate startDate, LocalDate endDate) {
-        LocalDate today = LocalDate.now();
-
-        if (startDate.isBefore(today)) {
-            throw new RuntimeException("Ngày bắt đầu phải từ hôm nay trở đi");
+    private LocalDate resolveEffectiveEndDate(LocalDate startDate, LocalDate endDate) {
+        if (startDate == null) {
+            return endDate;
         }
-
-        if (endDate != null && endDate.isBefore(startDate)) {
-            throw new RuntimeException("Ngày kết thúc phải sau ngày bắt đầu");
+        if (endDate != null) {
+            return endDate;
         }
+        return startDate.plusMonths(12);
     }
 
     private List<Service> validateServices(List<RecurringBookingDetailRequest> detailRequests) {
@@ -382,7 +451,8 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
     private RecurringBooking createRecurringBookingEntity(
             RecurringBookingCreateRequest request,
             Customer customer,
-            Address address
+            Address address,
+            List<Integer> normalizedRecurrenceDays
     ) {
         RecurringBooking recurringBooking = new RecurringBooking();
 
@@ -391,7 +461,7 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
         recurringBooking.setAssignedEmployee(null);
         recurringBooking.setRecurrenceType(request.recurrenceType());
         recurringBooking.setRecurrenceDays(
-                request.recurrenceDays().stream()
+                normalizedRecurrenceDays.stream()
                         .map(String::valueOf)
                         .collect(Collectors.joining(","))
         );
@@ -675,6 +745,76 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
         }
     }
 
+    @Async
+    @org.springframework.transaction.event.TransactionalEventListener(phase = org.springframework.transaction.event.TransactionPhase.AFTER_COMMIT)
+    public void handleRecurringBookingCreatedEvent(RecurringBookingCreatedEvent event) {
+        try {
+            RecurringBooking recurringBooking = recurringBookingRepository
+                    .findByIdWithDetails(event.getRecurringBookingId())
+                    .orElseGet(() -> recurringBookingRepository.findById(event.getRecurringBookingId()).orElse(null));
+            if (recurringBooking == null) {
+                log.warn("Recurring booking {} not found for background tasks", event.getRecurringBookingId());
+                return;
+            }
+            List<RecurringBookingDetailRequest> detailRequests = event.getDetailRequests();
+            self.assignEmployeeAsync(recurringBooking.getRecurringBookingId(), detailRequests);
+            // Skip immediate slot generation to keep response fast; rely on scheduled jobs to generate bookings
+        } catch (Exception e) {
+            log.error("Failed to handle RecurringBookingCreatedEvent for {}: {}", event.getRecurringBookingId(), e.getMessage(), e);
+        }
+    }
+
+    @Async
+    public void generateInitialWindowAsync(
+            RecurringBooking recurringBooking,
+            List<RecurringBookingDetailRequest> detailRequests
+    ) {
+        if (recurringBooking == null || recurringBooking.getRecurringBookingId() == null) {
+            return;
+        }
+        try {
+            int windowDays = resolveGenerationWindowDays(recurringBooking);
+            LocalDate anchor = LocalDate.now();
+            LocalDate windowStart = resolveWindowStart(recurringBooking.getStartDate(), anchor);
+            LocalDate windowEnd = resolveWindowEnd(windowStart, recurringBooking.getEndDate(), windowDays);
+
+            Set<LocalDateTime> existingTimes = getExistingBookingTimes(
+                    recurringBooking.getRecurringBookingId(),
+                    windowStart,
+                    windowEnd
+            );
+
+            List<LocalDateTime> planned = collectPlannedBookingTimes(
+                    recurringBooking,
+                    windowStart,
+                    windowEnd,
+                    existingTimes
+            ).stream()
+                    .filter(dt -> dt.isAfter(LocalDateTime.now()))
+                    .sorted()
+                    .toList();
+
+            if (planned.isEmpty()) {
+                return;
+            }
+
+            List<AssignmentRequest> recurringAssignments = buildRecurringAssignments(
+                    recurringBooking,
+                    planned,
+                    detailRequests
+            );
+
+            generateBookingsAsync(
+                    recurringBooking.getRecurringBookingId(),
+                    planned,
+                    recurringAssignments
+            );
+        } catch (Exception e) {
+            log.error("Initial window generation failed for recurring booking {}: {}",
+                    recurringBooking.getRecurringBookingId(), e.getMessage());
+        }
+    }
+
     private boolean shouldGenerateBookingForDate(
             RecurrenceType type,
             List<Integer> recurrenceDays,
@@ -771,6 +911,8 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .map(Integer::parseInt)
+                .distinct()
+                .sorted()
                 .collect(Collectors.toList());
     }
 
@@ -873,21 +1015,155 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
         return assignments;
     }
 
-    private Integer calculateTotalBookings(RecurringBookingCreateRequest request) {
-        LocalDate startDate = request.startDate();
-        LocalDate endDate = request.endDate() != null ? request.endDate() : startDate.plusMonths(12); // Default 1 year
+    private int calculateExpectedBookingsForWindow(
+            RecurringBookingCreateRequest request,
+            List<Integer> normalizedRecurrenceDays,
+            int windowDays
+    ) {
+        LocalDate anchorDate = LocalDate.now();
+        LocalDate windowStart = resolveWindowStart(request.startDate(), anchorDate);
+        LocalDate windowEnd = resolveWindowEnd(windowStart, request.endDate(), windowDays);
+        return calculateExpectedBookingsForWindow(
+                request.recurrenceType(),
+                normalizedRecurrenceDays,
+                windowStart,
+                windowEnd
+        );
+    }
 
-        int count = 0;
-        LocalDate currentDate = startDate;
+    private int calculateExpectedBookingsForWindow(
+            RecurrenceType recurrenceType,
+            List<Integer> recurrenceDays,
+            LocalDate windowStart,
+            LocalDate windowEnd
+    ) {
+        return countOccurrences(recurrenceType, recurrenceDays, windowStart, windowEnd);
+    }
 
-        while (currentDate.isBefore(endDate) || currentDate.isEqual(endDate)) {
-            if (shouldGenerateBookingForDate(request.recurrenceType(), request.recurrenceDays(), currentDate)) {
-                count++;
-            }
-            currentDate = currentDate.plusDays(1);
+    private int countOccurrences(
+            RecurrenceType recurrenceType,
+            List<Integer> recurrenceDays,
+            LocalDate start,
+            LocalDate end
+    ) {
+        if (recurrenceType == null || recurrenceDays == null || recurrenceDays.isEmpty() || start == null || end == null) {
+            return 0;
+        }
+        if (start.isAfter(end)) {
+            return 0;
         }
 
+        int count = 0;
+        LocalDate current = start;
+        while (!current.isAfter(end)) {
+            if (shouldGenerateBookingForDate(recurrenceType, recurrenceDays, current)) {
+                count++;
+            }
+            current = current.plusDays(1);
+        }
         return count;
+    }
+
+    private LocalDate resolveWindowStart(LocalDate startDate, LocalDate anchorDate) {
+        if (startDate == null) {
+            return anchorDate;
+        }
+        return startDate.isAfter(anchorDate) ? startDate : anchorDate;
+    }
+
+    private LocalDate resolveWindowEnd(LocalDate windowStart, LocalDate endDate, int windowDays) {
+        LocalDate windowEnd = windowStart.plusDays(windowDays);
+        if (endDate != null && endDate.isBefore(windowEnd)) {
+            return endDate;
+        }
+        return windowEnd;
+    }
+
+    private int resolveGenerationWindowDays(RecurringBooking recurringBooking) {
+        return recurringBooking != null && recurringBooking.getAssignedEmployee() != null
+                ? ASSIGNED_GENERATION_WINDOW_DAYS
+                : DEFAULT_GENERATION_WINDOW_DAYS;
+    }
+
+    private double calculateProgress(long generated, int expected) {
+        if (expected <= 0) {
+            return 100.0;
+        }
+        double progress = (generated * 100.0) / expected;
+        return Math.min(progress, 100.0);
+    }
+
+    private void populateInitialExpectedStats(
+            RecurringBookingResponse response,
+            RecurringBookingCreateRequest request,
+            List<Integer> normalizedRecurrenceDays
+    ) {
+        // set baseline
+        response.setTotalGeneratedBookings(0);
+        response.setUpcomingBookings(0);
+
+        int windowDays = resolveGenerationWindowDays(null);
+        LocalDate anchorDate = LocalDate.now();
+        LocalDate windowStart = resolveWindowStart(request.startDate(), anchorDate);
+        LocalDate windowEnd = resolveWindowEnd(windowStart, request.endDate(), windowDays);
+        List<Integer> recurrenceDays = (normalizedRecurrenceDays != null && !normalizedRecurrenceDays.isEmpty())
+                ? normalizedRecurrenceDays
+                : request.recurrenceDays();
+        int expected = calculateExpectedBookingsForWindow(
+                request.recurrenceType(),
+                recurrenceDays,
+                windowStart,
+                windowEnd
+        );
+
+        response.setExpectedBookingsInWindow(expected);
+        response.setGeneratedBookingsInWindow(0);
+        response.setGenerationWindowDays(windowDays);
+        response.setGenerationProgressPercent(0.0);
+    }
+
+    private void setInitialWindowStats(
+            RecurringBookingResponse response,
+            RecurringBooking recurringBooking,
+            List<Integer> normalizedRecurrenceDays
+    ) {
+        // Base stats from DB at the time of response
+        long totalGenerated = bookingRepository.countByRecurringBooking_RecurringBookingId(
+                recurringBooking.getRecurringBookingId()
+        );
+        response.setTotalGeneratedBookings((int) totalGenerated);
+
+        LocalDateTime now = LocalDateTime.now();
+        long upcoming = bookingRepository.countUpcomingByRecurringAndStatuses(
+                recurringBooking.getRecurringBookingId(),
+                now,
+                List.of(BookingStatus.PENDING, BookingStatus.AWAITING_EMPLOYEE)
+        );
+        response.setUpcomingBookings((int) upcoming);
+
+        int windowDays = resolveGenerationWindowDays(recurringBooking);
+        LocalDate anchorDate = LocalDate.now();
+        LocalDate windowStart = resolveWindowStart(recurringBooking.getStartDate(), anchorDate);
+        LocalDate windowEnd = resolveWindowEnd(windowStart, recurringBooking.getEndDate(), windowDays);
+        List<Integer> recurrenceDays = (normalizedRecurrenceDays != null && !normalizedRecurrenceDays.isEmpty())
+                ? normalizedRecurrenceDays
+                : parseRecurrenceDays(recurringBooking.getRecurrenceDays());
+        int expected = calculateExpectedBookingsForWindow(
+                recurringBooking.getRecurrenceType(),
+                recurrenceDays,
+                windowStart,
+                windowEnd
+        );
+        long generatedInWindow = bookingRepository.countGeneratedRecurringBookingsInWindow(
+                recurringBooking.getRecurringBookingId(),
+                windowStart.atStartOfDay(),
+                windowEnd.plusDays(1).atStartOfDay()
+        );
+
+        response.setExpectedBookingsInWindow(expected);
+        response.setGeneratedBookingsInWindow((int) generatedInWindow);
+        response.setGenerationWindowDays(windowDays);
+        response.setGenerationProgressPercent(calculateProgress(generatedInWindow, expected));
     }
     
     private void updateStatistics(RecurringBookingResponse response, RecurringBooking recurringBooking) {
@@ -910,11 +1186,38 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
                 response.setAssignedEmployeeId(recurringBooking.getAssignedEmployee().getEmployeeId());
                 response.setAssignedEmployeeName(recurringBooking.getAssignedEmployee().getFullName());
             }
+
+            int windowDays = resolveGenerationWindowDays(recurringBooking);
+            List<Integer> recurrenceDays = parseRecurrenceDays(recurringBooking.getRecurrenceDays());
+            LocalDate anchorDate = LocalDate.now();
+            LocalDate windowStart = resolveWindowStart(recurringBooking.getStartDate(), anchorDate);
+            LocalDate windowEnd = resolveWindowEnd(windowStart, recurringBooking.getEndDate(), windowDays);
+            int expected = calculateExpectedBookingsForWindow(
+                    recurringBooking.getRecurrenceType(),
+                    recurrenceDays,
+                    windowStart,
+                    windowEnd
+            );
+
+            long generatedInWindow = bookingRepository.countGeneratedRecurringBookingsInWindow(
+                    recurringBooking.getRecurringBookingId(),
+                    windowStart.atStartOfDay(),
+                    windowEnd.plusDays(1).atStartOfDay()
+            );
+
+            response.setExpectedBookingsInWindow(expected);
+            response.setGeneratedBookingsInWindow((int) generatedInWindow);
+            response.setGenerationWindowDays(windowDays);
+            response.setGenerationProgressPercent(calculateProgress(generatedInWindow, expected));
         } catch (Exception e) {
             log.warn("Error calculating statistics for recurring booking {}: {}", 
                 recurringBooking.getRecurringBookingId(), e.getMessage());
             response.setTotalGeneratedBookings(0);
             response.setUpcomingBookings(0);
+            response.setExpectedBookingsInWindow(0);
+            response.setGeneratedBookingsInWindow(0);
+            response.setGenerationWindowDays(DEFAULT_GENERATION_WINDOW_DAYS);
+            response.setGenerationProgressPercent(0.0);
         }
     }
 }

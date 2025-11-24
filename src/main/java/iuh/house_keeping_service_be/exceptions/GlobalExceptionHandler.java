@@ -4,6 +4,7 @@ import iuh.house_keeping_service_be.dtos.Booking.response.BookingErrorResponse;
 import iuh.house_keeping_service_be.dtos.EmployeeSchedule.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -66,6 +67,22 @@ public class GlobalExceptionHandler {
         );
         
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+    }
+
+    @ExceptionHandler(RecurringBookingValidationException.class)
+    public ResponseEntity<BookingErrorResponse> handleRecurringValidation(RecurringBookingValidationException ex) {
+        log.warn("Recurring booking validation failed: {}", ex.getErrors());
+
+        var response = BookingErrorResponse.builder()
+                .success(false)
+                .message(ex.getMessage())
+                .errorCode(ex.getErrorCode())
+                .validationErrors(ex.getErrors())
+                .conflicts(List.of())
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        return ResponseEntity.badRequest().body(response);
     }
 
     @ExceptionHandler(PriceCalculationException.class)

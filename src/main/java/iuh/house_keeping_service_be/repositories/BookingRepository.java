@@ -341,6 +341,15 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate);
 
+    @Query("SELECT COUNT(b) FROM Booking b " +
+           "WHERE b.recurringBooking.recurringBookingId = :recurringBookingId " +
+           "AND b.bookingTime BETWEEN :startDate AND :endDate " +
+           "AND b.status <> iuh.house_keeping_service_be.enums.BookingStatus.CANCELLED")
+    long countGeneratedRecurringBookingsInWindow(
+            @Param("recurringBookingId") String recurringBookingId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate);
+
     @Query("SELECT b FROM Booking b " +
            "WHERE b.recurringBooking.recurringBookingId = :recurringBookingId " +
            "AND b.bookingTime > :after " +
