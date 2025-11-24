@@ -37,14 +37,21 @@ public class EmployeeAssignmentController {
             @RequestParam(defaultValue = "10") int size) {
 
         try {
-            List<AssignmentDetailResponse> assignments = assignmentService
+            var pageResponse = assignmentService
                     .getEmployeeAssignments(employeeId, status, page, size);
 
             return ResponseEntity.ok(Map.of(
                     "success", true,
                     "message", "Lấy danh sách công việc thành công",
-                    "data", assignments,
-                    "totalItems", assignments.size()
+                    "data", pageResponse.getContent(),
+                    "pagination", Map.of(
+                            "currentPage", pageResponse.getCurrentPage(),
+                            "pageSize", pageResponse.getPageSize(),
+                            "totalItems", pageResponse.getTotalItems(),
+                            "totalPages", pageResponse.getTotalPages(),
+                            "hasNext", pageResponse.isHasNext(),
+                            "hasPrevious", pageResponse.isHasPrevious()
+                    )
             ));
 
         } catch (Exception e) {
