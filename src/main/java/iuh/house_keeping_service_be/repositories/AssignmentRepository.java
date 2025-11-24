@@ -148,6 +148,17 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
             @Param("employeeId") String employeeId,
             Pageable pageable);
 
+    @Query("SELECT COUNT(a) FROM Assignment a " +
+            "WHERE a.employee.employeeId = :employeeId")
+    long countByEmployeeId(@Param("employeeId") String employeeId);
+
+    @Query("SELECT COUNT(a) FROM Assignment a " +
+            "WHERE a.employee.employeeId = :employeeId " +
+            "AND a.status = :status")
+    long countByEmployeeIdAndStatus(
+            @Param("employeeId") String employeeId,
+            @Param("status") AssignmentStatus status);
+
     @Query("SELECT a FROM Assignment a " +
             "WHERE a.bookingDetail.booking.bookingId = :bookingId")
     List<Assignment> findByBookingIdWithStatus(@Param("bookingId") String bookingId);

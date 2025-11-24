@@ -3,6 +3,7 @@ package iuh.house_keeping_service_be.services.AssignmentService.impl;
 import iuh.house_keeping_service_be.dtos.Assignment.request.AssignmentCancelRequest;
 import iuh.house_keeping_service_be.dtos.Assignment.response.AssignmentDetailResponse;
 import iuh.house_keeping_service_be.dtos.Assignment.response.BookingSummary;
+import iuh.house_keeping_service_be.dtos.common.PageResponse;
 import iuh.house_keeping_service_be.enums.AssignmentStatus;
 import iuh.house_keeping_service_be.enums.BookingStatus;
 import iuh.house_keeping_service_be.enums.MediaType;
@@ -44,26 +45,32 @@ public class AssignmentServiceImpl implements AssignmentService {
     private final NotificationService notificationService;
 
     @Override
-    public List<AssignmentDetailResponse> getEmployeeAssignments(String employeeId, String status, int page, int size) {
+    public PageResponse<AssignmentDetailResponse> getEmployeeAssignments(String employeeId, String status, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "bookingDetail.booking.bookingTime"));
 
         List<Assignment> assignments;
+        long totalItems;
 
         if (status != null && !status.isEmpty()) {
             try {
                 AssignmentStatus assignmentStatus = AssignmentStatus.valueOf(status.toUpperCase());
                 assignments = assignmentRepository.findByEmployeeIdAndStatusWithDetails(employeeId, assignmentStatus, pageable);
+                totalItems = assignmentRepository.countByEmployeeIdAndStatus(employeeId, assignmentStatus);
             } catch (IllegalArgumentException e) {
                 log.warn("Invalid status provided: {}", status);
                 assignments = assignmentRepository.findByEmployeeIdWithDetails(employeeId, pageable);
+                totalItems = assignmentRepository.countByEmployeeId(employeeId);
             }
         } else {
             assignments = assignmentRepository.findByEmployeeIdWithDetails(employeeId, pageable);
+            totalItems = assignmentRepository.countByEmployeeId(employeeId);
         }
 
-        return assignments.stream()
+        List<AssignmentDetailResponse> content = assignments.stream()
                 .map(this::mapToAssignmentDetailResponse)
                 .collect(Collectors.toList());
+
+        return new PageResponse<>(content, page, size, totalItems);
     }
 
 //    @Override

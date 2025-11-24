@@ -6,13 +6,14 @@ import iuh.house_keeping_service_be.dtos.Assignment.response.AssignmentDetailRes
 import iuh.house_keeping_service_be.dtos.Assignment.response.AssignmentStatisticsByStatusResponse;
 import iuh.house_keeping_service_be.dtos.Assignment.response.BookingSummary;
 import iuh.house_keeping_service_be.dtos.Employee.response.EmployeeBookingStatisticsByStatusResponse;
+import iuh.house_keeping_service_be.dtos.common.PageResponse;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 public interface AssignmentService {
-    List<AssignmentDetailResponse> getEmployeeAssignments(String employeeId, String status, int page, int size);
+    PageResponse<AssignmentDetailResponse> getEmployeeAssignments(String employeeId, String status, int page, int size);
     boolean cancelAssignment(String assignmentId, AssignmentCancelRequest request);
     AssignmentDetailResponse acceptAssignment(String assignmentId, String employeeId);
 
