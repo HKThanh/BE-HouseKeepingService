@@ -4,6 +4,8 @@ import iuh.house_keeping_service_be.dtos.RecurringBooking.request.RecurringBooki
 import iuh.house_keeping_service_be.dtos.RecurringBooking.request.RecurringBookingCreateRequest;
 import iuh.house_keeping_service_be.dtos.RecurringBooking.response.RecurringBookingCreationSummary;
 import iuh.house_keeping_service_be.dtos.RecurringBooking.response.RecurringBookingResponse;
+import iuh.house_keeping_service_be.dtos.Booking.response.BookingErrorResponse;
+import iuh.house_keeping_service_be.exceptions.RecurringBookingValidationException;
 import iuh.house_keeping_service_be.services.RecurringBookingService.RecurringBookingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -54,6 +57,17 @@ public class RecurringBookingController {
                     )
             );
 
+        } catch (RecurringBookingValidationException e) {
+            log.error("Validation error creating recurring booking: {}", e.getErrors());
+            BookingErrorResponse errorResponse = BookingErrorResponse.builder()
+                    .success(false)
+                    .message(e.getMessage())
+                    .errorCode(e.getErrorCode())
+                    .validationErrors(e.getErrors())
+                    .conflicts(List.of())
+                    .timestamp(java.time.LocalDateTime.now())
+                    .build();
+            return ResponseEntity.badRequest().body(errorResponse);
         } catch (IllegalArgumentException e) {
             log.error("Validation error creating recurring booking: {}", e.getMessage());
             return ResponseEntity.badRequest().body(

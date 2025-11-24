@@ -19,6 +19,10 @@ public class RecurringBookingCreationSummary {
     private String message;
     private RecurringBookingResponse recurringBooking;
     private List<String> generatedBookingIds = new ArrayList<>();
-    private Integer totalBookingsToBeCreated; // Estimated number of bookings
+    private Integer totalBookingsToBeCreated; // Estimated number of bookings in the current window
+    private Integer expectedBookingsInWindow;
+    private Integer generatedBookingsInWindow;
+    private Integer generationWindowDays;
+    private Double generationProgressPercent;
     private ConversationResponse conversation;
 }

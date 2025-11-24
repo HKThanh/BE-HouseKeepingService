@@ -10,9 +10,12 @@ import iuh.house_keeping_service_be.services.NotificationService.NotificationSer
 import iuh.house_keeping_service_be.services.WebSocketNotificationService.WebSocketNotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -26,6 +29,9 @@ public class NotificationServiceImpl implements NotificationService {
     private final EmailService emailService;
     private final EmailRecipientResolver emailRecipientResolver;
     private final WebSocketNotificationService webSocketNotificationService;
+    @Lazy
+    @Autowired
+    private NotificationServiceImpl self;
     
     @Override
     @Transactional
@@ -49,15 +55,8 @@ public class NotificationServiceImpl implements NotificationService {
         log.info("Notification created successfully: {} for role: {}", 
                 saved.getNotificationId(), saved.getTargetRole());
         
-        // Send via email (if email available, otherwise skip)
-        dispatchEmailNotification(saved);
-        
-        // Send via WebSocket for real-time notification (with role-based routing)
-        webSocketNotificationService.sendNotificationToUser(
-                saved.getAccountId(), 
-                saved.getTargetRole(), 
-                saved
-        );
+        // Dispatch channels asynchronously to avoid slowing down request thread
+        self.dispatchNotificationChannelsAsync(saved);
         
         return NotificationResponse.fromEntity(saved);
     }
@@ -150,6 +149,25 @@ public class NotificationServiceImpl implements NotificationService {
         
         log.info("Deleted {} old read notifications", deleted);
         return deleted;
+    }
+
+    @Async
+    protected void dispatchNotificationChannelsAsync(Notification notification) {
+        try {
+            dispatchEmailNotification(notification);
+        } catch (Exception e) {
+            log.error("Failed to send email notification asynchronously for {}: {}", notification.getNotificationId(), e.getMessage(), e);
+        }
+
+        try {
+            webSocketNotificationService.sendNotificationToUser(
+                    notification.getAccountId(),
+                    notification.getTargetRole(),
+                    notification
+            );
+        } catch (Exception e) {
+            log.error("Failed to send websocket notification asynchronously for {}: {}", notification.getNotificationId(), e.getMessage(), e);
+        }
     }
     
     // ========== Specific Notification Methods ==========
