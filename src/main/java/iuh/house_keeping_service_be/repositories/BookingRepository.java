@@ -257,6 +257,54 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
            "ORDER BY b.bookingTime DESC")
     Page<Booking> findAllBookingsOrderByBookingTimeDesc(Pageable pageable);
 
+    // Find all bookings by status ordered by booking time descending (for admin)
+    @Query("SELECT b FROM Booking b " +
+           "LEFT JOIN FETCH b.customer c " +
+           "LEFT JOIN FETCH b.address a " +
+           "LEFT JOIN FETCH b.promotion p " +
+           "WHERE b.status = :status " +
+           "ORDER BY b.bookingTime DESC")
+    Page<Booking> findAllBookingsOrderByBookingTimeDescWithStatus(
+            @Param("status") BookingStatus status,
+            Pageable pageable);
+
+    // Find all bookings by status and date ordered by booking time descending (for admin)
+    @Query("SELECT b FROM Booking b " +
+           "LEFT JOIN FETCH b.customer c " +
+           "LEFT JOIN FETCH b.address a " +
+           "LEFT JOIN FETCH b.promotion p " +
+           "WHERE b.status = :status " +
+           "AND b.bookingTime >= :fromDate " +
+           "ORDER BY b.bookingTime DESC")
+    Page<Booking> findAllBookingsOrderByBookingTimeDescWithDateAndStatus(
+            @Param("status") BookingStatus status,
+            @Param("fromDate") java.time.LocalDateTime fromDate,
+            Pageable pageable);
+
+    // Find bookings whose payment is not PAID (unpaid) with optional booking status filter
+    @Query(value = "SELECT DISTINCT b FROM Booking b " +
+            "JOIN b.payments p " +
+            "WHERE p.paymentStatus <> iuh.house_keeping_service_be.enums.PaymentStatus.PAID " +
+            "AND (:status IS NULL OR b.status = :status) " +
+            "ORDER BY b.bookingTime DESC",
+            countQuery = "SELECT COUNT(DISTINCT b) FROM Booking b " +
+                    "JOIN b.payments p " +
+                    "WHERE p.paymentStatus <> iuh.house_keeping_service_be.enums.PaymentStatus.PAID " +
+                    "AND (:status IS NULL OR b.status = :status)")
+    Page<Booking> findUnpaidBookings(@Param("status") BookingStatus status, Pageable pageable);
+
+    // Find bookings whose payment is PAID with optional booking status filter
+    @Query(value = "SELECT DISTINCT b FROM Booking b " +
+            "JOIN b.payments p " +
+            "WHERE p.paymentStatus = iuh.house_keeping_service_be.enums.PaymentStatus.PAID " +
+            "AND (:status IS NULL OR b.status = :status) " +
+            "ORDER BY b.bookingTime DESC",
+            countQuery = "SELECT COUNT(DISTINCT b) FROM Booking b " +
+                    "JOIN b.payments p " +
+                    "WHERE p.paymentStatus = iuh.house_keeping_service_be.enums.PaymentStatus.PAID " +
+                    "AND (:status IS NULL OR b.status = :status)")
+    Page<Booking> findPaidBookings(@Param("status") BookingStatus status, Pageable pageable);
+
     // Find all bookings with date filter ordered by booking time descending (for admin)
     @Query("SELECT b FROM Booking b " +
            "LEFT JOIN FETCH b.customer c " +
@@ -321,6 +369,15 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
     Page<Booking> findBookingsByEmployeeIdOrderByBookingTimeWithDate(@Param("employeeId") String employeeId, 
                                                                       @Param("fromDate") java.time.LocalDateTime fromDate, 
                                                                       Pageable pageable);
+
+    // Search bookings by booking code with partial match
+    @Query("SELECT b FROM Booking b " +
+           "LEFT JOIN FETCH b.customer c " +
+           "LEFT JOIN FETCH b.address a " +
+           "LEFT JOIN FETCH b.promotion p " +
+           "WHERE LOWER(b.bookingCode) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+           "ORDER BY b.bookingTime DESC")
+    Page<Booking> searchBookingsByCode(@Param("keyword") String keyword, Pageable pageable);
     
     // Find bookings by status list and booking time range (for urgent booking notifications)
     @Query("SELECT b FROM Booking b WHERE b.status IN :statuses " +

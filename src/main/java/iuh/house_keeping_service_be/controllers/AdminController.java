@@ -5,6 +5,7 @@ import iuh.house_keeping_service_be.dtos.Booking.request.UpdateBookingStatusRequ
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingResponse;
 import iuh.house_keeping_service_be.dtos.Statistics.RevenueStatisticsResponse;
 import iuh.house_keeping_service_be.dtos.Statistics.ServiceBookingStatisticsResponse;
+import iuh.house_keeping_service_be.enums.BookingStatus;
 import iuh.house_keeping_service_be.services.AdminService.AdminService;
 import iuh.house_keeping_service_be.services.AuthorizationService.AuthorizationService;
 import iuh.house_keeping_service_be.services.BookingService.BookingService;
@@ -75,10 +76,11 @@ public class AdminController {
     public ResponseEntity<?> getAllBookings(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate) {
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime fromDate,
+            @RequestParam(required = false) BookingStatus status) {
         
-        log.info("Admin fetching all bookings sorted by booking time (page: {}, size: {}, fromDate: {})", 
-                 page, size, fromDate);
+        log.info("Admin fetching all bookings sorted by booking time (page: {}, size: {}, fromDate: {}, status: {})", 
+                 page, size, fromDate, status);
         
         try {
             // Validate pagination parameters
@@ -86,13 +88,7 @@ public class AdminController {
             if (size <= 0 || size > 100) size = 10;
             
             Pageable pageable = PageRequest.of(page, size);
-            Page<BookingResponse> allBookings;
-            
-            if (fromDate != null) {
-                allBookings = bookingService.getAllBookingsSortedByBookingTime(fromDate, pageable);
-            } else {
-                allBookings = bookingService.getAllBookingsSortedByBookingTime(pageable);
-            }
+            Page<BookingResponse> allBookings = bookingService.getAllBookingsSortedByBookingTime(fromDate, status, pageable);
             
             return ResponseEntity.ok(Map.of(
                 "success", true,
@@ -106,6 +102,78 @@ public class AdminController {
             return ResponseEntity.status(500).body(Map.of(
                 "success", false,
                 "message", "Đã xảy ra lỗi khi lấy danh sách booking"
+            ));
+        }
+    }
+
+    @GetMapping("/bookings/search")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    public ResponseEntity<?> searchBookingsByCode(
+            @RequestParam String bookingCode,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        log.info("Admin searching bookings by code '{}' (page: {}, size: {})", bookingCode, page, size);
+
+        try {
+            if (bookingCode == null || bookingCode.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "bookingCode không được để trống"
+                ));
+            }
+
+            if (page < 0) page = 0;
+            if (size <= 0 || size > 100) size = 10;
+
+            Pageable pageable = PageRequest.of(page, size);
+            Page<BookingResponse> bookings = bookingService.searchBookingsByBookingCode(bookingCode.trim(), pageable);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "data", bookings.getContent(),
+                    "currentPage", bookings.getNumber(),
+                    "totalItems", bookings.getTotalElements(),
+                    "totalPages", bookings.getTotalPages()
+            ));
+        } catch (Exception e) {
+            log.error("Error searching bookings by code {}: {}", bookingCode, e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "success", false,
+                    "message", "Đã xảy ra lỗi khi tìm kiếm booking"
+            ));
+        }
+    }
+
+    @GetMapping("/bookings/unpaid")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    public ResponseEntity<?> getUnpaidBookings(
+            @RequestParam(required = false) BookingStatus status,
+            @RequestParam(required = false, defaultValue = "false") Boolean isPaid,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
+        log.info("Admin fetching bookings by payment flag (isPaid: {}) with status: {}, page: {}, size: {}", isPaid, status, page, size);
+
+        try {
+            if (page < 0) page = 0;
+            if (size <= 0 || size > 100) size = 10;
+
+            Pageable pageable = PageRequest.of(page, size);
+            Page<BookingResponse> bookings = bookingService.getBookingsByPaymentFlag(isPaid, status, pageable);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "data", bookings.getContent(),
+                    "currentPage", bookings.getNumber(),
+                    "totalItems", bookings.getTotalElements(),
+                    "totalPages", bookings.getTotalPages()
+            ));
+        } catch (Exception e) {
+            log.error("Error fetching unpaid bookings with status {}: {}", status, e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "success", false,
+                    "message", "Đã xảy ra lỗi khi lấy danh sách booking chưa thanh toán"
             ));
         }
     }

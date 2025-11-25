@@ -11,6 +11,7 @@ import iuh.house_keeping_service_be.dtos.Booking.response.BookingStatisticsBySta
 import iuh.house_keeping_service_be.dtos.Booking.summary.BookingCreationSummary;
 import iuh.house_keeping_service_be.dtos.Booking.summary.MultipleBookingCreationSummary;
 import iuh.house_keeping_service_be.dtos.Booking.internal.BookingValidationResult;
+import iuh.house_keeping_service_be.enums.BookingStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -47,6 +48,13 @@ public interface BookingService {
     // Get all bookings sorted by booking time descending (for Admin only)
     Page<BookingResponse> getAllBookingsSortedByBookingTime(Pageable pageable);
     Page<BookingResponse> getAllBookingsSortedByBookingTime(LocalDateTime fromDate, Pageable pageable);
+    Page<BookingResponse> getAllBookingsSortedByBookingTime(LocalDateTime fromDate, BookingStatus status, Pageable pageable);
+    
+    // Get bookings filtered by paid/unpaid state with optional booking status filter
+    Page<BookingResponse> getBookingsByPaymentFlag(Boolean isPaid, BookingStatus status, Pageable pageable);
+    
+    // Search bookings by booking code (partial match) for Admin
+    Page<BookingResponse> searchBookingsByBookingCode(String bookingCode, Pageable pageable);
     
     // Get bookings where employee has assignment, sorted by booking time
     Page<BookingResponse> getBookingsByEmployeeId(String employeeId, Pageable pageable);

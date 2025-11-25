@@ -1684,9 +1684,30 @@ public class BookingServiceImpl implements BookingService {
     @Override
     @Transactional(readOnly = true)
     public Page<BookingResponse> getAllBookingsSortedByBookingTime(Pageable pageable) {
-        log.info("Admin fetching all bookings sorted by booking time descending");
+        return getAllBookingsSortedByBookingTime(null, null, pageable);
+    }
 
-        Page<Booking> allBookings = bookingRepository.findAllBookingsOrderByBookingTimeDesc(pageable);
+    @Override
+    @Transactional(readOnly = true)
+    public Page<BookingResponse> getAllBookingsSortedByBookingTime(LocalDateTime fromDate, Pageable pageable) {
+        return getAllBookingsSortedByBookingTime(fromDate, null, pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<BookingResponse> getAllBookingsSortedByBookingTime(LocalDateTime fromDate, BookingStatus status, Pageable pageable) {
+        log.info("Admin fetching all bookings sorted by booking time descending with fromDate: {}, status: {}", fromDate, status);
+
+        Page<Booking> allBookings;
+        if (status != null && fromDate != null) {
+            allBookings = bookingRepository.findAllBookingsOrderByBookingTimeDescWithDateAndStatus(status, fromDate, pageable);
+        } else if (status != null) {
+            allBookings = bookingRepository.findAllBookingsOrderByBookingTimeDescWithStatus(status, pageable);
+        } else if (fromDate != null) {
+            allBookings = bookingRepository.findAllBookingsOrderByBookingTimeDescWithDate(fromDate, pageable);
+        } else {
+            allBookings = bookingRepository.findAllBookingsOrderByBookingTimeDesc(pageable);
+        }
 
         Page<BookingResponse> response = allBookings.map(bookingMapper::toBookingResponse);
 
@@ -1700,22 +1721,36 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<BookingResponse> getAllBookingsSortedByBookingTime(LocalDateTime fromDate, Pageable pageable) {
-        log.info("Admin fetching all bookings sorted by booking time descending with fromDate: {}", fromDate);
+    public Page<BookingResponse> searchBookingsByBookingCode(String bookingCode, Pageable pageable) {
+        log.info("Admin searching bookings by booking code: {}", bookingCode);
 
-        Page<Booking> allBookings;
-        if (fromDate != null) {
-            allBookings = bookingRepository.findAllBookingsOrderByBookingTimeDescWithDate(fromDate, pageable);
-        } else {
-            allBookings = bookingRepository.findAllBookingsOrderByBookingTimeDesc(pageable);
-        }
+        Page<Booking> bookings = bookingRepository.searchBookingsByCode(bookingCode, pageable);
+        Page<BookingResponse> response = bookings.map(bookingMapper::toBookingResponse);
 
-        Page<BookingResponse> response = allBookings.map(bookingMapper::toBookingResponse);
+        log.info("Found {} bookings matching code '{}' (page {} of {})",
+                bookings.getNumberOfElements(),
+                bookingCode,
+                bookings.getNumber() + 1,
+                bookings.getTotalPages());
+
+        return response;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<BookingResponse> getBookingsByPaymentFlag(Boolean isPaid, BookingStatus status, Pageable pageable) {
+        boolean targetPaid = Boolean.TRUE.equals(isPaid);
+        log.info("Admin fetching bookings by payment flag. isPaid: {}, status: {}", targetPaid, status);
+
+        Page<Booking> bookings = targetPaid
+                ? bookingRepository.findPaidBookings(status, pageable)
+                : bookingRepository.findUnpaidBookings(status, pageable);
+        Page<BookingResponse> response = bookings.map(bookingMapper::toBookingResponse);
 
         log.info("Found {} bookings (page {} of {})",
-                allBookings.getNumberOfElements(),
-                allBookings.getNumber() + 1,
-                allBookings.getTotalPages());
+                bookings.getNumberOfElements(),
+                bookings.getNumber() + 1,
+                bookings.getTotalPages());
 
         return response;
     }
