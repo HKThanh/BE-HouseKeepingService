@@ -31,10 +31,11 @@ All endpoints require:
 ## API Endpoints Covered
 1. **GET /{employeeId}/assignments** - Get Employee Assignments
 2. **POST /assignments/{assignmentId}/cancel** - Cancel Assignment
-3. **GET /available-bookings** - Get Available Bookings
-4. **POST /booking-details/{detailId}/accept** - Accept Booking Detail
-5. **POST /assignments/{assignmentId}/check-in** - Check In Assignment
-6. **POST /assignments/{assignmentId}/check-out** - Check Out Assignment
+3. **POST /assignments/{assignmentId}/accept** - Accept Pending Assignment
+4. **GET /available-bookings** - Get Available Bookings
+5. **POST /booking-details/{detailId}/accept** - Accept Booking Detail
+6. **POST /assignments/{assignmentId}/check-in** - Check In Assignment
+7. **POST /assignments/{assignmentId}/check-out** - Check Out Assignment
 
 ---
 
@@ -533,10 +534,79 @@ All endpoints require:
 
 ---
 
+## POST /assignments/{assignmentId}/accept - Accept Pending Assignment
+
+### Test Case 5: Successful Acceptance of Pending Assignment
+- **Test Case ID**: TC_EMP_ASSIGN_005
+- **Description**: Verify Jane Smith can accept her pending assignment and lock the timeslot
+- **Preconditions**:
+  - Assignment `as000001-0000-0000-0000-000000000006` exists in PENDING status
+  - Booking BK000011 (Tổng vệ sinh) scheduled for November 25, 2025 at 08:00 in TP. Hồ Chí Minh
+  - Valid JWT token with EMPLOYEE role for Jane Smith
+- **Input**:
+  - **Path Parameter**: assignmentId = "as000001-0000-0000-0000-000000000006"
+  - **Query Parameters**: employeeId = "e1000001-0000-0000-0000-000000000001"
+  - **Headers**: 
+    ```
+    Authorization: Bearer <jane_smith_employee_token>
+    Content-Type: application/json
+    ```
+- **Expected Output**:
+  ```json
+  {
+    "success": true,
+    "message": "Nhận công việc thành công",
+    "data": {
+      "assignmentId": "as000001-0000-0000-0000-000000000006",
+      "bookingCode": "BK000011",
+      "serviceName": "Tổng vệ sinh",
+      "customerName": "Trần Thị Bích",
+      "customerPhone": "0976543210",
+      "serviceAddress": "128 Trần Hưng Đạo, Phường Chánh Hiệp, Thành phố Hồ Chí Minh",
+      "bookingTime": "2025-11-25 08:00:00",
+      "estimatedDurationHours": 2.00,
+      "pricePerUnit": 100000.00,
+      "quantity": 2,
+      "totalAmount": 200000.00,
+      "status": "ASSIGNED",
+      "assignedAt": null,
+      "checkInTime": null,
+      "checkOutTime": null,
+      "note": "Test nhiều assignments - Tổng vệ sinh căn hộ lớn"
+    }
+  }
+  ```
+- **Status Code**: 200 OK
+
+### Test Case 6: Cannot Accept When Already Assigned
+- **Test Case ID**: TC_EMP_ASSIGN_006
+- **Description**: Verify acceptance is rejected when assignment is not in PENDING status
+- **Preconditions**:
+  - Assignment `as000001-0000-0000-0000-000000000005` for booking BK000010 is in ASSIGNED status
+  - Valid JWT token with EMPLOYEE role for Jane Smith
+- **Input**:
+  - **Path Parameter**: assignmentId = "as000001-0000-0000-0000-000000000005"
+  - **Query Parameters**: employeeId = "e1000001-0000-0000-0000-000000000001"
+  - **Headers**: 
+    ```
+    Authorization: Bearer <jane_smith_employee_token>
+    Content-Type: application/json
+    ```
+- **Expected Output**:
+  ```json
+  {
+    "success": false,
+    "message": "Không thể nhận công việc đang ở trạng thái ASSIGNED. Chỉ có thể nhận công việc đang ở trạng thái PENDING."
+  }
+  ```
+- **Status Code**: 400 Bad Request
+
+---
+
 ## GET /available-bookings - Get Available Bookings
 
-### Test Case 5: Zone-Based Booking Retrieval
-- **Test Case ID**: TC_EMP_ASSIGN_005
+### Test Case 7: Zone-Based Booking Retrieval
+- **Test Case ID**: TC_EMP_ASSIGN_007
 - **Description**: Verify Jane Smith gets bookings from her working zones (Tân Phú, Tân Bình) prioritized first
 - **Preconditions**:
   - Jane Smith has working zones: Quận Tân Phú, Quận Tân Bình in TP. Hồ Chí Minh
@@ -573,8 +643,8 @@ All endpoints require:
   ```
 - **Status Code**: 200 OK
 
-### Test Case 6: No Available Bookings
-- **Test Case ID**: TC_EMP_ASSIGN_006
+### Test Case 8: No Available Bookings
+- **Test Case ID**: TC_EMP_ASSIGN_008
 - **Description**: Verify proper handling when no bookings are available for the employee
 - **Preconditions**:
   - No available bookings exist for the employee in any zone
@@ -604,8 +674,8 @@ All endpoints require:
 
 ## POST /booking-details/{detailId}/accept - Accept Booking Detail
 
-### Test Case 7: Successful Booking Detail Acceptance
-- **Test Case ID**: TC_EMP_ASSIGN_007
+### Test Case 9: Successful Booking Detail Acceptance
+- **Test Case ID**: TC_EMP_ASSIGN_009
 - **Description**: Verify Jane Smith can successfully accept an air conditioner cleaning booking
 - **Preconditions**:
   - Booking detail exists for "Vệ sinh máy lạnh" service with ID 'bd000001-0000-0000-0000-000000000005'
@@ -639,19 +709,19 @@ All endpoints require:
   ```
 - **Status Code**: 200 OK
 
-### Test Case 8: Booking Acceptance Conflict Scenarios
-- **Test Case ID**: TC_EMP_ASSIGN_008
+### Test Case 10: Booking Acceptance Conflict Scenarios
+- **Test Case ID**: TC_EMP_ASSIGN_010
 - **Description**: Verify comprehensive error handling for various booking acceptance conflicts
 - **Sub-scenarios**:
-  - **8a**: Employee already assigned to same booking detail
-  - **8b**: Booking detail already at capacity (has enough employees)
-  - **8c**: Employee has schedule conflict with existing assignment
-  - **8d**: Employee has approved leave during booking time
-  - **8e**: Booking is in invalid status (CANCELLED)
-- **Input Example (8a)**:
+  - **10a**: Employee already assigned to same booking detail
+  - **10b**: Booking detail already at capacity (has enough employees)
+  - **10c**: Employee has schedule conflict with existing assignment
+  - **10d**: Employee has approved leave during booking time
+  - **10e**: Booking is in invalid status (CANCELLED)
+- **Input Example (10a)**:
   - **Path Parameter**: detailId = "bd000001-0000-0000-0000-000000000002"
   - **Query Parameters**: employeeId = "e1000001-0000-0000-0000-000000000001"
-- **Expected Output (8a)**:
+- **Expected Output (10a)**:
   ```json
   {
     "success": false,
@@ -660,8 +730,8 @@ All endpoints require:
   ```
 - **Status Code**: 400 Bad Request
 
-### Test Case 9: Multi-Staff Service Coordination
-- **Test Case ID**: TC_EMP_ASSIGN_009
+### Test Case 11: Multi-Staff Service Coordination
+- **Test Case ID**: TC_EMP_ASSIGN_011
 - **Description**: Verify booking status updates to CONFIRMED when all positions are filled for multi-staff services
 - **Preconditions**:
   - Multi-staff service booking (Tổng vệ sinh requires 3 employees)
@@ -696,14 +766,14 @@ All endpoints require:
 
 ## Authorization and Error Scenarios
 
-### Test Case 10: Role-Based Authorization Validation
-- **Test Case ID**: TC_EMP_ASSIGN_010
+### Test Case 12: Role-Based Authorization Validation
+- **Test Case ID**: TC_EMP_ASSIGN_012
 - **Description**: Verify proper role-based access control across all endpoints
 - **Sub-scenarios**:
-  - **10a**: ADMIN cannot accept booking details (EMPLOYEE role required)
-  - **10b**: ADMIN can view employee assignments
-  - **10c**: Invalid/expired JWT tokens are rejected
-- **Input Example (10a)**:
+  - **12a**: ADMIN cannot accept booking details (EMPLOYEE role required)
+  - **12b**: ADMIN can view employee assignments
+  - **12c**: Invalid/expired JWT tokens are rejected
+- **Input Example (12a)**:
   - **Path Parameter**: detailId = "bd000001-0000-0000-0000-000000000005"
   - **Query Parameters**: employeeId = "e1000001-0000-0000-0000-000000000001"
   - **Headers**:
@@ -711,7 +781,7 @@ All endpoints require:
     Authorization: Bearer <admin_one_token>
     Content-Type: application/json
     ```
-- **Expected Output (10a)**:
+- **Expected Output (12a)**:
   ```json
   {
     "success": false,
@@ -720,16 +790,16 @@ All endpoints require:
   ```
 - **Status Code**: 403 Forbidden
 
-### Test Case 11: Data Validation and Edge Cases
-- **Test Case ID**: TC_EMP_ASSIGN_011
+### Test Case 13: Data Validation and Edge Cases
+- **Test Case ID**: TC_EMP_ASSIGN_013
 - **Description**: Verify proper validation and edge case handling across all endpoints
 - **Sub-scenarios**:
-  - **11a**: Missing/invalid request body for assignment cancellation
-  - **11b**: Non-existent employee ID for available bookings
-  - **11c**: Non-existent assignment ID for cancellation
-  - **11d**: Duration calculation with null service duration (defaults to 2 hours)
-  - **11e**: Employee with no working zones configured (fallback to general bookings)
-- **Input Example (11a)**:
+  - **13a**: Missing/invalid request body for assignment cancellation
+  - **13b**: Non-existent employee ID for available bookings
+  - **13c**: Non-existent assignment ID for cancellation
+  - **13d**: Duration calculation with null service duration (defaults to 2 hours)
+  - **13e**: Employee with no working zones configured (fallback to general bookings)
+- **Input Example (13a)**:
   - **Path Parameter**: assignmentId = "as000001-0000-0000-0000-000000000002"
   - **Request Body**:
     ```json
@@ -738,7 +808,7 @@ All endpoints require:
       "employeeId": null
     }
     ```
-- **Expected Output (11a)**:
+- **Expected Output (13a)**:
   ```json
   {
     "success": false,
@@ -751,8 +821,8 @@ All endpoints require:
 
 ## POST /assignments/{assignmentId}/check-in - Check In Assignment
 
-### Test Case 12: Successful Check-In Within Time Window
-- **Test Case ID**: TC_EMP_ASSIGN_012
+### Test Case 14: Successful Check-In Within Time Window
+- **Test Case ID**: TC_EMP_ASSIGN_014
 - **Description**: Verify employee can check in to assignment within the allowed time window (10 minutes before to 5 minutes after booking time)
 - **Preconditions**:
   - Assignment exists with ASSIGNED status
@@ -803,8 +873,8 @@ All endpoints require:
   ```
 - **Status Code**: 200 OK
 
-### Test Case 13: Check-In Outside Time Window
-- **Test Case ID**: TC_EMP_ASSIGN_013
+### Test Case 15: Check-In Outside Time Window
+- **Test Case ID**: TC_EMP_ASSIGN_015
 - **Description**: Verify check-in is rejected when attempted outside the allowed time window
 - **Preconditions**:
   - Assignment exists with ASSIGNED status
@@ -828,8 +898,8 @@ All endpoints require:
   ```
 - **Status Code**: 400 Bad Request
 
-### Test Case 14: Check-In Already Completed
-- **Test Case ID**: TC_EMP_ASSIGN_014
+### Test Case 16: Check-In Already Completed
+- **Test Case ID**: TC_EMP_ASSIGN_016
 - **Description**: Verify employee cannot check in twice to the same assignment
 - **Preconditions**:
   - Assignment already has check-in time recorded
@@ -851,8 +921,8 @@ All endpoints require:
   ```
 - **Status Code**: 400 Bad Request
 
-### Test Case 15: Check-In Wrong Assignment Status
-- **Test Case ID**: TC_EMP_ASSIGN_015
+### Test Case 17: Check-In Wrong Assignment Status
+- **Test Case ID**: TC_EMP_ASSIGN_017
 - **Description**: Verify check-in is rejected for assignments not in ASSIGNED status
 - **Preconditions**:
   - Assignment exists with COMPLETED status (not ASSIGNED)
@@ -878,8 +948,8 @@ All endpoints require:
 
 ## POST /assignments/{assignmentId}/check-out - Check Out Assignment
 
-### Test Case 16: Successful Check-Out After Work Completion
-- **Test Case ID**: TC_EMP_ASSIGN_016
+### Test Case 18: Successful Check-Out After Work Completion
+- **Test Case ID**: TC_EMP_ASSIGN_018
 - **Description**: Verify employee can successfully check out from assignment after completing work
 - **Preconditions**:
   - Assignment exists with IN_PROGRESS status
@@ -929,8 +999,8 @@ All endpoints require:
   ```
 - **Status Code**: 200 OK
 
-### Test Case 17: Check-Out Without Check-In
-- **Test Case ID**: TC_EMP_ASSIGN_017
+### Test Case 19: Check-Out Without Check-In
+- **Test Case ID**: TC_EMP_ASSIGN_019
 - **Description**: Verify check-out is rejected for assignments that haven't been checked in
 - **Preconditions**:
   - Assignment exists with ASSIGNED status (not checked in yet)
@@ -952,8 +1022,8 @@ All endpoints require:
   ```
 - **Status Code**: 400 Bad Request
 
-### Test Case 18: Double Check-Out Prevention
-- **Test Case ID**: TC_EMP_ASSIGN_018
+### Test Case 20: Double Check-Out Prevention
+- **Test Case ID**: TC_EMP_ASSIGN_020
 - **Description**: Verify employee cannot check out twice from the same assignment
 - **Preconditions**:
   - Assignment already has check-out time recorded
@@ -975,8 +1045,8 @@ All endpoints require:
   ```
 - **Status Code**: 400 Bad Request
 
-### Test Case 19: Booking Status Update After All Assignments Complete
-- **Test Case ID**: TC_EMP_ASSIGN_019
+### Test Case 21: Booking Status Update After All Assignments Complete
+- **Test Case ID**: TC_EMP_ASSIGN_021
 - **Description**: Verify booking status updates to COMPLETED when all assigned employees check out
 - **Preconditions**:
   - Multi-staff booking with multiple assignments
@@ -1020,8 +1090,8 @@ All endpoints require:
 
 ## Database Integration Test Scenarios
 
-### Test Case 20: Real Database Integration
-- **Test Case ID**: TC_EMP_ASSIGN_020
+### Test Case 22: Real Database Integration
+- **Test Case ID**: TC_EMP_ASSIGN_022
 - **Description**: Verify integration with actual database data from housekeeping_service_v8.sql
 - **Covered Data**:
   - **Employees**: Jane Smith (e1000001-0000-0000-0000-000000000001), Bob Wilson (e1000001-0000-0000-0000-000000000002)
