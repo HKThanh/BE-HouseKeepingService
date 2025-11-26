@@ -6,18 +6,38 @@ spring:
     username: postgres
     password: 123456
     driver-class-name: org.postgresql.Driver
+    # HikariCP connection pool settings for better performance
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
       ddl-auto: validate
-    show-sql: true
+    show-sql: false  # Disable SQL logging in production for better performance
     properties:
       hibernate:
         jdbc:
           time_zone: Asia/Ho_Chi_Minh
+          # OPTIMIZATION: Enable batch inserts/updates for better performance
+          batch_size: 25
+          batch_versioned_data: true
+        # OPTIMIZATION: Order inserts and updates for batch grouping
+        order_inserts: true
+        order_updates: true
+        # OPTIMIZATION: Enable batch fetch for lazy collections
+        default_batch_fetch_size: 16
+        # OPTIMIZATION: Disable generation of SQL statistics (reduces overhead)
+        generate_statistics: false
   logging:
     level:
-      iuh.house_keeping_service_be: DEBUG
+      iuh.house_keeping_service_be: INFO
+      # Reduce Hibernate logging overhead
+      org.hibernate.SQL: WARN
+      org.hibernate.type.descriptor.sql: WARN
   data:
     redis:
       host: localhost

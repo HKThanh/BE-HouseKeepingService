@@ -15,6 +15,7 @@ CREATE TABLE payment_methods (
      method_name VARCHAR(100) NOT NULL,
      is_active BOOLEAN DEFAULT TRUE,
      description TEXT,
+     iconURL VARCHAR(255),
      created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
      updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

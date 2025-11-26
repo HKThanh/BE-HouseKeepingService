@@ -26,43 +26,118 @@ Sau khi tạo recurring booking, hệ thống sẽ tự động tạo (hoặc t�
   - Response 201 (đã rút gọn):
     ```json
     {
-      "success": true,
-      "message": "Đặt lịch định kỳ thành công",
-      "data": {
+    "success": true,
+    "message": "Đặt lịch định kỳ thành công",
+    "data": {
         "success": true,
         "message": "Đặt lịch định kỳ thành công",
         "recurringBooking": {
-          "recurringBookingId": "rb000001-...",
-          "customerId": "c1000001-...",
-          "title": "Recurring clean",
-          "status": "ACTIVE",
-          "bookingTime": "09:00:00",
-          "startDate": "2025-11-25",
-          "endDate": "2025-12-31",
-          "recurringBookingDetails": [
-            { "serviceId": 1, "serviceName": "Vệ sinh nhà cửa", "quantity": 1, "pricePerUnit": 120000 }
-          ],
-          "upcomingBookings": 2,
-          "totalGeneratedBookings": 2
+            "recurringBookingId": "dd1a0a33-8cb3-4e11-9a82-f9cffdeb65ee",
+            "customerId": "c1000001-0000-0000-0000-000000000004",
+            "customerName": "Nguyễn Văn An",
+            "customer": {
+                "customerId": "c1000001-0000-0000-0000-000000000004",
+                "fullName": "Nguyễn Văn An",
+                "avatar": "https://i.pravatar.cc/150?img=11",
+                "email": "nguyenvanan@gmail.com",
+                "phoneNumber": "0987654321",
+                "isMale": true,
+                "birthdate": "1995-03-15",
+                "rating": null,
+                "vipLevel": null
+            },
+            "address": {
+                "addressId": "adrs0001-0000-0000-0000-000000000009",
+                "fullAddress": "45 Nguyễn Huệ, Phường Phú An, Thành phố Hồ Chí Minh",
+                "ward": "Phường Phú An",
+                "city": "Thành phố Hồ Chí Minh",
+                "latitude": 10.7743,
+                "longitude": 106.7043,
+                "isDefault": true
+            },
+            "recurrenceType": "WEEKLY",
+            "recurrenceTypeDisplay": "Hàng tuần",
+            "recurrenceDays": [
+                1,
+                2,
+                4
+            ],
+            "recurrenceDaysDisplay": "Thứ 2, Thứ 3, Thứ 5",
+            "bookingTime": "08:00:00",
+            "startDate": "2025-11-27",
+            "endDate": "2026-01-01",
+            "note": "Vệ sinh định kỳ căn hộ 2 phòng ngủ",
+            "title": "Dọn dẹp hàng tuần",
+            "promotion": null,
+            "recurringBookingDetails": [
+                {
+                    "bookingDetailId": "abd5fa1d-046e-4fac-a96d-9bac273c395c",
+                    "service": {
+                        "serviceId": 1,
+                        "name": "Dọn dẹp theo giờ",
+                        "description": "Lau dọn, hút bụi, làm sạch các bề mặt cơ bản trong nhà. Phù hợp cho nhu cầu duy trì vệ sinh hàng tuần.",
+                        "basePrice": 50000.00,
+                        "unit": "Giờ",
+                        "estimatedDurationHours": 2.0,
+                        "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599899/Cleaning_Clock_z29juh.png",
+                        "categoryName": "Dọn dẹp nhà",
+                        "isActive": true
+                    },
+                    "quantity": 1,
+                    "pricePerUnit": 50000.00,
+                    "formattedPricePerUnit": "50,000 đ",
+                    "subTotal": 50000.00,
+                    "formattedSubTotal": "50,000 đ",
+                    "selectedChoices": [],
+                    "assignments": [],
+                    "duration": "2.0h",
+                    "formattedDuration": "2.0h"
+                }
+            ],
+            "assignedEmployeeId": "e1000001-0000-0000-0000-000000000020",
+            "assignedEmployeeName": "Phạm Thị Dung Em",
+            "status": "ACTIVE",
+            "statusDisplay": "Đang hoạt động",
+            "cancelledAt": null,
+            "cancellationReason": null,
+            "createdAt": "2025-11-26T21:43:06",
+            "updatedAt": "2025-11-26T21:43:06",
+            "totalGeneratedBookings": 3,
+            "upcomingBookings": 3,
+            "expectedBookingsInWindow": 4,
+            "generatedBookingsInWindow": 3,
+            "generationWindowDays": 7,
+            "generationProgressPercent": 75.0
         },
         "generatedBookingIds": [
-          "b0000001-0000-0000-0000-000000000010",
-          "b0000001-0000-0000-0000-000000000011"
+            "bf2f7c6a-6608-4fad-9417-b486105be6e9",
+            "b6f25b01-2806-4246-8c33-3bd234e0ae5f",
+            "7a294acf-f251-46d6-a0c8-eefda5ea8932"
         ],
-        "totalBookingsToBeCreated": 2,
+        "totalBookingsToBeCreated": 4,
+        "expectedBookingsInWindow": 4,
+        "generatedBookingsInWindow": 3,
+        "generationWindowDays": 7,
+        "generationProgressPercent": 75.0,
         "conversation": {
-          "conversationId": "conv-rec-0001",
-          "customerId": "c1000001-0000-0000-0000-000000000001",
-          "employeeId": "e1000001-0000-0000-0000-000000000003",
-          "bookingId": "b0000001-0000-0000-0000-000000000010",
-          "recurringBookingId": "rb000001-...",
-          "lastMessage": "Xin chào. Tôi là ...",
-          "lastMessageTime": "2025-11-21T09:00:00",
-          "isActive": true,
-          "canChat": true
+            "conversationId": "190ed24d-cf48-426d-a79e-3188965775fa",
+            "customerId": "c1000001-0000-0000-0000-000000000004",
+            "customerName": "Nguyễn Văn An",
+            "customerAvatar": "https://i.pravatar.cc/150?img=11",
+            "employeeId": "e1000001-0000-0000-0000-000000000020",
+            "employeeName": "Phạm Thị Dung Em",
+            "employeeAvatar": "https://i.pravatar.cc/150?img=45",
+            "bookingId": null,
+            "recurringBookingId": "dd1a0a33-8cb3-4e11-9a82-f9cffdeb65ee",
+            "lastMessage": "Xin chào. Tôi là Phạm Thị Dung Em sẽ đồng hành cùng lịch sử dụng dịch vụ Dọn dẹp theo giờ định kỳ của bạn tại 45 Nguyễn Huệ, Phường Phú An, Thành phố Hồ Chí Minh vào lúc 08:00 Thứ 2, Thứ 3, Thứ 5 mỗi tuần. Nếu bạn có câu hỏi, hãy nhắn tin tại đây.",
+            "lastMessageTime": "2025-11-26T21:43:31.317952955",
+            "isActive": true,
+            "canChat": true,
+            "createdAt": null,
+            "updatedAt": null
         }
-      }
     }
+  }
     ```
 - Lưu ý:
   - BE sẽ cố gắng tìm nhân viên từ assignment của các booking vừa tạo (bỏ assignment CANCELLED). Nếu tìm được, conversation được tạo và trả về.
