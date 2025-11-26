@@ -2,6 +2,7 @@ package iuh.house_keeping_service_be.services.WebSocketNotificationService;
 
 import iuh.house_keeping_service_be.dtos.Notification.NotificationWebSocketDTO;
 import iuh.house_keeping_service_be.models.Notification;
+import iuh.house_keeping_service_be.repositories.NotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 public class WebSocketNotificationService {
 
     private final SimpMessagingTemplate messagingTemplate;
+    private final NotificationRepository notificationRepository;
 
     /**
      * Send notification to a specific user via WebSocket with role-based routing
@@ -28,7 +30,8 @@ public class WebSocketNotificationService {
      */
     public void sendNotificationToUser(String accountId, String targetRole, Notification notification) {
         try {
-            NotificationWebSocketDTO dto = NotificationWebSocketDTO.fromEntity(notification);
+            Long unreadCount = calculateUnreadCount(accountId);
+            NotificationWebSocketDTO dto = NotificationWebSocketDTO.fromEntity(notification, unreadCount);
             
             // Build role-specific destination
             String destination = (targetRole != null && !targetRole.isEmpty())
@@ -97,15 +100,44 @@ public class WebSocketNotificationService {
      */
     public void sendNotificationDTOToUser(String accountId, NotificationWebSocketDTO dto) {
         try {
+            NotificationWebSocketDTO enrichedDto = dto.getUnreadCount() == null
+                    ? NotificationWebSocketDTO.builder()
+                        .notificationId(dto.getNotificationId())
+                        .accountId(dto.getAccountId())
+                        .targetRole(dto.getTargetRole())
+                        .type(dto.getType())
+                        .title(dto.getTitle())
+                        .message(dto.getMessage())
+                        .relatedId(dto.getRelatedId())
+                        .relatedType(dto.getRelatedType())
+                        .priority(dto.getPriority())
+                        .actionUrl(dto.getActionUrl())
+                        .createdAt(dto.getCreatedAt())
+                        .unreadCount(calculateUnreadCount(accountId))
+                        .build()
+                    : dto;
+            
             messagingTemplate.convertAndSendToUser(
                 accountId,
                 "/queue/notifications",
-                dto
+                enrichedDto
             );
             
             log.info("Sent custom WebSocket notification to user: {}", accountId);
         } catch (Exception e) {
             log.error("Failed to send custom WebSocket notification to user: {}", accountId, e);
+        }
+    }
+
+    private Long calculateUnreadCount(String accountId) {
+        if (accountId == null || accountId.isBlank()) {
+            return null;
+        }
+        try {
+            return notificationRepository.countUnreadByAccountId(accountId);
+        } catch (Exception ex) {
+            log.warn("Failed to calculate unread count for account {}: {}", accountId, ex.getMessage());
+            return null;
         }
     }
 }

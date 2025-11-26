@@ -185,11 +185,11 @@ VALUES (
  AND label = 'Có' LIMIT 1)
 );
 
-INSERT INTO payment_methods (method_code, method_name, is_active) VALUES
-('CASH', 'Thanh toán tiền mặt', TRUE),
-('MOMO', 'Ví điện tử Momo', TRUE),
-('VNPAY', 'Cổng thanh toán VNPAY', TRUE),
-('BANK_TRANSFER', 'Chuyển khoản ngân hàng', TRUE);
+INSERT INTO payment_methods (method_code, method_name, is_active, iconURL) VALUES
+('CASH', 'Thanh toán tiền mặt', TRUE, 'https://res.cloudinary.com/dkzemgit8/image/upload/v1764169848/money_512_qzobsf.png'),
+('MOMO', 'Ví điện tử Momo', FALSE, ''),
+('VNPAY', 'Cổng thanh toán VNPAY', TRUE, 'https://res.cloudinary.com/dkzemgit8/image/upload/v1764169316/Icon-VNPAY-QR_l9xhso.webp'),
+('BANK_TRANSFER', 'Chuyển khoản ngân hàng', FALSE, '');
 
 -- Add corresponding payments for the bookings
 INSERT INTO payments (payment_id, booking_id, amount, method_id, payment_status, transaction_code, paid_at) VALUES

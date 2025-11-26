@@ -29,6 +29,7 @@ public class NotificationWebSocketDTO {
     private String priority;
     private String actionUrl;
     private LocalDateTime createdAt;
+    private Long unreadCount;
     
     public static NotificationWebSocketDTO fromEntity(Notification notification) {
         return NotificationWebSocketDTO.builder()
@@ -43,6 +44,24 @@ public class NotificationWebSocketDTO {
                 .priority(notification.getPriority().name())
                 .actionUrl(notification.getActionUrl())
                 .createdAt(notification.getCreatedAt())
+                .unreadCount(null)
+                .build();
+    }
+    
+    public static NotificationWebSocketDTO fromEntity(Notification notification, Long unreadCount) {
+        return NotificationWebSocketDTO.builder()
+                .notificationId(notification.getNotificationId())
+                .accountId(notification.getAccountId())
+                .targetRole(notification.getTargetRole())
+                .type(notification.getType().name())
+                .title(notification.getTitle())
+                .message(notification.getMessage())
+                .relatedId(notification.getRelatedId())
+                .relatedType(notification.getRelatedType() != null ? notification.getRelatedType().name() : null)
+                .priority(notification.getPriority().name())
+                .actionUrl(notification.getActionUrl())
+                .createdAt(notification.getCreatedAt())
+                .unreadCount(unreadCount)
                 .build();
     }
     
@@ -59,6 +78,24 @@ public class NotificationWebSocketDTO {
                 .priority(response.priority().name())
                 .actionUrl(response.actionUrl())
                 .createdAt(response.createdAt())
+                .unreadCount(null)
+                .build();
+    }
+    
+    public static NotificationWebSocketDTO fromResponse(NotificationResponse response, Long unreadCount) {
+        return NotificationWebSocketDTO.builder()
+                .notificationId(response.notificationId())
+                .accountId(response.accountId())
+                .targetRole(response.targetRole())
+                .type(response.type().name())
+                .title(response.title())
+                .message(response.message())
+                .relatedId(response.relatedId())
+                .relatedType(response.relatedType() != null ? response.relatedType().name() : null)
+                .priority(response.priority().name())
+                .actionUrl(response.actionUrl())
+                .createdAt(response.createdAt())
+                .unreadCount(unreadCount)
                 .build();
     }
 }
