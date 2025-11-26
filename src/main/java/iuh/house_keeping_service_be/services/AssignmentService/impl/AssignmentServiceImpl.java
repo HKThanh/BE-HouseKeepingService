@@ -1,8 +1,10 @@
 package iuh.house_keeping_service_be.services.AssignmentService.impl;
 
+import iuh.house_keeping_service_be.dtos.Assignment.AssignmentProgressWebSocketEvent;
 import iuh.house_keeping_service_be.dtos.Assignment.request.AssignmentCancelRequest;
 import iuh.house_keeping_service_be.dtos.Assignment.response.AssignmentDetailResponse;
 import iuh.house_keeping_service_be.dtos.Assignment.response.BookingSummary;
+import iuh.house_keeping_service_be.dtos.Booking.BookingStatusWebSocketEvent;
 import iuh.house_keeping_service_be.dtos.common.PageResponse;
 import iuh.house_keeping_service_be.enums.AssignmentStatus;
 import iuh.house_keeping_service_be.enums.BookingStatus;
@@ -13,6 +15,7 @@ import iuh.house_keeping_service_be.repositories.projections.ZoneCoordinate;
 import iuh.house_keeping_service_be.services.AssignmentService.AssignmentService;
 import iuh.house_keeping_service_be.services.BookingMediaService.BookingMediaService;
 import iuh.house_keeping_service_be.services.NotificationService.NotificationService;
+import iuh.house_keeping_service_be.services.WebSocketNotificationService.BookingRealtimeEventPublisher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -43,6 +46,7 @@ public class AssignmentServiceImpl implements AssignmentService {
     private final AddressRepository addressRepository;
     private final BookingMediaService bookingMediaService;
     private final NotificationService notificationService;
+    private final BookingRealtimeEventPublisher bookingRealtimeEventPublisher;
 
     @Override
     public PageResponse<AssignmentDetailResponse> getEmployeeAssignments(String employeeId, String status, int page, int size) {
@@ -228,6 +232,7 @@ public class AssignmentServiceImpl implements AssignmentService {
             booking.setStatus(BookingStatus.CONFIRMED);
             booking.setUpdatedAt(LocalDateTime.now());
             bookingRepository.save(booking);
+            publishBookingStatusEvent(booking, "EMPLOYEE_ACCEPT", "Booking đã đủ nhân viên", LocalDateTime.now());
             
             // Send notification to customer when booking is confirmed
             notificationService.sendBookingConfirmedNotification(
@@ -281,6 +286,7 @@ public class AssignmentServiceImpl implements AssignmentService {
             throw new IllegalStateException("Không xác định được thời gian bắt đầu của lịch làm");
         }
 
+        BookingStatus previousBookingStatus = booking.getStatus();
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime bookingTime = booking.getBookingTime();
         LocalDateTime windowStart = bookingTime.minusMinutes(10);
@@ -314,6 +320,13 @@ public class AssignmentServiceImpl implements AssignmentService {
         }
 
         updateBookingStatusToInProgressIfNeeded(booking, now);
+
+        // Realtime WS updates
+        bookingRealtimeEventPublisher.publishAssignmentProgress(
+                buildAssignmentProgressEvent(savedAssignment, booking, "CHECK_IN", now));
+        if (previousBookingStatus != booking.getStatus()) {
+            publishBookingStatusEvent(booking, "CHECK_IN", "Nhân viên đã điểm danh", now);
+        }
 
         return mapToAssignmentDetailResponse(savedAssignment);
     }
@@ -356,6 +369,7 @@ public class AssignmentServiceImpl implements AssignmentService {
         }
 
         Booking booking = assignment.getBookingDetail().getBooking();
+        BookingStatus previousBookingStatus = booking != null ? booking.getStatus() : null;
         boolean bookingCompleted = updateBookingStatusToCompletedIfNeeded(booking, now);
 
         if (bookingCompleted && booking != null && booking.getCustomer() != null
@@ -371,7 +385,59 @@ public class AssignmentServiceImpl implements AssignmentService {
             }
         }
 
+        bookingRealtimeEventPublisher.publishAssignmentProgress(
+                buildAssignmentProgressEvent(savedAssignment, booking, "CHECK_OUT", now));
+        if (booking != null && (bookingCompleted || (previousBookingStatus != null && previousBookingStatus != booking.getStatus()))) {
+            publishBookingStatusEvent(
+                    booking,
+                    bookingCompleted ? "CHECK_OUT_ALL" : "CHECK_OUT",
+                    bookingCompleted ? "Tất cả nhân viên đã checkout" : "Cập nhật tiến độ công việc",
+                    now
+            );
+        }
+
         return mapToAssignmentDetailResponse(savedAssignment);
+    }
+
+    private AssignmentProgressWebSocketEvent buildAssignmentProgressEvent(
+            Assignment assignment,
+            Booking booking,
+            String action,
+            LocalDateTime eventTime
+    ) {
+        return AssignmentProgressWebSocketEvent.builder()
+                .action(action)
+                .bookingId(booking != null ? booking.getBookingId() : null)
+                .bookingCode(booking != null ? booking.getBookingCode() : null)
+                .assignmentId(assignment != null ? assignment.getAssignmentId() : null)
+                .employeeId(assignment != null && assignment.getEmployee() != null
+                        ? assignment.getEmployee().getEmployeeId()
+                        : null)
+                .employeeName(assignment != null && assignment.getEmployee() != null
+                        ? assignment.getEmployee().getFullName()
+                        : null)
+                .status(assignment != null ? assignment.getStatus() : null)
+                .checkInTime(assignment != null ? assignment.getCheckInTime() : null)
+                .checkOutTime(assignment != null ? assignment.getCheckOutTime() : null)
+                .bookingStatusAfterUpdate(booking != null ? booking.getStatus() : null)
+                .at(eventTime != null ? eventTime : LocalDateTime.now())
+                .build();
+    }
+
+    private void publishBookingStatusEvent(Booking booking, String trigger, String note, LocalDateTime at) {
+        if (booking == null) {
+            return;
+        }
+        bookingRealtimeEventPublisher.publishBookingStatus(
+                BookingStatusWebSocketEvent.builder()
+                        .bookingId(booking.getBookingId())
+                        .bookingCode(booking.getBookingCode())
+                        .status(booking.getStatus())
+                        .trigger(trigger)
+                        .note(note)
+                        .at(at != null ? at : LocalDateTime.now())
+                        .build()
+        );
     }
 
     private LocalDateTime calculateShiftEndTime(LocalDateTime shiftStart, BookingDetail bookingDetail) {
@@ -426,6 +492,16 @@ public class AssignmentServiceImpl implements AssignmentService {
 
             // Update booking status if all assignments are cancelled
             updateBookingStatusIfNeeded(booking.getBookingId());
+
+            Booking latestBooking = bookingRepository.findById(booking.getBookingId()).orElse(null);
+            if (latestBooking != null && latestBooking.getStatus() == BookingStatus.CANCELLED) {
+                publishBookingStatusEvent(
+                        latestBooking,
+                        "ASSIGNMENT_CANCELLED",
+                        "Tất cả nhân viên đã hủy, booking bị hủy",
+                        LocalDateTime.now()
+                );
+            }
 
             // Send crisis notification to customer
             sendCrisisNotification(booking, assignment, request.reason());

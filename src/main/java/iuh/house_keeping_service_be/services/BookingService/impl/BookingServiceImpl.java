@@ -7,6 +7,7 @@ import iuh.house_keeping_service_be.dtos.Booking.summary.*;
 import iuh.house_keeping_service_be.dtos.EmployeeSchedule.ApiResponse;
 import iuh.house_keeping_service_be.dtos.EmployeeSchedule.SuitableEmployeeRequest;
 import iuh.house_keeping_service_be.dtos.EmployeeSchedule.SuitableEmployeeResponse;
+import iuh.house_keeping_service_be.dtos.Booking.BookingStatusWebSocketEvent;
 import iuh.house_keeping_service_be.enums.AdditionalFeeType;
 import iuh.house_keeping_service_be.dtos.Service.*;
 import iuh.house_keeping_service_be.enums.*;
@@ -18,6 +19,7 @@ import iuh.house_keeping_service_be.services.BookingService.BookingService;
 import iuh.house_keeping_service_be.services.EmployeeScheduleService.EmployeeScheduleService;
 import iuh.house_keeping_service_be.services.NotificationService.NotificationService;
 import iuh.house_keeping_service_be.services.ServiceService.ServiceService;
+import iuh.house_keeping_service_be.services.WebSocketNotificationService.BookingRealtimeEventPublisher;
 import iuh.house_keeping_service_be.services.AdditionalFeeService.AdditionalFeeService;
 import iuh.house_keeping_service_be.utils.BookingDTOFormatter;
 
@@ -58,6 +60,7 @@ public class BookingServiceImpl implements BookingService {
     private final ServiceOptionChoiceRepository serviceOptionChoiceRepository;
     private final PricingRuleRepository pricingRuleRepository;
     private final RuleConditionRepository ruleConditionRepository;
+    private final BookingRealtimeEventPublisher bookingRealtimeEventPublisher;
     private final BookingAdditionalFeeRepository bookingAdditionalFeeRepository;
 
     // Other Services
@@ -1059,6 +1062,22 @@ public class BookingServiceImpl implements BookingService {
         return Optional.ofNullable(booking.getCustomer().getAccount().getAccountId());
     }
 
+    private void publishBookingStatusEvent(Booking booking, String trigger, String note) {
+        if (booking == null) {
+            return;
+        }
+        bookingRealtimeEventPublisher.publishBookingStatus(
+                BookingStatusWebSocketEvent.builder()
+                        .bookingId(booking.getBookingId())
+                        .bookingCode(booking.getBookingCode())
+                        .status(booking.getStatus())
+                        .trigger(trigger)
+                        .note(note)
+                        .at(LocalDateTime.now())
+                        .build()
+        );
+    }
+
     private String normalizeReason(String reason, String fallback) {
         return (reason != null && !reason.trim().isEmpty()) ? reason.trim() : fallback;
     }
@@ -1468,6 +1487,7 @@ public class BookingServiceImpl implements BookingService {
 
         // 8. Save booking
         Booking savedBooking = bookingRepository.save(booking);
+        publishBookingStatusEvent(savedBooking, "CUSTOMER_CANCEL", reason);
 
         log.info("Booking {} cancelled successfully by customer {}", bookingId, customerId);
         notifyCustomerBookingCancelled(savedBooking, reason);
@@ -1820,6 +1840,7 @@ public class BookingServiceImpl implements BookingService {
         }
 
         Booking savedBooking = bookingRepository.save(booking);
+        publishBookingStatusEvent(savedBooking, "ADMIN_UPDATE", request.getAdminComment());
 
         return bookingMapper.toBookingResponse(savedBooking);
     }
