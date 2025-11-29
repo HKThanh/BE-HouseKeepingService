@@ -14,7 +14,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -31,6 +33,10 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
     private final ServiceRepository serviceRepository;
     private final EmployeeRecommendationService recommendationService;
     private final ReviewDetailRepository reviewDetailRepository;
+    private final EmployeeWorkingHoursRepository workingHoursRepository;
+    
+    // Default travel time buffer in minutes between assignments
+    private static final int DEFAULT_TRAVEL_TIME_MINUTES = 30;
 
     @Override
     public ApiResponse<List<EmployeeScheduleResponse>> getAvailableEmployees(EmployeeScheduleRequest request) {
@@ -42,7 +48,8 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
             }
 
             List<EmployeeScheduleResponse> availableEmployees = employees.stream()
-                    .filter(employee -> isEmployeeAvailable(employee.getEmployeeId(), request.startDate(), request.endDate()))
+                    .filter(employee -> isEmployeeAvailableWithWorkingHours(
+                            employee.getEmployeeId(), request.startDate(), request.endDate(), true))
                     .map(employee -> mapToEmployeeScheduleResponse(employee, request.startDate(), request.endDate(), true))
                     .collect(Collectors.toList());
 
@@ -63,7 +70,8 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
             }
 
             List<EmployeeScheduleResponse> busyEmployees = employees.stream()
-                    .filter(employee -> !isEmployeeAvailable(employee.getEmployeeId(), request.startDate(), request.endDate()))
+                    .filter(employee -> !isEmployeeAvailableWithWorkingHours(
+                            employee.getEmployeeId(), request.startDate(), request.endDate(), true))
                     .map(employee -> mapToEmployeeScheduleResponse(employee, request.startDate(), request.endDate(), false))
                     .collect(Collectors.toList());
 
@@ -149,6 +157,59 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
         boolean hasUnavailabilityConflict = unavailabilityRepository.hasConflict(employeeId, startTime, endTime);
         boolean hasAssignmentConflict = assignmentRepository.hasActiveAssignmentConflict(employeeId, startTime, endTime);
         return !hasUnavailabilityConflict && !hasAssignmentConflict;
+    }
+
+    @Override
+    public boolean isEmployeeAvailableWithWorkingHours(String employeeId, LocalDateTime startTime, LocalDateTime endTime, boolean checkWorkingHours) {
+        // Basic availability check (unavailability and assignment conflicts)
+        boolean hasUnavailabilityConflict = unavailabilityRepository.hasConflict(employeeId, startTime, endTime);
+        if (hasUnavailabilityConflict) {
+            log.debug("Employee {} has unavailability conflict", employeeId);
+            return false;
+        }
+
+        // Check assignment conflicts with travel time buffer
+        LocalDateTime bufferStartTime = startTime.minusMinutes(DEFAULT_TRAVEL_TIME_MINUTES);
+        LocalDateTime bufferEndTime = endTime.plusMinutes(DEFAULT_TRAVEL_TIME_MINUTES);
+        boolean hasAssignmentConflict = assignmentRepository.hasActiveAssignmentConflict(employeeId, bufferStartTime, bufferEndTime);
+        if (hasAssignmentConflict) {
+            log.debug("Employee {} has assignment conflict (with travel time buffer)", employeeId);
+            return false;
+        }
+
+        // Check working hours if requested
+        if (checkWorkingHours) {
+            DayOfWeek dayOfWeek = startTime.getDayOfWeek();
+            Optional<EmployeeWorkingHours> workingHoursOpt = 
+                    workingHoursRepository.findByEmployee_EmployeeIdAndDayOfWeek(employeeId, dayOfWeek);
+            
+            if (workingHoursOpt.isEmpty()) {
+                // If no working hours configured, assume employee is available (backward compatibility)
+                log.debug("Employee {} has no working hours configured for {}, assuming available", employeeId, dayOfWeek);
+                return true;
+            }
+
+            EmployeeWorkingHours workingHours = workingHoursOpt.get();
+            
+            // Check if it's a working day
+            if (!workingHours.getIsWorkingDay()) {
+                log.debug("Employee {} is not working on {}", employeeId, dayOfWeek);
+                return false;
+            }
+
+            // Check if time range is within working hours
+            LocalTime slotStartTime = startTime.toLocalTime();
+            LocalTime slotEndTime = endTime.toLocalTime();
+            
+            if (!workingHours.isTimeRangeWithinWorkingHours(slotStartTime, slotEndTime)) {
+                log.debug("Employee {} booking time {}-{} is outside working hours {}-{}", 
+                        employeeId, slotStartTime, slotEndTime, 
+                        workingHours.getStartTime(), workingHours.getEndTime());
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private boolean hasScheduleConflict(String employeeId, LocalDateTime startTime, LocalDateTime endTime) {
@@ -329,27 +390,29 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
                 }
             }
 
-            // 4. Kiểm tra tình trạng rảnh và phân loại nhân viên
+            // 4. Kiểm tra tình trạng rảnh (bao gồm cả khung giờ làm việc) và phân loại nhân viên
             List<SuitableEmployeeResponse> employeesWithHistory = new ArrayList<>();
             List<SuitableEmployeeResponse> employeesWithoutHistory = new ArrayList<>();
 
             for (Employee employee : potentialEmployees) {
                 boolean isAvailable = false;
                 
-                // Nếu có danh sách bookingTimes, kiểm tra tất cả các slot
+                // Nếu có danh sách bookingTimes, kiểm tra tất cả các slot (bao gồm kiểm tra khung giờ làm việc)
                 if (request.bookingTimes() != null && !request.bookingTimes().isEmpty()) {
                     isAvailable = true;
                     for (LocalDateTime bookingTime : request.bookingTimes()) {
                         LocalDateTime slotEndTime = bookingTime.plusHours(estimatedDuration.longValue());
-                        if (!isEmployeeAvailable(employee.getEmployeeId(), bookingTime, slotEndTime)) {
+                        // Sử dụng phương thức mới có kiểm tra khung giờ làm việc
+                        if (!isEmployeeAvailableWithWorkingHours(employee.getEmployeeId(), bookingTime, slotEndTime, true)) {
                             isAvailable = false;
-                            log.debug("Employee {} is busy at time slot: {}", employee.getFullName(), bookingTime);
+                            log.debug("Employee {} is not available at time slot: {} (working hours or conflicts)", 
+                                    employee.getFullName(), bookingTime);
                             break;
                         }
                     }
                 } else {
-                    // Nếu không có bookingTimes, kiểm tra theo bookingTime đơn lẻ (logic cũ)
-                    isAvailable = isEmployeeAvailable(employee.getEmployeeId(), startTime, endTime);
+                    // Nếu không có bookingTimes, kiểm tra theo bookingTime đơn lẻ (sử dụng phương thức mới)
+                    isAvailable = isEmployeeAvailableWithWorkingHours(employee.getEmployeeId(), startTime, endTime, true);
                 }
                 
                 if (isAvailable) {
@@ -364,7 +427,7 @@ public class EmployeeScheduleServiceImpl implements EmployeeScheduleService {
                         log.debug("Employee {} is available (new to customer)", employee.getFullName());
                     }
                 } else {
-                    log.debug("Employee {} is busy during requested time", employee.getFullName());
+                    log.debug("Employee {} is not available during requested time", employee.getFullName());
                 }
             }
 

@@ -10,4 +10,14 @@ public interface EmployeeScheduleService {
     ApiResponse<EmployeeScheduleResponse> getEmployeeSchedule(String employeeId, LocalDateTime startDate, LocalDateTime endDate);
     ApiResponse<EmployeeScheduleResponse> createUnavailability(UnavailabilityRequest request);
     ApiResponse<List<SuitableEmployeeResponse>> findSuitableEmployees(SuitableEmployeeRequest request);
+    
+    /**
+     * Check if employee is available within their working hours and has no conflicts
+     * @param employeeId The employee ID
+     * @param startTime The start time of the booking
+     * @param endTime The end time of the booking
+     * @param checkWorkingHours Whether to also check against employee's configured working hours
+     * @return true if employee is available
+     */
+    boolean isEmployeeAvailableWithWorkingHours(String employeeId, LocalDateTime startTime, LocalDateTime endTime, boolean checkWorkingHours);
 }
