@@ -35,6 +35,9 @@ public class AvailableSlotServiceImpl implements AvailableSlotService {
     
     // Minimum slot duration in minutes
     private static final int MIN_SLOT_DURATION_MINUTES = 30;
+    
+    // Default service duration in minutes when not specified
+    private static final int DEFAULT_SERVICE_DURATION_MINUTES = 60;
 
     @Override
     public ApiResponse<DailyAvailableSlotsResponse> getAvailableSlots(AvailableSlotsRequest request) {
@@ -390,7 +393,9 @@ public class AvailableSlotServiceImpl implements AvailableSlotService {
             }
         }
 
-        return 0;
+        // Return default duration if not specified
+        log.info("Using default service duration: {} minutes", DEFAULT_SERVICE_DURATION_MINUTES);
+        return DEFAULT_SERVICE_DURATION_MINUTES;
     }
 
     /**
