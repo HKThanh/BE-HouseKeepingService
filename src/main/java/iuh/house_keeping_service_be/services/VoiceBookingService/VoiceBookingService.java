@@ -698,8 +698,13 @@ public class VoiceBookingService {
         iuh.house_keeping_service_be.models.VoiceBookingRequest voiceRequest = voiceBookingRequestRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Voice booking request not found: " + requestId));
 
-        if (!"AWAITING_CONFIRMATION".equals(voiceRequest.getStatus())) {
-            throw new IllegalStateException("Voice booking request is not awaiting confirmation");
+        String currentStatus = voiceRequest.getStatus();
+        log.info("Voice booking request {} has status: {}", requestId, currentStatus);
+        
+        if (!"AWAITING_CONFIRMATION".equals(currentStatus)) {
+            String errorMessage = buildConfirmationErrorMessage(currentStatus);
+            log.warn("Cannot confirm voice booking {}: current status is {}", requestId, currentStatus);
+            throw new IllegalStateException(errorMessage);
         }
 
         Customer customer = customerRepository.findByAccount_Username(username)
@@ -1356,5 +1361,20 @@ public class VoiceBookingService {
         }
 
         voiceBookingRequestRepository.save(voiceRequest);
+    }
+
+    /**
+     * Build a user-friendly error message for confirmation failures based on current status
+     */
+    private String buildConfirmationErrorMessage(String currentStatus) {
+        return switch (currentStatus) {
+            case "PARTIAL" -> "Yêu cầu đặt lịch chưa hoàn tất. Vui lòng cung cấp thêm thông tin còn thiếu trước khi xác nhận.";
+            case "PROCESSING" -> "Yêu cầu đang được xử lý. Vui lòng đợi xử lý hoàn tất trước khi xác nhận.";
+            case "PENDING" -> "Yêu cầu đang chờ xử lý. Vui lòng đợi hệ thống xử lý giọng nói.";
+            case "COMPLETED" -> "Đơn đặt lịch này đã được xác nhận trước đó.";
+            case "CANCELLED" -> "Yêu cầu đặt lịch này đã bị huỷ.";
+            case "FAILED" -> "Yêu cầu đặt lịch này đã thất bại. Vui lòng tạo yêu cầu mới.";
+            default -> "Trạng thái yêu cầu không hợp lệ: " + currentStatus + ". Không thể xác nhận.";
+        };
     }
 }
