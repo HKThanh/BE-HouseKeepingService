@@ -342,7 +342,18 @@ GET /api/v1/available-slots?date=2025-12-01&city=Hồ Chí Minh&ward=Tây Thạn
         "endTime": "2025-12-01T10:30:00",
         "durationMinutes": 120,
         "availableEmployeeCount": 2,
-        "availableEmployees": [...]
+        "availableEmployees": [
+          {
+            "employeeId": "e1000001-0000-0000-0000-000000000003",
+            "fullName": "Trần Văn Long",
+            "avatar": "https://i.pravatar.cc/150?img=33",
+            "rating": "4.06",
+            "skills": [
+                "Vệ sinh tổng quát",
+                "Lau dọn"
+            ]
+          }
+        ]
       }
     ]
   }
@@ -370,30 +381,258 @@ GET /api/v1/available-slots?date=2025-12-01&city=Hồ Chí Minh&ward=Tây Thạn
 
 **Example Request:**
 ```
-GET /api/v1/available-slots/range?startDate=2025-12-01&endDate=2025-12-07&city=Hồ Chí Minh&serviceId=1
+GET /api/v1/available-slots/range?startDate=2025-12-01&endDate=2025-12-04&ward=Bình Dương&serviceId=1
 ```
 
 **Response Success (200 OK):**
 ```json
 {
-  "success": true,
-  "message": "Tìm thấy slot khả dụng cho 7 ngày",
-  "data": [
-    {
-      "date": "2025-12-01",
-      "dayOfWeek": "Thứ Hai",
-      "totalSlots": 15,
-      "totalAvailableEmployees": 3,
-      "slots": [...]
-    },
-    {
-      "date": "2025-12-02",
-      "dayOfWeek": "Thứ Ba",
-      "totalSlots": 12,
-      "totalAvailableEmployees": 2,
-      "slots": [...]
-    }
-  ]
+    "success": true,
+    "message": "Tìm thấy slot khả dụng cho 4 ngày",
+    "data": [
+        {
+            "date": "2025-12-01",
+            "dayOfWeek": "Thứ Hai",
+            "totalSlots": 13,
+            "totalAvailableEmployees": 1,
+            "slots": [
+                {
+                    "startTime": "2025-12-01T22:00:00",
+                    "endTime": "2025-12-01T00:00:00",
+                    "durationMinutes": 120,
+                    "availableEmployeeCount": 1,
+                    "availableEmployees": [
+                        {
+                            "employeeId": "e1000001-0000-0000-0000-000000000003",
+                            "fullName": "Trần Văn Long",
+                            "avatar": "https://i.pravatar.cc/150?img=33",
+                            "rating": "4.06",
+                            "skills": [
+                                "Vệ sinh tổng quát",
+                                "Lau dọn"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "startTime": "2025-12-01T22:30:00",
+                    "endTime": "2025-12-01T00:30:00",
+                    "durationMinutes": 120,
+                    "availableEmployeeCount": 1,
+                    "availableEmployees": [
+                        {
+                            "employeeId": "e1000001-0000-0000-0000-000000000003",
+                            "fullName": "Trần Văn Long",
+                            "avatar": "https://i.pravatar.cc/150?img=33",
+                            "rating": "4.06",
+                            "skills": [
+                                "Vệ sinh tổng quát",
+                                "Lau dọn"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "startTime": "2025-12-01T23:00:00",
+                    "endTime": "2025-12-01T01:00:00",
+                    "durationMinutes": 120,
+                    "availableEmployeeCount": 1,
+                    "availableEmployees": [
+                        {
+                            "employeeId": "e1000001-0000-0000-0000-000000000003",
+                            "fullName": "Trần Văn Long",
+                            "avatar": "https://i.pravatar.cc/150?img=33",
+                            "rating": "4.06",
+                            "skills": [
+                                "Vệ sinh tổng quát",
+                                "Lau dọn"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "startTime": "2025-12-01T23:30:00",
+                    "endTime": "2025-12-01T01:30:00",
+                    "durationMinutes": 120,
+                    "availableEmployeeCount": 1,
+                    "availableEmployees": [
+                        {
+                            "employeeId": "e1000001-0000-0000-0000-000000000003",
+                            "fullName": "Trần Văn Long",
+                            "avatar": "https://i.pravatar.cc/150?img=33",
+                            "rating": "4.06",
+                            "skills": [
+                                "Vệ sinh tổng quát",
+                                "Lau dọn"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "startTime": "2025-12-01T07:00:00",
+                    "endTime": "2025-12-01T09:00:00",
+                    "durationMinutes": 120,
+                    "availableEmployeeCount": 1,
+                    "availableEmployees": [
+                        {
+                            "employeeId": "e1000001-0000-0000-0000-000000000003",
+                            "fullName": "Trần Văn Long",
+                            "avatar": "https://i.pravatar.cc/150?img=33",
+                            "rating": "4.06",
+                            "skills": [
+                                "Vệ sinh tổng quát",
+                                "Lau dọn"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "startTime": "2025-12-01T07:30:00",
+                    "endTime": "2025-12-01T09:30:00",
+                    "durationMinutes": 120,
+                    "availableEmployeeCount": 1,
+                    "availableEmployees": [
+                        {
+                            "employeeId": "e1000001-0000-0000-0000-000000000003",
+                            "fullName": "Trần Văn Long",
+                            "avatar": "https://i.pravatar.cc/150?img=33",
+                            "rating": "4.06",
+                            "skills": [
+                                "Vệ sinh tổng quát",
+                                "Lau dọn"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "startTime": "2025-12-01T08:00:00",
+                    "endTime": "2025-12-01T10:00:00",
+                    "durationMinutes": 120,
+                    "availableEmployeeCount": 1,
+                    "availableEmployees": [
+                        {
+                            "employeeId": "e1000001-0000-0000-0000-000000000003",
+                            "fullName": "Trần Văn Long",
+                            "avatar": "https://i.pravatar.cc/150?img=33",
+                            "rating": "4.06",
+                            "skills": [
+                                "Vệ sinh tổng quát",
+                                "Lau dọn"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "startTime": "2025-12-01T08:30:00",
+                    "endTime": "2025-12-01T10:30:00",
+                    "durationMinutes": 120,
+                    "availableEmployeeCount": 1,
+                    "availableEmployees": [
+                        {
+                            "employeeId": "e1000001-0000-0000-0000-000000000003",
+                            "fullName": "Trần Văn Long",
+                            "avatar": "https://i.pravatar.cc/150?img=33",
+                            "rating": "4.06",
+                            "skills": [
+                                "Vệ sinh tổng quát",
+                                "Lau dọn"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "startTime": "2025-12-01T09:00:00",
+                    "endTime": "2025-12-01T11:00:00",
+                    "durationMinutes": 120,
+                    "availableEmployeeCount": 1,
+                    "availableEmployees": [
+                        {
+                            "employeeId": "e1000001-0000-0000-0000-000000000003",
+                            "fullName": "Trần Văn Long",
+                            "avatar": "https://i.pravatar.cc/150?img=33",
+                            "rating": "4.06",
+                            "skills": [
+                                "Vệ sinh tổng quát",
+                                "Lau dọn"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "startTime": "2025-12-01T09:30:00",
+                    "endTime": "2025-12-01T11:30:00",
+                    "durationMinutes": 120,
+                    "availableEmployeeCount": 1,
+                    "availableEmployees": [
+                        {
+                            "employeeId": "e1000001-0000-0000-0000-000000000003",
+                            "fullName": "Trần Văn Long",
+                            "avatar": "https://i.pravatar.cc/150?img=33",
+                            "rating": "4.06",
+                            "skills": [
+                                "Vệ sinh tổng quát",
+                                "Lau dọn"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "startTime": "2025-12-01T12:00:00",
+                    "endTime": "2025-12-01T14:00:00",
+                    "durationMinutes": 120,
+                    "availableEmployeeCount": 1,
+                    "availableEmployees": [
+                        {
+                            "employeeId": "e1000001-0000-0000-0000-000000000003",
+                            "fullName": "Trần Văn Long",
+                            "avatar": "https://i.pravatar.cc/150?img=33",
+                            "rating": "4.06",
+                            "skills": [
+                                "Vệ sinh tổng quát",
+                                "Lau dọn"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "startTime": "2025-12-01T12:30:00",
+                    "endTime": "2025-12-01T14:30:00",
+                    "durationMinutes": 120,
+                    "availableEmployeeCount": 1,
+                    "availableEmployees": [
+                        {
+                            "employeeId": "e1000001-0000-0000-0000-000000000003",
+                            "fullName": "Trần Văn Long",
+                            "avatar": "https://i.pravatar.cc/150?img=33",
+                            "rating": "4.06",
+                            "skills": [
+                                "Vệ sinh tổng quát",
+                                "Lau dọn"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "startTime": "2025-12-01T13:00:00",
+                    "endTime": "2025-12-01T15:00:00",
+                    "durationMinutes": 120,
+                    "availableEmployeeCount": 1,
+                    "availableEmployees": [
+                        {
+                            "employeeId": "e1000001-0000-0000-0000-000000000003",
+                            "fullName": "Trần Văn Long",
+                            "avatar": "https://i.pravatar.cc/150?img=33",
+                            "rating": "4.06",
+                            "skills": [
+                                "Vệ sinh tổng quát",
+                                "Lau dọn"
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
 }
 ```
 
@@ -456,24 +695,6 @@ Khi tìm nhân viên phù hợp (`findSuitableEmployees`):
 
 ---
 
-## IV. Database Schema
-
-### Table: employee_working_hours
-
-```sql
-CREATE TABLE employee_working_hours (
-    working_hours_id VARCHAR(36) PRIMARY KEY,
-    employee_id VARCHAR(36) NOT NULL REFERENCES employee(employee_id),
-    day_of_week VARCHAR(15) NOT NULL,
-    start_time TIME NOT NULL,
-    end_time TIME NOT NULL,
-    is_working_day BOOLEAN NOT NULL DEFAULT TRUE,
-    break_start_time TIME,
-    break_end_time TIME,
-    UNIQUE (employee_id, day_of_week)
-);
-```
-
 ### Default Values
 
 Khi khởi tạo, mỗi nhân viên sẽ có:
@@ -482,7 +703,7 @@ Khi khởi tạo, mỗi nhân viên sẽ có:
 
 ---
 
-## V. Error Responses
+## IV. Error Responses
 
 ### Common Errors
 
