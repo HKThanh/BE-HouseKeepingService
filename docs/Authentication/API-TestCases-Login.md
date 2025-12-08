@@ -56,7 +56,9 @@ Each test case includes:
         "phoneNumber": "0901234567",
         "isMale": true,
         "status": "ACTIVE",
-        "address": "123 Nguyen Van Cu, Hanoi"
+        "address": "123 Lê Trọng Tấn, Phường Thủ Dầu Một, Thành phố Hồ Chí Minh",
+        "isEmailVerified": false,
+        "isPhoneVerified": true
       }
     }
   }
@@ -82,7 +84,9 @@ Each test case includes:
             "phoneNumber": "0901234567",
             "isMale": true,
             "status": "ACTIVE",
-            "address": "123 Nguyen Van Cu, Hanoi"
+            "address": "123 Lê Trọng Tấn, Phường Thủ Dầu Một, Thành phố Hồ Chí Minh",
+            "isEmailVerified": false,
+            "isPhoneVerified": true
         }
     }
   }
@@ -126,7 +130,9 @@ Each test case includes:
         "phoneNumber": "0912345678",
         "isMale": false,
         "status": "ACTIVE",
-        "address": "789 Tran Hung Dao, Hanoi"
+        "address": "2024-01-15",
+        "isEmailVerified": false,
+        "isPhoneVerified": true
       }
     }
   }
@@ -153,7 +159,9 @@ Each test case includes:
             "phoneNumber": "0912345678",
             "isMale": false,
             "status": "ACTIVE",
-            "address": "789 Tran Hung Dao, Hanoi"
+            "address": "2024-01-15",
+            "isEmailVerified": false,
+            "isPhoneVerified": true
         }
     }
   }

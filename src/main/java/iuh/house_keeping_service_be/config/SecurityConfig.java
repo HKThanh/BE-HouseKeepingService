@@ -49,6 +49,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/get-role",
                                 "/api/v1/auth/decode-qr",
                                 "/api/v1/auth/phone/**",
+                                "/api/v1/auth/register",
                                 "/api/v1/otp/**",
                                 "/api/v1/media/**",
                                 "/api/v1/reviews/**",
@@ -58,7 +59,6 @@ public class SecurityConfig {
                                 "/api/v1/payment/vnpay/ipn",
                                 "/api/v1/customer/bookings/voice/status",
                                 "/ws/**").permitAll()
-                        .requestMatchers("/api/v1/auth/register").hasAnyRole("EMPLOYEE", "CUSTOMER")
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/v1/employee/**").hasAnyRole("EMPLOYEE", "ADMIN")
                         .requestMatchers("/api/v1/customer/**").hasAnyRole("CUSTOMER", "ADMIN")
