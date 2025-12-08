@@ -86,12 +86,14 @@ All fields are mandatory and cannot be left empty:
   ```json
   {
     "success": true,
-    "message": "Đăng ký thành công",
     "data": {
-      "username": "examplec",
-      "email": "examplec@gmail.com",
-      "role": "CUSTOMER"
-    }
+        "username": "examplez",
+        "email": "thanhdavid18t@gmail.com",
+        "role": "CUSTOMER",
+        "isEmailVerified": false,
+        "isPhoneVerified": false
+    },
+    "message": "Đăng ký thành công"
   }
   ```
 - **Status Code**: 201 Created
@@ -100,12 +102,14 @@ All fields are mandatory and cannot be left empty:
   ```json
   {
     "success": true,
-    "message": "Đăng ký thành công",
     "data": {
-      "username": "examplec",
-      "email": "examplec@gmail.com",
-      "role": "CUSTOMER"
-    }
+        "username": "examplez",
+        "email": "thanhdavid18t@gmail.com",
+        "role": "CUSTOMER",
+        "isEmailVerified": false,
+        "isPhoneVerified": false
+    },
+    "message": "Đăng ký thành công"
   }
   ```
 - **Status Code**: 201 Created
@@ -126,7 +130,9 @@ All fields are mandatory and cannot be left empty:
     "fullName": "John Employee",
     "email": "employee1@company.com",
     "phoneNumber": "+84987654321",
-    "role": "EMPLOYEE"
+    "role": "EMPLOYEE",
+    "isEmailVerified": false,
+    "isPhoneVerified": false
   }
   ```
 - **Expected Output**:
@@ -137,7 +143,9 @@ All fields are mandatory and cannot be left empty:
     "data": {
       "username": "employee1",
       "email": "employee1@company.com",
-      "role": "EMPLOYEE"
+      "role": "EMPLOYEE",
+      "isEmailVerified": false,
+      "isPhoneVerified": false
     }
   }
   ```

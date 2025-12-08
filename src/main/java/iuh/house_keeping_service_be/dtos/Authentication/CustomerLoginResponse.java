@@ -10,6 +10,8 @@ public record CustomerLoginResponse(
         String phoneNumber,
         boolean isMale,
         String status,
-        String address
+        String address,
+        Boolean isEmailVerified,
+        Boolean isPhoneVerified
 ) {
 }

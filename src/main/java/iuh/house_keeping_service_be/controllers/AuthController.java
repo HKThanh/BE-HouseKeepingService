@@ -290,7 +290,9 @@ public class AuthController {
                         account.getPhoneNumber(),
                         customer.getIsMale(),
                         account.getStatus().name(),
-                        address != null ? address.getFullAddress() : null
+                        address != null ? address.getFullAddress() : null,
+                        customer.getIsEmailVerified(),
+                        account.getIsPhoneVerified()
                 );
 
             case EMPLOYEE:
@@ -305,7 +307,9 @@ public class AuthController {
                         account.getPhoneNumber(),
                         employee.getIsMale(),
                         account.getStatus().name(),
-                        employee.getHiredDate() != null ? employee.getHiredDate().toString() : null
+                        employee.getHiredDate() != null ? employee.getHiredDate().toString() : null,
+                        employee.getIsEmailVerified(),
+                        account.getIsPhoneVerified()
                 );
 
             default:
@@ -387,7 +391,9 @@ public class AuthController {
             RegisterResponse response = new RegisterResponse(
                     account.getUsername(),
                     registerRequest.email(),
-                    registerRequest.role()
+                    registerRequest.role(),
+                    false,
+                    account.getIsPhoneVerified()
             );
 
             return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
