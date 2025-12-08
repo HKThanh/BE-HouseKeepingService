@@ -70,11 +70,15 @@ public class AdditionalFeeServiceImpl implements AdditionalFeeService {
     public AdditionalFeeResponse markAsSystemSurcharge(String id) {
         AdditionalFee existing = additionalFeeRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy phụ phí: " + id));
+        
+        // QUAN TRỌNG: Tắt phí hệ thống cũ TRƯỚC khi đặt phí mới
+        // để tránh vi phạm unique constraint (chỉ cho phép 1 phí hệ thống active)
+        additionalFeeRepository.deactivateOtherSystemSurcharge(id);
+        
         existing.setSystemSurcharge(true);
         existing.setActive(true);
-        additionalFeeRepository.save(existing);
-        additionalFeeRepository.deactivateOtherSystemSurcharge(existing.getId());
-        return mapToResponse(existing);
+        AdditionalFee saved = additionalFeeRepository.save(existing);
+        return mapToResponse(saved);
     }
 
     @Override
