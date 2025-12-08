@@ -49,6 +49,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/get-role",
                                 "/api/v1/auth/decode-qr",
                                 "/api/v1/auth/phone/**",
+                                "/api/v1/otp/**",
                                 "/api/v1/media/**",
                                 "/api/v1/reviews/**",
                                 "/api/v1/addresses/**",

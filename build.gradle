@@ -49,6 +49,8 @@ dependencies {
     // Audio processing library
     implementation 'com.googlecode.soundlibs:jlayer:1.0.1.4'
     implementation 'com.googlecode.soundlibs:mp3spi:1.9.5.4'
+    // Firebase Admin SDK for OTP verification
+    implementation 'com.google.firebase:firebase-admin:9.2.0'
     // https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt-impl
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.11.5'
     // https://mvnrepository.com/artifact/io.jsonwebtoken/jjwt-jackson
