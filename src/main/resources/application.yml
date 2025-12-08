@@ -139,3 +139,24 @@ fpt:
     verify-delay: ${FPT_TTS_VERIFY_DELAY:1200}
     verify-timeout: ${FPT_TTS_VERIFY_TIMEOUT:45000}
     cloudinary-folder: ${FPT_TTS_CLOUDINARY_FOLDER:voice_booking/tts}
+
+# Firebase Configuration for Phone OTP Authentication
+firebase:
+  enabled: ${FIREBASE_ENABLED:false}
+  project-id: ${FIREBASE_PROJECT_ID:}
+  api-key: ${FIREBASE_API_KEY:}
+  service-account:
+    path: ${FIREBASE_SERVICE_ACCOUNT_PATH:}
+    base64: ${FIREBASE_SERVICE_ACCOUNT_BASE64:}
+    json: ${FIREBASE_SERVICE_ACCOUNT_JSON:}
+  phone:
+    otp-length: ${FIREBASE_PHONE_OTP_LENGTH:6}
+    session-ttl: ${FIREBASE_PHONE_SESSION_TTL:120}
+    fallback-to-log: ${FIREBASE_PHONE_FALLBACK_TO_LOG:true}
+
+# OTP Configuration
+otp:
+  length: ${OTP_LENGTH:6}
+  expiration-minutes: ${OTP_EXPIRATION_MINUTES:5}
+  max-attempts: ${OTP_MAX_ATTEMPTS:5}
+  resend-cooldown-seconds: ${OTP_RESEND_COOLDOWN_SECONDS:60}

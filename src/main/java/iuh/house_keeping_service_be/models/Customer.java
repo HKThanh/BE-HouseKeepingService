@@ -40,6 +40,9 @@ import java.time.LocalDate;
         @Column(name = "email", length = 100, unique = true)
         private String email;
 
+        @Column(name = "is_email_verified")
+        private Boolean isEmailVerified = false;
+
         @Column(name = "birthdate")
         private LocalDate birthdate;
 
