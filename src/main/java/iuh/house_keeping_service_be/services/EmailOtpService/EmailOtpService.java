@@ -43,4 +43,22 @@ public interface EmailOtpService {
      * @param email Email
      */
     void clearEmailOtp(String email);
+    
+    /**
+     * Gửi OTP cho quên mật khẩu qua email
+     * Giống sendEmailOtp nhưng dùng cho use case password reset
+     * @param email Email người dùng
+     * @return true nếu gửi thành công
+     */
+    boolean sendForgotPasswordOtp(String email);
+    
+    /**
+     * Xác thực OTP email và đặt lại mật khẩu
+     * @param email Email
+     * @param otp Mã OTP 6 số
+     * @param newPassword Mật khẩu mới
+     * @return true nếu OTP hợp lệ và mật khẩu được cập nhật thành công
+     * @throws IllegalArgumentException nếu OTP không đúng, hết hạn, hoặc email không tìm thấy
+     */
+    boolean verifyOtpAndResetPassword(String email, String otp, String newPassword);
 }

@@ -337,6 +337,74 @@ public class OtpController {
     }
 
     /**
+     * Gửi OTP cho quên mật khẩu qua email
+     */
+    @PostMapping("/email/forgot-password-request")
+    public ResponseEntity<?> sendForgotPasswordOtp(@Valid @RequestBody ForgotPasswordEmailRequest request) {
+        try {
+            String email = request.email();
+            
+            // Gửi OTP cho quên mật khẩu
+            emailOtpService.sendForgotPasswordOtp(email);
+            
+            long cooldownSeconds = emailOtpService.getResendCooldownSeconds(email);
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Mã OTP đã được gửi đến email của bạn",
+                "expirationSeconds", 180, // 3 minutes
+                "cooldownSeconds", cooldownSeconds
+            ));
+            
+        } catch (IllegalArgumentException e) {
+            log.warn("Send forgot password OTP error: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            log.error("Send forgot password OTP error: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "success", false,
+                "message", "Không thể gửi mã OTP. Vui lòng thử lại sau"
+            ));
+        }
+    }
+
+    /**
+     * Xác thực OTP và đặt lại mật khẩu
+     */
+    @PostMapping("/email/reset-password")
+    public ResponseEntity<?> resetPasswordWithEmail(@Valid @RequestBody ResetPasswordEmailRequest request) {
+        try {
+            String email = request.email();
+            String otp = request.otp();
+            String newPassword = request.newPassword();
+            
+            // Xác thực OTP và đặt lại mật khẩu
+            emailOtpService.verifyOtpAndResetPassword(email, otp, newPassword);
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Mật khẩu của bạn đã được đặt lại thành công"
+            ));
+            
+        } catch (IllegalArgumentException e) {
+            log.warn("Reset password with email error: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            log.error("Reset password with email error: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "success", false,
+                "message", "Đã xảy ra lỗi khi đặt lại mật khẩu"
+            ));
+        }
+    }
+
+    /**
      * Validate request gửi OTP dựa trên loại
      */
     private void validateSendOtpRequest(String phoneNumber, OtpType otpType) {
