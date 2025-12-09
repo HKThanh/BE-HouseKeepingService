@@ -248,7 +248,7 @@ public class EmailOtpServiceImpl implements EmailOtpService {
                 "    <div style=\"max-width: 600px; margin: 20px auto; background-color: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow: hidden;\">" +
                 "        <!-- Header -->" +
                 "        <div style=\"background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px 20px; text-align: center; color: white;\">" +
-                "            <h1 style=\"margin: 0; font-size: 24px; font-weight: 600;\">House Keeping Service</h1>" +
+                "            <h1 style=\"margin: 0; font-size: 24px; font-weight: 600;\">HomeMate</h1>" +
                 "            <p style=\"margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;\">Xác thực email của bạn</p>" +
                 "        </div>" +
                 "        " +

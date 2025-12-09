@@ -117,7 +117,7 @@ public class AuthServiceImpl implements AuthService {
 
            // Update last login
            Account account = accountRepository.findByUsername(username.trim())
-               .orElseThrow(() -> new RuntimeException("Không tìm thấy tài khoản"));
+               .orElse(null);
            updateLastLoginTime(account);
 
            return tokenPair;
