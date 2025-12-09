@@ -39,4 +39,9 @@ public interface ConversationRepository extends JpaRepository<Conversation, Stri
            "WHERE (c.customer.customerId = :senderId OR c.employee.employeeId = :senderId) " +
            "ORDER BY c.lastMessageTime DESC")
     Page<Conversation> findBySenderId(@Param("senderId") String senderId, Pageable pageable);
+
+    // Unlink booking from conversations (set booking_id = null) - for cascade delete
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("UPDATE Conversation c SET c.booking = null WHERE c.booking.bookingId IN :bookingIds")
+    void unlinkBookingsByIds(@Param("bookingIds") List<String> bookingIds);
 }

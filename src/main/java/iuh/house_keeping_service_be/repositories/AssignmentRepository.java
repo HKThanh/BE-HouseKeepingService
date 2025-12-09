@@ -265,4 +265,10 @@ public interface AssignmentRepository extends JpaRepository<Assignment, String> 
     long countDistinctBookingsByEmployeeIdAndDateRange(@Param("employeeId") String employeeId,
                                                         @Param("startDate") LocalDateTime startDate,
                                                         @Param("endDate") LocalDateTime endDate);
+
+    // Delete assignments by booking IDs (for cascade delete when cancelling recurring bookings)
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM Assignment a WHERE a.bookingDetail.id IN " +
+           "(SELECT bd.id FROM BookingDetail bd WHERE bd.booking.bookingId IN :bookingIds)")
+    void deleteByBookingIds(@Param("bookingIds") List<String> bookingIds);
 }

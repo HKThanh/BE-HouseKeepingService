@@ -66,8 +66,9 @@ public class RecurringBookingMapper {
         response.setCreatedAt(recurringBooking.getCreatedAt());
         response.setUpdatedAt(recurringBooking.getUpdatedAt());
         if (recurringBooking.getAssignedEmployee() != null) {
-            response.setAssignedEmployeeId(recurringBooking.getAssignedEmployee().getEmployeeId());
-            response.setAssignedEmployeeName(recurringBooking.getAssignedEmployee().getFullName());
+            response.setAssignedEmployee(
+                bookingMapper.toEmployeeInfoPublic(recurringBooking.getAssignedEmployee())
+            );
         }
 
         // Statistics - safely handle lazy loading
