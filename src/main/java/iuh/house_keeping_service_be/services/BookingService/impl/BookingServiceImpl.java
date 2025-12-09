@@ -1,5 +1,6 @@
 package iuh.house_keeping_service_be.services.BookingService.impl;
 
+import iuh.house_keeping_service_be.config.CacheConfig;
 import iuh.house_keeping_service_be.dtos.Booking.internal.*;
 import iuh.house_keeping_service_be.dtos.Booking.request.*;
 import iuh.house_keeping_service_be.dtos.Booking.response.*;
@@ -93,6 +94,11 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
+    @org.springframework.cache.annotation.CacheEvict(
+            value = CacheConfig.PROMOTION_VALIDATION_CACHE,
+            allEntries = true,
+            condition = "#request.promoCode() != null && !#request.promoCode().isEmpty()"
+    )
     public BookingCreationSummary createBooking(BookingCreateRequest request) {
         log.info("Creating booking for customer with {} services", request.bookingDetails().size());
 
@@ -286,6 +292,874 @@ public class BookingServiceImpl implements BookingService {
         log.info("Validating booking request");
 
         return performValidation(request).result();
+    }
+
+    @Override
+    public BookingPreviewResponse previewBooking(BookingPreviewRequest request, String currentUserId, boolean isAdmin) {
+        log.info("Generating booking preview for user: {}, isAdmin: {}", currentUserId, isAdmin);
+        
+        try {
+            // Determine which customer to use
+            String targetCustomerId = determineTargetCustomerId(request, currentUserId, isAdmin);
+            
+            // Convert preview request to internal format for validation
+            PreviewValidationOutcome validationOutcome = performPreviewValidation(request, targetCustomerId);
+            
+            // Check for critical errors (customer/address not found)
+            if (validationOutcome.hasCriticalError()) {
+                return BookingPreviewResponse.error(validationOutcome.errors());
+            }
+            
+            // Build the full preview response (includes any non-critical errors/warnings)
+            return buildPreviewResponse(validationOutcome, request);
+            
+        } catch (Exception e) {
+            log.error("Error generating booking preview: {}", e.getMessage(), e);
+            return BookingPreviewResponse.error(List.of("Error generating preview: " + e.getMessage()));
+        }
+    }
+    
+    @Override
+    public MultipleBookingPreviewResponse previewMultipleBookings(MultipleBookingPreviewRequest request, String currentUserId, boolean isAdmin) {
+        log.info("Generating multiple booking preview for user: {}, isAdmin: {}, bookingTimes: {}", 
+                currentUserId, isAdmin, request.bookingTimes().size());
+        
+        try {
+            // Determine target customer
+            String targetCustomerId = determineTargetCustomerIdForMultiple(request, currentUserId, isAdmin);
+            
+            List<BookingPreviewResponse> bookingPreviews = new ArrayList<>();
+            List<LocalDateTime> validBookingTimes = new ArrayList<>();
+            List<LocalDateTime> invalidBookingTimes = new ArrayList<>();
+            List<String> allErrors = new ArrayList<>();
+            BookingPreviewResponse firstValidPreview = null;
+            
+            // Process each booking time
+            for (LocalDateTime bookingTime : request.bookingTimes()) {
+                // Convert to single preview request
+                BookingPreviewRequest singleRequest = new BookingPreviewRequest(
+                        request.customerId(),
+                        request.addressId(),
+                        request.newAddress(),
+                        bookingTime,
+                        request.note(),
+                        request.title(),
+                        request.promoCode(), // Promo applies to ALL bookings
+                        request.bookingDetails(),
+                        request.paymentMethodId(),
+                        request.additionalFeeIds()
+                );
+                
+                PreviewValidationOutcome validationOutcome = performPreviewValidation(singleRequest, targetCustomerId);
+                
+                if (validationOutcome.hasCriticalError()) {
+                    BookingPreviewResponse errorResponse = BookingPreviewResponse.error(validationOutcome.errors());
+                    errorResponse.setBookingTime(bookingTime);
+                    bookingPreviews.add(errorResponse);
+                    invalidBookingTimes.add(bookingTime);
+                    allErrors.addAll(validationOutcome.errors().stream()
+                            .map(e -> bookingTime + ": " + e)
+                            .toList());
+                } else {
+                    BookingPreviewResponse preview = buildPreviewResponse(validationOutcome, singleRequest);
+                    bookingPreviews.add(preview);
+                    if (preview.isValid()) {
+                        validBookingTimes.add(bookingTime);
+                        if (firstValidPreview == null) {
+                            firstValidPreview = preview;
+                        }
+                    } else {
+                        invalidBookingTimes.add(bookingTime);
+                        allErrors.addAll(preview.getErrors().stream()
+                                .map(e -> bookingTime + ": " + e)
+                                .toList());
+                    }
+                }
+            }
+            
+            // Calculate aggregated totals
+            BigDecimal totalEstimatedPrice = bookingPreviews.stream()
+                    .filter(BookingPreviewResponse::isValid)
+                    .map(BookingPreviewResponse::getGrandTotal)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            
+            // Calculate total duration
+            int totalDurationMinutes = bookingPreviews.stream()
+                    .filter(BookingPreviewResponse::isValid)
+                    .map(BookingPreviewResponse::getEstimatedDuration)
+                    .filter(Objects::nonNull)
+                    .mapToInt(this::parseDurationToMinutes)
+                    .sum();
+            String totalDuration = formatMinutesToDuration(totalDurationMinutes);
+            
+            boolean allValid = invalidBookingTimes.isEmpty() && !validBookingTimes.isEmpty();
+            
+            // Build response with shared service info from first valid preview
+            MultipleBookingPreviewResponse.MultipleBookingPreviewResponseBuilder responseBuilder = MultipleBookingPreviewResponse.builder()
+                    .valid(allValid)
+                    .errors(allValid ? List.of() : allErrors)
+                    .bookingCount(request.bookingTimes().size())
+                    .bookingPreviews(bookingPreviews)
+                    .totalEstimatedPrice(totalEstimatedPrice)
+                    .formattedTotalEstimatedPrice(BookingDTOFormatter.formatPrice(totalEstimatedPrice))
+                    .totalEstimatedDuration(totalDuration)
+                    .promoCode(request.promoCode())
+                    .promoAppliedToAll(request.promoCode() != null && !request.promoCode().isBlank())
+                    .validBookingsCount(validBookingTimes.size())
+                    .invalidBookingsCount(invalidBookingTimes.size())
+                    .validBookingTimes(validBookingTimes)
+                    .invalidBookingTimes(invalidBookingTimes);
+            
+            // Add shared service info from first valid preview (same for all bookings)
+            if (firstValidPreview != null) {
+                responseBuilder
+                        // Service items (shared)
+                        .serviceItems(firstValidPreview.getServiceItems())
+                        .totalServices(firstValidPreview.getTotalServices())
+                        .totalQuantityPerBooking(firstValidPreview.getTotalQuantity())
+                        .subtotalPerBooking(firstValidPreview.getSubtotal())
+                        .formattedSubtotalPerBooking(firstValidPreview.getFormattedSubtotal())
+                        // Customer info (shared)
+                        .customerId(firstValidPreview.getCustomerId())
+                        .customerName(firstValidPreview.getCustomerName())
+                        .customerPhone(firstValidPreview.getCustomerPhone())
+                        .customerEmail(firstValidPreview.getCustomerEmail())
+                        .addressInfo(firstValidPreview.getAddressInfo())
+                        .usingNewAddress(firstValidPreview.isUsingNewAddress())
+                        // Payment method (shared)
+                        .paymentMethodId(firstValidPreview.getPaymentMethodId())
+                        .paymentMethodName(firstValidPreview.getPaymentMethodName())
+                        // Fees (shared)
+                        .feeBreakdowns(firstValidPreview.getFeeBreakdowns())
+                        .totalFeesPerBooking(firstValidPreview.getTotalFees())
+                        .formattedTotalFeesPerBooking(firstValidPreview.getFormattedTotalFees())
+                        // Promotion (shared)
+                        .promotionInfo(firstValidPreview.getPromotionInfo())
+                        .discountPerBooking(firstValidPreview.getDiscountAmount())
+                        .formattedDiscountPerBooking(firstValidPreview.getFormattedDiscountAmount())
+                        // Price per booking
+                        .pricePerBooking(firstValidPreview.getGrandTotal())
+                        .formattedPricePerBooking(firstValidPreview.getFormattedGrandTotal())
+                        // Duration per booking
+                        .estimatedDurationPerBooking(firstValidPreview.getEstimatedDuration())
+                        .recommendedStaff(firstValidPreview.getRecommendedStaff());
+            }
+            
+            return responseBuilder.build();
+            
+        } catch (Exception e) {
+            log.error("Error generating multiple booking preview: {}", e.getMessage(), e);
+            return MultipleBookingPreviewResponse.error(List.of("Error generating preview: " + e.getMessage()));
+        }
+    }
+    
+    @Override
+    public RecurringBookingPreviewResponse previewRecurringBooking(RecurringBookingPreviewRequest request, String currentUserId, boolean isAdmin) {
+        log.info("Generating recurring booking preview for user: {}, isAdmin: {}, recurrenceType: {}", 
+                currentUserId, isAdmin, request.recurrenceType());
+        
+        try {
+            // Determine target customer
+            String targetCustomerId = determineTargetCustomerIdForRecurring(request, currentUserId, isAdmin);
+            
+            // Normalize recurrence days
+            List<Integer> normalizedDays = normalizeRecurrenceDays(request.recurrenceType(), request.recurrenceDays());
+            
+            // Calculate planned booking times (limited by maxPreviewOccurrences)
+            int maxOccurrences = request.getEffectiveMaxPreviewOccurrences();
+            List<LocalDateTime> allPlannedTimes = calculatePlannedBookingTimesForPreview(
+                    request, normalizedDays, maxOccurrences + 1 // +1 to check if there are more
+            );
+            
+            boolean hasMoreOccurrences = allPlannedTimes.size() > maxOccurrences;
+            List<LocalDateTime> plannedTimes = allPlannedTimes.stream()
+                    .limit(maxOccurrences)
+                    .toList();
+            
+            if (plannedTimes.isEmpty()) {
+                return RecurringBookingPreviewResponse.error(
+                        List.of("Không có lịch đặt nào trong khoảng thời gian đã chọn")
+                );
+            }
+            
+            // Preview the first occurrence to get detailed pricing
+            LocalDateTime firstBookingTime = plannedTimes.get(0);
+            BookingPreviewRequest singleRequest = new BookingPreviewRequest(
+                    request.customerId(),
+                    request.addressId(),
+                    request.newAddress(),
+                    firstBookingTime,
+                    request.note(),
+                    request.title(),
+                    request.promoCode(),
+                    request.bookingDetails(),
+                    request.paymentMethodId(),
+                    request.additionalFeeIds()
+            );
+            
+            PreviewValidationOutcome validationOutcome = performPreviewValidation(singleRequest, targetCustomerId);
+            
+            if (validationOutcome.hasCriticalError()) {
+                return RecurringBookingPreviewResponse.error(validationOutcome.errors());
+            }
+            
+            BookingPreviewResponse singlePreview = buildPreviewResponse(validationOutcome, singleRequest);
+            
+            // Calculate totals
+            int occurrenceCount = plannedTimes.size();
+            BigDecimal pricePerOccurrence = singlePreview.getGrandTotal() != null ? 
+                    singlePreview.getGrandTotal() : BigDecimal.ZERO;
+            BigDecimal totalEstimatedPrice = pricePerOccurrence.multiply(BigDecimal.valueOf(occurrenceCount));
+            
+            // Generate recurrence description
+            String recurrenceDescription = RecurringBookingPreviewResponse.generateRecurrenceDescription(
+                    request.recurrenceType(), normalizedDays, request.bookingTime()
+            );
+            
+            return RecurringBookingPreviewResponse.builder()
+                    .valid(singlePreview.isValid())
+                    .errors(singlePreview.getErrors())
+                    // Shared service info (same for all occurrences)
+                    .serviceItems(singlePreview.getServiceItems())
+                    .totalServices(singlePreview.getTotalServices())
+                    .totalQuantityPerOccurrence(singlePreview.getTotalQuantity())
+                    .subtotalPerOccurrence(singlePreview.getSubtotal())
+                    .formattedSubtotalPerOccurrence(singlePreview.getFormattedSubtotal())
+                    // Fees (shared)
+                    .feeBreakdowns(singlePreview.getFeeBreakdowns())
+                    .totalFeesPerOccurrence(singlePreview.getTotalFees())
+                    .formattedTotalFeesPerOccurrence(singlePreview.getFormattedTotalFees())
+                    // Discount per occurrence
+                    .discountPerOccurrence(singlePreview.getDiscountAmount())
+                    .formattedDiscountPerOccurrence(singlePreview.getFormattedDiscountAmount())
+                    // Recurrence info
+                    .recurrenceType(request.recurrenceType())
+                    .recurrenceDays(normalizedDays)
+                    .recurrenceDescription(recurrenceDescription)
+                    .bookingTime(request.bookingTime())
+                    .startDate(request.startDate())
+                    .endDate(request.endDate())
+                    .plannedBookingTimes(plannedTimes)
+                    .occurrenceCount(occurrenceCount)
+                    .maxPreviewOccurrences(maxOccurrences)
+                    .hasMoreOccurrences(hasMoreOccurrences)
+                    .singleBookingPreview(singlePreview)
+                    .pricePerOccurrence(pricePerOccurrence)
+                    .formattedPricePerOccurrence(BookingDTOFormatter.formatPrice(pricePerOccurrence))
+                    .totalEstimatedPrice(totalEstimatedPrice)
+                    .formattedTotalEstimatedPrice(BookingDTOFormatter.formatPrice(totalEstimatedPrice))
+                    .estimatedDurationPerOccurrence(singlePreview.getEstimatedDuration())
+                    .recommendedStaff(singlePreview.getRecommendedStaff())
+                    // Customer and address info
+                    .customerId(singlePreview.getCustomerId())
+                    .customerName(singlePreview.getCustomerName())
+                    .customerPhone(singlePreview.getCustomerPhone())
+                    .customerEmail(singlePreview.getCustomerEmail())
+                    .addressInfo(singlePreview.getAddressInfo())
+                    .usingNewAddress(singlePreview.isUsingNewAddress())
+                    // Payment method
+                    .paymentMethodId(singlePreview.getPaymentMethodId())
+                    .paymentMethodName(singlePreview.getPaymentMethodName())
+                    // Promo info
+                    .promoCode(request.promoCode())
+                    .promoAppliedToAll(request.promoCode() != null && !request.promoCode().isBlank())
+                    .promotionInfo(singlePreview.getPromotionInfo())
+                    .build();
+            
+        } catch (Exception e) {
+            log.error("Error generating recurring booking preview: {}", e.getMessage(), e);
+            return RecurringBookingPreviewResponse.error(List.of("Error generating preview: " + e.getMessage()));
+        }
+    }
+    
+    private String determineTargetCustomerIdForMultiple(MultipleBookingPreviewRequest request, String currentUserId, boolean isAdmin) {
+        if (isAdmin && request.customerId() != null && !request.customerId().isBlank()) {
+            return request.customerId();
+        }
+        return currentUserId;
+    }
+    
+    private String determineTargetCustomerIdForRecurring(RecurringBookingPreviewRequest request, String currentUserId, boolean isAdmin) {
+        if (isAdmin && request.customerId() != null && !request.customerId().isBlank()) {
+            return request.customerId();
+        }
+        return currentUserId;
+    }
+    
+    /**
+     * Calculate planned booking times for preview based on recurrence pattern.
+     * Similar to RecurringBookingServiceImpl but simplified for preview purposes.
+     */
+    private List<LocalDateTime> calculatePlannedBookingTimesForPreview(
+            RecurringBookingPreviewRequest request,
+            List<Integer> normalizedRecurrenceDays,
+            int maxOccurrences
+    ) {
+        List<LocalDateTime> times = new ArrayList<>();
+        
+        java.time.LocalDate currentDate = request.startDate();
+        java.time.LocalDate effectiveEndDate = request.endDate();
+        
+        // If no end date, calculate up to 1 year from start
+        if (effectiveEndDate == null) {
+            effectiveEndDate = request.startDate().plusYears(1);
+        }
+        
+        while (!currentDate.isAfter(effectiveEndDate) && times.size() < maxOccurrences) {
+            if (shouldGenerateBookingForDatePreview(request.recurrenceType(), normalizedRecurrenceDays, currentDate)) {
+                LocalDateTime bookingDateTime = LocalDateTime.of(currentDate, request.bookingTime());
+                // Only include future times
+                if (bookingDateTime.isAfter(LocalDateTime.now())) {
+                    times.add(bookingDateTime);
+                }
+            }
+            currentDate = currentDate.plusDays(1);
+        }
+        
+        return times.stream().sorted().toList();
+    }
+    
+    /**
+     * Check if a booking should be generated for a specific date based on recurrence pattern.
+     */
+    private boolean shouldGenerateBookingForDatePreview(
+            RecurrenceType type,
+            List<Integer> recurrenceDays,
+            java.time.LocalDate date
+    ) {
+        if (type == RecurrenceType.WEEKLY) {
+            int dayOfWeek = date.getDayOfWeek().getValue(); // 1 = Monday, 7 = Sunday
+            return recurrenceDays.contains(dayOfWeek);
+        } else if (type == RecurrenceType.MONTHLY) {
+            int dayOfMonth = date.getDayOfMonth();
+            return recurrenceDays.contains(dayOfMonth);
+        }
+        return false;
+    }
+    
+    /**
+     * Normalize recurrence days based on recurrence type.
+     * For WEEKLY: ensure values are 1-7 (Mon-Sun)
+     * For MONTHLY: ensure values are 1-31
+     */
+    private List<Integer> normalizeRecurrenceDays(RecurrenceType type, List<Integer> days) {
+        if (days == null || days.isEmpty()) {
+            return List.of();
+        }
+        
+        if (type == RecurrenceType.WEEKLY) {
+            return days.stream()
+                    .filter(d -> d >= 1 && d <= 7)
+                    .distinct()
+                    .sorted()
+                    .toList();
+        } else if (type == RecurrenceType.MONTHLY) {
+            return days.stream()
+                    .filter(d -> d >= 1 && d <= 31)
+                    .distinct()
+                    .sorted()
+                    .toList();
+        }
+        return days;
+    }
+    
+    /**
+     * Parse duration string (e.g., "2 giờ 30 phút") to minutes.
+     */
+    private int parseDurationToMinutes(String duration) {
+        if (duration == null || duration.isBlank()) {
+            return 0;
+        }
+        
+        int totalMinutes = 0;
+        
+        // Parse hours
+        if (duration.contains("giờ")) {
+            String[] parts = duration.split("giờ");
+            try {
+                totalMinutes += Integer.parseInt(parts[0].trim()) * 60;
+            } catch (NumberFormatException ignored) {}
+            
+            // Parse remaining minutes if exists
+            if (parts.length > 1 && parts[1].contains("phút")) {
+                String minutePart = parts[1].replace("phút", "").trim();
+                try {
+                    totalMinutes += Integer.parseInt(minutePart);
+                } catch (NumberFormatException ignored) {}
+            }
+        } else if (duration.contains("phút")) {
+            String minutePart = duration.replace("phút", "").trim();
+            try {
+                totalMinutes = Integer.parseInt(minutePart);
+            } catch (NumberFormatException ignored) {}
+        }
+        
+        return totalMinutes;
+    }
+    
+    /**
+     * Format minutes to duration string (e.g., 150 -> "2 giờ 30 phút").
+     */
+    private String formatMinutesToDuration(int totalMinutes) {
+        if (totalMinutes <= 0) {
+            return "0 phút";
+        }
+        
+        int hours = totalMinutes / 60;
+        int minutes = totalMinutes % 60;
+        
+        StringBuilder sb = new StringBuilder();
+        if (hours > 0) {
+            sb.append(hours).append(" giờ");
+            if (minutes > 0) {
+                sb.append(" ").append(minutes).append(" phút");
+            }
+        } else {
+            sb.append(minutes).append(" phút");
+        }
+        
+        return sb.toString();
+    }
+    
+    private String determineTargetCustomerId(BookingPreviewRequest request, String currentUserId, boolean isAdmin) {
+        // Admin can specify customerId, otherwise use current user
+        if (isAdmin && request.customerId() != null && !request.customerId().isBlank()) {
+            return request.customerId();
+        }
+        return currentUserId;
+    }
+    
+    private PreviewValidationOutcome performPreviewValidation(BookingPreviewRequest request, String customerId) {
+        log.info("Performing preview validation for customer: {}", customerId);
+        
+        List<String> errors = new ArrayList<>();      // Critical errors
+        List<String> warnings = new ArrayList<>();    // Non-critical warnings (promotion issues, etc.)
+        
+        // Validate customer and address
+        CustomerAddressContext addressContext;
+        try {
+            addressContext = validateCustomerAndAddressForPreview(request, customerId);
+        } catch (AddressNotFoundException | CustomerNotFoundException | IllegalArgumentException e) {
+            log.error("Error validating preview address: {}", e.getMessage());
+            errors.add(e.getMessage());
+            return new PreviewValidationOutcome(errors, warnings, null, null, null, null, null, null, null, null, null, null, null);
+        } catch (Exception e) {
+            log.error("Unexpected error validating preview address: {}", e.getMessage(), e);
+            errors.add("Validation error: " + e.getMessage());
+            return new PreviewValidationOutcome(errors, warnings, null, null, null, null, null, null, null, null, null, null, null);
+        }
+        
+        Customer customer = addressContext.customer();
+        
+        // Validate services and calculate prices (skip booking time validation for preview)
+        List<ServiceValidationInfo> serviceValidations = validateServices(request.bookingDetails(), errors);
+        BigDecimal calculatedTotalAmount = serviceValidations.stream()
+                .map(ServiceValidationInfo::getCalculatedPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        // Apply promotion with full result (cached)
+        PromotionApplicationResult promotionResult = applyPromotionWithDetails(
+                request.promoCode(), calculatedTotalAmount, customer);
+        
+        // Promotion errors are warnings, not critical errors
+        if (promotionResult.hasError()) {
+            warnings.add(promotionResult.errorMessage());
+        }
+        
+        BigDecimal finalAmount = promotionResult.finalAmount();
+        
+        // Apply system surcharge + other fees
+        FeeCalculationResult feeResult = calculateFees(finalAmount, request.additionalFeeIds());
+        BigDecimal totalWithFees = finalAmount.add(feeResult.totalFees());
+        
+        // Get payment method info if provided
+        iuh.house_keeping_service_be.models.PaymentMethod paymentMethod = null;
+        if (request.paymentMethodId() > 0) {
+            paymentMethod = paymentMethodRepository.findById(request.paymentMethodId()).orElse(null);
+        }
+        
+        // Build choice details for display
+        Map<Integer, List<ChoicePreviewItem>> choicesByService = buildChoicePreviewItems(request.bookingDetails());
+        
+        return new PreviewValidationOutcome(
+                errors,
+                warnings,
+                addressContext,
+                customer,
+                serviceValidations,
+                calculatedTotalAmount,
+                promotionResult,
+                finalAmount,
+                feeResult,
+                totalWithFees,
+                paymentMethod,
+                choicesByService,
+                request.bookingTime()
+        );
+    }
+    
+    private CustomerAddressContext validateCustomerAndAddressForPreview(BookingPreviewRequest request, String customerId) {
+        boolean hasAddressId = request.addressId() != null && !request.addressId().isBlank();
+        boolean hasNewAddress = request.newAddress() != null;
+
+        if ((hasAddressId && hasNewAddress) || (!hasAddressId && !hasNewAddress)) {
+            throw new IllegalArgumentException("Either addressId or newAddress must be provided");
+        }
+
+        if (hasAddressId) {
+            Address address = addressRepository.findAddressWithCustomer(request.addressId())
+                    .orElseThrow(() -> AddressNotFoundException.withId(request.addressId()));
+
+            Customer customer = address.getCustomer();
+            if (customer == null) {
+                throw CustomerNotFoundException.forAddress(request.addressId());
+            }
+
+            return new CustomerAddressContext(customer, address, false);
+        }
+
+        NewAddressRequest newAddress = request.newAddress();
+        // For preview, use the customerId from the request or the determined target customer
+        String targetCustomerId = newAddress.customerId() != null ? newAddress.customerId() : customerId;
+        Customer customer = customerRepository.findById(targetCustomerId)
+                .orElseThrow(() -> CustomerNotFoundException.withId(targetCustomerId));
+
+        Address address = new Address();
+        address.setCustomer(customer);
+        address.setFullAddress(newAddress.fullAddress());
+        address.setWard(newAddress.ward());
+        address.setCity(newAddress.city());
+        address.setLatitude(newAddress.latitude() != null ? BigDecimal.valueOf(newAddress.latitude()) : null);
+        address.setLongitude(newAddress.longitude() != null ? BigDecimal.valueOf(newAddress.longitude()) : null);
+        address.setIsDefault(Boolean.FALSE);
+
+        return new CustomerAddressContext(customer, address, true);
+    }
+    
+    /**
+     * Apply promotion with full details for preview (cacheable).
+     * Unlike applyPromotion(), this method returns all promotion details needed for display.
+     */
+    @org.springframework.cache.annotation.Cacheable(
+            value = CacheConfig.PROMOTION_VALIDATION_CACHE,
+            key = "#promoCode + ':' + #amount.toString() + ':' + #customer.customerId",
+            unless = "#result.hasError()"
+    )
+    public PromotionApplicationResult applyPromotionWithDetails(String promoCode, BigDecimal amount, Customer customer) {
+        if (promoCode == null || promoCode.trim().isEmpty()) {
+            return PromotionApplicationResult.noPromotion(amount);
+        }
+
+        Optional<Promotion> promotionOpt = promotionRepository.findAvailablePromotion(promoCode, LocalDateTime.now());
+        if (promotionOpt.isEmpty()) {
+            return PromotionApplicationResult.error(amount, "Promotion code is invalid or expired: " + promoCode);
+        }
+
+        Promotion promotion = promotionOpt.get();
+
+        // Check customer usage limit (if applicable)
+        long customerUsage = promotionRepository.countPromoCodeUsageByCustomer(promoCode, customer.getCustomerId());
+        if (customerUsage > 0) { // Assuming one-time use per customer
+            return PromotionApplicationResult.error(amount, "Promotion code has already been used by this customer");
+        }
+
+        // Calculate discount
+        BigDecimal discount = BigDecimal.ZERO;
+        if (promotion.getDiscountType() == DiscountType.FIXED_AMOUNT) {
+            discount = promotion.getDiscountValue();
+        } else if (promotion.getDiscountType() == DiscountType.PERCENTAGE) {
+            discount = amount.multiply(promotion.getDiscountValue()).divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+
+            // Apply max discount limit
+            if (promotion.getMaxDiscountAmount() != null &&
+                    discount.compareTo(promotion.getMaxDiscountAmount()) > 0) {
+                discount = promotion.getMaxDiscountAmount();
+            }
+        }
+
+        BigDecimal finalAmount = amount.subtract(discount).max(BigDecimal.ZERO);
+        
+        // Build promotion info for display
+        PromotionInfo promotionInfo = new PromotionInfo(
+                promotion.getPromotionId(),
+                promotion.getPromoCode(),
+                promotion.getDescription(),
+                promotion.getDiscountType(),
+                promotion.getDiscountValue(),
+                promotion.getMaxDiscountAmount()
+        );
+
+        return PromotionApplicationResult.success(finalAmount, discount, promotion, promotionInfo);
+    }
+    
+    private Map<Integer, List<ChoicePreviewItem>> buildChoicePreviewItems(List<BookingDetailRequest> bookingDetails) {
+        // Collect all choice IDs across all booking details
+        List<Integer> allChoiceIds = bookingDetails.stream()
+                .filter(detail -> detail.selectedChoiceIds() != null)
+                .flatMap(detail -> detail.selectedChoiceIds().stream())
+                .distinct()
+                .collect(Collectors.toList());
+        
+        if (allChoiceIds.isEmpty()) {
+            return Map.of();
+        }
+        
+        // Fetch all choices with option names in a single query
+        List<ServiceOptionChoice> choices = serviceOptionChoiceRepository.findChoicesWithOptionNames(allChoiceIds);
+        
+        // Build a map of choiceId -> ChoicePreviewItem with price from PricingRule
+        Map<Integer, ChoicePreviewItem> choiceItemMap = choices.stream()
+                .collect(Collectors.toMap(
+                        ServiceOptionChoice::getId,
+                        choice -> {
+                            // Get price adjustment from PricingRule via RuleCondition
+                            BigDecimal priceAdjustment = BigDecimal.ZERO;
+                            try {
+                                RuleCondition ruleCondition = ruleConditionRepository.findByChoice_Id(choice.getId());
+                                if (ruleCondition != null && ruleCondition.getRule() != null 
+                                        && ruleCondition.getRule().getPriceAdjustment() != null) {
+                                    priceAdjustment = ruleCondition.getRule().getPriceAdjustment();
+                                }
+                            } catch (Exception e) {
+                                log.debug("No pricing rule found for choice {}", choice.getId());
+                            }
+                            
+                            return new ChoicePreviewItem(
+                                    choice.getId(),
+                                    choice.getLabel(),
+                                    choice.getOption() != null ? choice.getOption().getLabel() : null,
+                                    priceAdjustment,
+                                    BookingDTOFormatter.formatPrice(priceAdjustment)
+                            );
+                        }
+                ));
+        
+        // Group by service
+        Map<Integer, List<ChoicePreviewItem>> result = new HashMap<>();
+        for (BookingDetailRequest detail : bookingDetails) {
+            if (detail.selectedChoiceIds() != null && !detail.selectedChoiceIds().isEmpty()) {
+                List<ChoicePreviewItem> items = detail.selectedChoiceIds().stream()
+                        .map(choiceItemMap::get)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
+                result.put(detail.serviceId(), items);
+            }
+        }
+        
+        return result;
+    }
+    
+    private BookingPreviewResponse buildPreviewResponse(PreviewValidationOutcome outcome, BookingPreviewRequest request) {
+        Customer customer = outcome.customer();
+        CustomerAddressContext addressContext = outcome.addressContext();
+        
+        // Build service preview items
+        List<ServicePreviewItem> serviceItems = buildServicePreviewItems(
+                outcome.serviceValidations(),
+                request.bookingDetails(),
+                outcome.choicesByService()
+        );
+        
+        // Calculate totals
+        int totalServices = serviceItems.size();
+        int totalQuantity = request.bookingDetails().stream()
+                .mapToInt(d -> d.quantity() != null ? d.quantity() : 1)
+                .sum();
+        
+        // Estimated duration (sum of all service durations)
+        BigDecimal totalDurationHours = outcome.serviceValidations().stream()
+                .filter(ServiceValidationInfo::isValid)
+                .map(info -> {
+                    Optional<Service> serviceOpt = serviceRepository.findById(info.getServiceId());
+                    return serviceOpt.map(s -> s.getEstimatedDurationHours() != null ? 
+                            s.getEstimatedDurationHours() : BigDecimal.ZERO).orElse(BigDecimal.ZERO);
+                })
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        // Recommended staff (max of all services)
+        int recommendedStaff = outcome.serviceValidations().stream()
+                .filter(ServiceValidationInfo::isValid)
+                .mapToInt(info -> info.getRecommendedStaff() != null ? info.getRecommendedStaff() : 1)
+                .max()
+                .orElse(1);
+        
+        // Build fee breakdowns
+        List<FeeBreakdownResponse> feeBreakdowns = outcome.feeResult().breakdowns().stream()
+                .map(info -> FeeBreakdownResponse.builder()
+                        .name(info.getName())
+                        .type(info.getType())
+                        .value(info.getValue())
+                        .amount(info.getAmount())
+                        .systemSurcharge(info.isSystemSurcharge())
+                        .build())
+                .collect(Collectors.toList());
+        
+        PromotionApplicationResult promotionResult = outcome.promotionResult();
+        
+        // Get phone from customer's account
+        String customerPhone = customer.getAccount() != null ? customer.getAccount().getPhoneNumber() : null;
+        
+        // Combine errors and warnings for display
+        List<String> allMessages = outcome.allMessages();
+        
+        // valid = true only if no errors AND no warnings
+        boolean isValid = outcome.errors().isEmpty() && outcome.warnings().isEmpty();
+        
+        return BookingPreviewResponse.builder()
+                .valid(isValid)
+                .errors(allMessages)  // Contains both errors and warnings
+                // Customer info
+                .customerId(customer.getCustomerId())
+                .customerName(customer.getFullName())
+                .customerPhone(customerPhone)
+                .customerEmail(customer.getEmail())
+                // Address info
+                .addressInfo(buildAddressInfo(addressContext.address()))
+                .usingNewAddress(addressContext.isNewAddress())
+                // Booking time
+                .bookingTime(outcome.bookingTime())
+                // Service items
+                .serviceItems(serviceItems)
+                .totalServices(totalServices)
+                .totalQuantity(totalQuantity)
+                // Pricing
+                .subtotal(outcome.calculatedTotalAmount())
+                .formattedSubtotal(BookingDTOFormatter.formatPrice(outcome.calculatedTotalAmount()))
+                // Promotion
+                .promotionInfo(promotionResult.promotionInfo())
+                .discountAmount(promotionResult.discountAmount())
+                .formattedDiscountAmount(BookingDTOFormatter.formatPrice(promotionResult.discountAmount()))
+                // After discount
+                .totalAfterDiscount(outcome.finalAmount())
+                .formattedTotalAfterDiscount(BookingDTOFormatter.formatPrice(outcome.finalAmount()))
+                // Fees
+                .feeBreakdowns(feeBreakdowns)
+                .totalFees(outcome.feeResult().totalFees())
+                .formattedTotalFees(BookingDTOFormatter.formatPrice(outcome.feeResult().totalFees()))
+                // Grand total
+                .grandTotal(outcome.totalWithFees())
+                .formattedGrandTotal(BookingDTOFormatter.formatPrice(outcome.totalWithFees()))
+                // Additional info
+                .estimatedDuration(formatDuration(totalDurationHours))
+                .recommendedStaff(recommendedStaff)
+                .note(request.note())
+                // Payment method
+                .paymentMethodId(outcome.paymentMethod() != null ? outcome.paymentMethod().getMethodId() : null)
+                .paymentMethodName(outcome.paymentMethod() != null ? outcome.paymentMethod().getMethodName() : null)
+                .build();
+    }
+    
+    private List<ServicePreviewItem> buildServicePreviewItems(
+            List<ServiceValidationInfo> serviceValidations,
+            List<BookingDetailRequest> bookingDetails,
+            Map<Integer, List<ChoicePreviewItem>> choicesByService) {
+        
+        // Map service validations by serviceId
+        Map<Integer, ServiceValidationInfo> validationMap = serviceValidations.stream()
+                .collect(Collectors.toMap(ServiceValidationInfo::getServiceId, v -> v, (a, b) -> a));
+        
+        return bookingDetails.stream()
+                .map(detail -> {
+                    ServiceValidationInfo validation = validationMap.get(detail.serviceId());
+                    if (validation == null || !validation.isValid()) {
+                        return null;
+                    }
+                    
+                    // Get full service details
+                    Optional<Service> serviceOpt = serviceRepository.findById(detail.serviceId());
+                    Service service = serviceOpt.orElse(null);
+                    
+                    int quantity = detail.quantity() != null ? detail.quantity() : 1;
+                    BigDecimal unitPrice = validation.getCalculatedPrice()
+                            .divide(BigDecimal.valueOf(quantity), 2, RoundingMode.HALF_UP);
+                    
+                    return new ServicePreviewItem(
+                            detail.serviceId(),
+                            validation.getServiceName(),
+                            service != null ? service.getDescription() : null,
+                            service != null ? service.getIconUrl() : null,
+                            quantity,
+                            service != null ? service.getUnit() : null,
+                            unitPrice,
+                            BookingDTOFormatter.formatPrice(unitPrice),
+                            validation.getCalculatedPrice(),
+                            BookingDTOFormatter.formatPrice(validation.getCalculatedPrice()),
+                            choicesByService.getOrDefault(detail.serviceId(), List.of()),
+                            service != null ? formatDuration(service.getEstimatedDurationHours()) : null,
+                            validation.getRecommendedStaff()
+                    );
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+    
+    private CustomerAddressInfo buildAddressInfo(Address address) {
+        if (address == null) return null;
+        
+        return new CustomerAddressInfo(
+                address.getAddressId(),
+                address.getFullAddress(),
+                address.getWard(),
+                address.getCity(),
+                address.getLatitude() != null ? address.getLatitude().doubleValue() : null,
+                address.getLongitude() != null ? address.getLongitude().doubleValue() : null,
+                address.getIsDefault()
+        );
+    }
+    
+    private String formatDuration(BigDecimal hours) {
+        if (hours == null || hours.compareTo(BigDecimal.ZERO) <= 0) {
+            return null;
+        }
+        
+        int totalMinutes = hours.multiply(BigDecimal.valueOf(60)).intValue();
+        int h = totalMinutes / 60;
+        int m = totalMinutes % 60;
+        
+        if (h > 0 && m > 0) {
+            return h + " giờ " + m + " phút";
+        } else if (h > 0) {
+            return h + " giờ";
+        } else {
+            return m + " phút";
+        }
+    }
+    
+    /**
+     * Preview validation outcome containing all calculated values for building the response.
+     */
+    private record PreviewValidationOutcome(
+            List<String> errors,
+            List<String> warnings,
+            CustomerAddressContext addressContext,
+            Customer customer,
+            List<ServiceValidationInfo> serviceValidations,
+            BigDecimal calculatedTotalAmount,
+            PromotionApplicationResult promotionResult,
+            BigDecimal finalAmount,
+            FeeCalculationResult feeResult,
+            BigDecimal totalWithFees,
+            iuh.house_keeping_service_be.models.PaymentMethod paymentMethod,
+            Map<Integer, List<ChoicePreviewItem>> choicesByService,
+            LocalDateTime bookingTime
+    ) {
+        /**
+         * Check if there are critical errors that prevent building a full response.
+         * Critical errors: customer not found, address not found, no valid services.
+         */
+        public boolean hasCriticalError() {
+            return customer == null || addressContext == null;
+        }
+        
+        /**
+         * Get all messages (errors + warnings) for display.
+         */
+        public List<String> allMessages() {
+            List<String> all = new ArrayList<>(errors);
+            all.addAll(warnings);
+            return all;
+        }
     }
 
     private ValidationOutcome performValidation(BookingCreateRequest request) {

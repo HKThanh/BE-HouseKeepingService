@@ -1,11 +1,17 @@
 package iuh.house_keeping_service_be.services.BookingService;
 
 import iuh.house_keeping_service_be.dtos.Booking.request.BookingCreateRequest;
+import iuh.house_keeping_service_be.dtos.Booking.request.BookingPreviewRequest;
 import iuh.house_keeping_service_be.dtos.Booking.request.MultipleBookingCreateRequest;
+import iuh.house_keeping_service_be.dtos.Booking.request.MultipleBookingPreviewRequest;
+import iuh.house_keeping_service_be.dtos.Booking.request.RecurringBookingPreviewRequest;
 import iuh.house_keeping_service_be.dtos.Booking.request.ConvertBookingToPostRequest;
 import iuh.house_keeping_service_be.dtos.Booking.request.BookingVerificationRequest;
 import iuh.house_keeping_service_be.dtos.Booking.request.UpdateBookingStatusRequest;
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingHistoryResponse;
+import iuh.house_keeping_service_be.dtos.Booking.response.BookingPreviewResponse;
+import iuh.house_keeping_service_be.dtos.Booking.response.MultipleBookingPreviewResponse;
+import iuh.house_keeping_service_be.dtos.Booking.response.RecurringBookingPreviewResponse;
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingResponse;
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingStatisticsByStatusResponse;
 import iuh.house_keeping_service_be.dtos.Booking.summary.BookingCreationSummary;
@@ -24,6 +30,40 @@ public interface BookingService {
     BookingValidationResult validateBooking(BookingCreateRequest request);
     Page<BookingHistoryResponse> getBookingsByCustomerId(String customerId, Pageable pageable);
     Page<BookingHistoryResponse> getBookingsByCustomerId(String customerId, LocalDateTime fromDate, Pageable pageable);
+    
+    /**
+     * Preview booking with detailed pricing breakdown (like an invoice).
+     * Does NOT create a booking, only calculates and returns pricing information.
+     * 
+     * @param request The booking preview request with service details
+     * @param currentUserId The ID of the current user (customer or admin)
+     * @param isAdmin Whether the current user is an admin
+     * @return BookingPreviewResponse with detailed pricing breakdown
+     */
+    BookingPreviewResponse previewBooking(BookingPreviewRequest request, String currentUserId, boolean isAdmin);
+    
+    /**
+     * Preview multiple bookings with different time slots but same services.
+     * Promo code applies to ALL bookings.
+     * 
+     * @param request The multiple booking preview request
+     * @param currentUserId The ID of the current user
+     * @param isAdmin Whether the current user is an admin
+     * @return MultipleBookingPreviewResponse with individual previews and aggregated totals
+     */
+    MultipleBookingPreviewResponse previewMultipleBookings(MultipleBookingPreviewRequest request, String currentUserId, boolean isAdmin);
+    
+    /**
+     * Preview recurring booking with pricing for all planned occurrences.
+     * Shows pricing breakdown per occurrence and total across all occurrences.
+     * Limited to maxPreviewOccurrences (default 30).
+     * 
+     * @param request The recurring booking preview request
+     * @param currentUserId The ID of the current user
+     * @param isAdmin Whether the current user is an admin
+     * @return RecurringBookingPreviewResponse with recurrence info and pricing
+     */
+    RecurringBookingPreviewResponse previewRecurringBooking(RecurringBookingPreviewRequest request, String currentUserId, boolean isAdmin);
     
     // Convert booking to post (when no employee is selected)
     BookingResponse convertBookingToPost(String bookingId, ConvertBookingToPostRequest request);

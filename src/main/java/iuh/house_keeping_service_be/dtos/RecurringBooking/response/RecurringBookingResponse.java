@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingDetailInfo;
 import iuh.house_keeping_service_be.dtos.Booking.response.CustomerAddressInfo;
 import iuh.house_keeping_service_be.dtos.Booking.response.CustomerInfo;
+import iuh.house_keeping_service_be.dtos.Booking.response.EmployeeInfoPublic;
 import iuh.house_keeping_service_be.dtos.Booking.response.PromotionInfo;
 import iuh.house_keeping_service_be.enums.RecurrenceType;
 import iuh.house_keeping_service_be.enums.RecurringBookingStatus;
@@ -47,8 +48,9 @@ public class RecurringBookingResponse {
     private String title;
     private PromotionInfo promotion;
     private List<BookingDetailInfo> recurringBookingDetails;
-    private String assignedEmployeeId;
-    private String assignedEmployeeName;
+    
+    // Assigned employee info (without sensitive data like phone/email)
+    private EmployeeInfoPublic assignedEmployee;
 
     private RecurringBookingStatus status;
     private String statusDisplay; // Vietnamese display

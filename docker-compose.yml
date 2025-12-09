@@ -14,6 +14,43 @@ services:
     networks:
       - house_keeping_network
 
+  postgres:
+    image: postgres:15
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - ./postgres_data/data:/var/lib/postgresql/data
+      - ./postgres_data/init_sql:/docker-entrypoint-initdb.d
+    networks:
+      - house_keeping_network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d house_keeping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - house_keeping_network
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   app:
     build: .
     image: 21086351huynhkimthanh/house_keeping_app:latest
@@ -101,43 +138,6 @@ services:
       - SPRING_APPLICATION_JSON={"logging":{"level":{"iuh.house_keeping_service_be":"DEBUG"}}}
     networks:
       - house_keeping_network
-
-  postgres:
-    image: postgres:15
-    restart: always
-    env_file:
-      - .env
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-    volumes:
-      - ./postgres_data/data:/var/lib/postgresql/data
-      - ./postgres_data/init_sql:/docker-entrypoint-initdb.d
-    networks:
-      - house_keeping_network
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres -d house_keeping" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  redis:
-    image: redis:7
-    restart: always
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - house_keeping_network
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
 volumes:
   postgres_data:

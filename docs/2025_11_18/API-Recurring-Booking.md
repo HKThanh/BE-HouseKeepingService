@@ -17,53 +17,13 @@ Tính năng đặt lịch định kỳ cho phép khách hàng tạo các booking
 **Request Body:**
 ```json
 {
-  "addressId": "adrs0001-0000-0000-0000-000000000009",
-  "newAddress": {
-    "customerId": "c1000001-0000-0000-0000-000000000004",
-    "fullAddress": "45 Nguyễn Huệ, Phường Phú An, Thành phố Hồ Chí Minh",
-    "ward": "Phường Phú An",
-    "city": "Thành phố Hồ Chí Minh",
-    "latitude": 10.7743,
-    "longitude": 106.7043
-  },
-  "recurrenceType": "WEEKLY",
-  "recurrenceDays": [1, 3, 5],
-  "bookingTime": "14:00:00",
-  "startDate": "2025-11-20",
-  "endDate": "2026-12-30",
-  "note": "Vệ sinh định kỳ căn hộ 2 phòng ngủ",
-  "title": "Dọn dẹp hàng tuần",
-  "promoCode": null,
-  "bookingDetails": [
-    {
-      "serviceId": 2,
-      "quantity": 1
-    }
-  ]
-}
-```
-
-**Hành vi sinh slot ngay sau khi tạo (realtime window fill):**
-- Sau khi job 02:00 đã chạy, API vẫn sinh ngay các slot còn lại trong cửa sổ generate hiện tại (30 ngày nếu chưa cố định nhân viên, 7 ngày nếu đã cố định), miễn là `bookingTime` còn ở tương lai tính từ thời điểm gọi API.
-- Nếu `startDate` = hôm nay và hôm nay là ngày lặp, slot hôm nay sẽ được sinh nếu thời gian còn lại (>= now). Slot đã qua trong ngày sẽ bị bỏ qua.
-- Vẫn tránh trùng nhờ kiểm tra slot tồn tại trong khoảng cửa sổ.
-
-**Ràng buộc thời gian & mã lỗi:**
-- `startDate` phải từ hôm nay trở đi; `endDate` (nếu có) phải sau `startDate`.
-- `bookingTime` bắt buộc.
-- `recurrenceDays`: WEEKLY chỉ nhận 1-7, MONTHLY chỉ nhận 1-31; danh sách không được rỗng.
-- Tổng số lần lặp tối đa 365 lần (nếu không truyền `endDate`, BE kiểm tra trong 12 tháng kể từ `startDate`). Vi phạm trả về `errorCode: RECURRING_TIME_INVALID` kèm danh sách lỗi chi tiết.
-
-**Response thành công (201):**
-```json
-{
     "success": true,
     "message": "Đặt lịch định kỳ thành công",
     "data": {
         "success": true,
         "message": "Đặt lịch định kỳ thành công",
         "recurringBooking": {
-            "recurringBookingId": "ab854ad3-5cc1-49fe-8087-8673ece2b3d2",
+            "recurringBookingId": "1ddc656e-f820-4b81-8c6d-15520d1d77f1",
             "customerId": "c1000001-0000-0000-0000-000000000004",
             "customerName": "Nguyễn Văn An",
             "customer": {
@@ -90,74 +50,230 @@ Tính năng đặt lịch định kỳ cho phép khách hàng tạo các booking
             "recurrenceTypeDisplay": "Hàng tuần",
             "recurrenceDays": [
                 1,
-                3,
-                5
+                2,
+                4
             ],
-            "recurrenceDaysDisplay": "Thứ 2, Thứ 4, Thứ 6",
-            "bookingTime": "16:00:00",
-            "startDate": "2025-11-23",
-            "endDate": "2026-12-10",
+            "recurrenceDaysDisplay": "Thứ 2, Thứ 3, Thứ 5",
+            "bookingTime": "08:00:00",
+            "startDate": "2025-12-27",
+            "endDate": "2026-01-15",
             "note": "Vệ sinh định kỳ căn hộ 2 phòng ngủ",
             "title": "Dọn dẹp hàng tuần",
             "promotion": null,
             "recurringBookingDetails": [
                 {
-                    "bookingDetailId": "c4a78eca-aec1-493d-ad38-d7444cb46634",
+                    "bookingDetailId": "a0515373-973c-4626-89d4-da2687afeaf1",
                     "service": {
-                        "serviceId": 2,
-                        "name": "Tổng vệ sinh",
-                        "description": "Làm sạch sâu toàn diện, bao gồm các khu vực khó tiếp cận, trần nhà, lau cửa kính. Thích hợp cho nhà mới hoặc dọn dẹp theo mùa.",
-                        "basePrice": 100000.00,
-                        "unit": "Gói",
+                        "serviceId": 1,
+                        "name": "Dọn dẹp theo giờ",
+                        "description": "Lau dọn, hút bụi, làm sạch các bề mặt cơ bản trong nhà. Phù hợp cho nhu cầu duy trì vệ sinh hàng tuần.",
+                        "basePrice": 50000.00,
+                        "unit": "Giờ",
                         "estimatedDurationHours": 2.0,
-                        "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599581/house_cleaning_nob_umewqf.png",
+                        "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1764171235/Cleaning_Clock-removebg-preview_o0oevs.png",
                         "categoryName": "Dọn dẹp nhà",
                         "isActive": true
                     },
                     "quantity": 1,
-                    "pricePerUnit": 100000.00,
-                    "formattedPricePerUnit": "100,000 đ",
-                    "subTotal": 100000.00,
-                    "formattedSubTotal": "100,000 đ",
+                    "pricePerUnit": 50000.00,
+                    "formattedPricePerUnit": "50,000 đ",
+                    "subTotal": 50000.00,
+                    "formattedSubTotal": "50,000 đ",
                     "selectedChoices": [],
                     "assignments": [],
                     "duration": "2.0h",
                     "formattedDuration": "2.0h"
                 }
             ],
-            "assignedEmployeeId": "e1000001-0000-0000-0000-000000000004",
-            "assignedEmployeeName": "Nguyễn Thị Mai",
+            "assignedEmployee": {
+                "employeeId": "e1000001-0000-0000-0000-000000000020",
+                "fullName": "Phạm Thị Dung Em",
+                "avatar": "https://i.pravatar.cc/150?img=45",
+                "rating": "HIGH",
+                "employeeStatus": "AVAILABLE",
+                "skills": [
+                    "Vệ sinh sofa",
+                    "Giặt thảm"
+                ],
+                "bio": "Chuyên vệ sinh nội thất cao cấp."
+            },
             "status": "ACTIVE",
             "statusDisplay": "Đang hoạt động",
             "cancelledAt": null,
             "cancellationReason": null,
-            "createdAt": "2025-11-22T22:08:06",
-            "updatedAt": "2025-11-22T22:08:07",
-            "totalGeneratedBookings": 0,
-            "upcomingBookings": 0
+            "createdAt": "2025-12-09T15:43:15",
+            "updatedAt": "2025-12-09T15:43:15",
+            "totalGeneratedBookings": 3,
+            "upcomingBookings": 3,
+            "expectedBookingsInWindow": 3,
+            "generatedBookingsInWindow": 3,
+            "generationWindowDays": 7,
+            "generationProgressPercent": 100.0
         },
-        "generatedBookingIds": [],
-        "totalBookingsToBeCreated": 8,
-        "expectedBookingsInWindow": 8,
-        "generatedBookingsInWindow": 0,
-        "generationWindowDays": 30,
-        "generationProgressPercent": 0.0,
+        "generatedBookingIds": [
+            "e61dc6d8-cd73-4d04-8a46-558e2c54faae",
+            "bdb4dddb-2f17-45bc-993e-64c4ab2f9966",
+            "db204132-f90b-4650-9c10-7cd6b06b1f5a"
+        ],
+        "totalBookingsToBeCreated": 3,
+        "expectedBookingsInWindow": 3,
+        "generatedBookingsInWindow": 3,
+        "generationWindowDays": 7,
+        "generationProgressPercent": 100.0,
         "conversation": {
-            "conversationId": "6e1a222a-1e33-4744-b42c-92a72cef5254",
+            "conversationId": "b9b4769e-2313-44bc-bff2-aab04e4442f5",
             "customerId": "c1000001-0000-0000-0000-000000000004",
             "customerName": "Nguyễn Văn An",
             "customerAvatar": "https://i.pravatar.cc/150?img=11",
-            "employeeId": "e1000001-0000-0000-0000-000000000004",
-            "employeeName": "Nguyễn Thị Mai",
-            "employeeAvatar": "https://i.pravatar.cc/150?img=12",
+            "employeeId": "e1000001-0000-0000-0000-000000000020",
+            "employeeName": "Phạm Thị Dung Em",
+            "employeeAvatar": "https://i.pravatar.cc/150?img=45",
             "bookingId": null,
-            "recurringBookingId": "ab854ad3-5cc1-49fe-8087-8673ece2b3d2",
-            "lastMessage": "Xin chào. Tôi là Nguyễn Thị Mai sẽ đồng hành cùng lịch dọn định kỳ của bạn tại 45 Nguyễn Huệ, Phường Phú An, Thành phố Hồ Chí Minh. Nếu bạn có câu hỏi, hãy nhắn tin tại đây.",
-            "lastMessageTime": "2025-11-22T22:08:07",
+            "recurringBookingId": "1ddc656e-f820-4b81-8c6d-15520d1d77f1",
+            "lastMessage": "Xin chào. Tôi là Phạm Thị Dung Em sẽ đồng hành cùng lịch sử dụng dịch vụ Dọn dẹp theo giờ định kỳ của bạn tại 45 Nguyễn Huệ, Phường Phú An, Thành phố Hồ Chí Minh vào lúc 08:00 Thứ 2, Thứ 3, Thứ 5 mỗi tuần. Nếu bạn có câu hỏi, hãy nhắn tin tại đây.",
+            "lastMessageTime": "2025-12-09T15:43:39.474681014",
             "isActive": true,
             "canChat": true,
-            "createdAt": "2025-11-22T22:08:07",
-            "updatedAt": "2025-11-22T22:08:07"
+            "createdAt": null,
+            "updatedAt": null
+        }
+    }
+}
+```
+
+**Hành vi sinh slot ngay sau khi tạo (realtime window fill):**
+- Sau khi job 02:00 đã chạy, API vẫn sinh ngay các slot còn lại trong cửa sổ generate hiện tại (30 ngày nếu chưa cố định nhân viên, 7 ngày nếu đã cố định), miễn là `bookingTime` còn ở tương lai tính từ thời điểm gọi API.
+- Nếu `startDate` = hôm nay và hôm nay là ngày lặp, slot hôm nay sẽ được sinh nếu thời gian còn lại (>= now). Slot đã qua trong ngày sẽ bị bỏ qua.
+- Vẫn tránh trùng nhờ kiểm tra slot tồn tại trong khoảng cửa sổ.
+
+**Ràng buộc thời gian & mã lỗi:**
+- `startDate` phải từ hôm nay trở đi; `endDate` (nếu có) phải sau `startDate`.
+- `bookingTime` bắt buộc.
+- `recurrenceDays`: WEEKLY chỉ nhận 1-7, MONTHLY chỉ nhận 1-31; danh sách không được rỗng.
+- Tổng số lần lặp tối đa 365 lần (nếu không truyền `endDate`, BE kiểm tra trong 12 tháng kể từ `startDate`). Vi phạm trả về `errorCode: RECURRING_TIME_INVALID` kèm danh sách lỗi chi tiết.
+
+**Response thành công (201):**
+```json
+{
+    "success": true,
+    "message": "Đặt lịch định kỳ thành công",
+    "data": {
+        "success": true,
+        "message": "Đặt lịch định kỳ thành công",
+        "recurringBooking": {
+            "recurringBookingId": "1ddc656e-f820-4b81-8c6d-15520d1d77f1",
+            "customerId": "c1000001-0000-0000-0000-000000000004",
+            "customerName": "Nguyễn Văn An",
+            "customer": {
+                "customerId": "c1000001-0000-0000-0000-000000000004",
+                "fullName": "Nguyễn Văn An",
+                "avatar": "https://i.pravatar.cc/150?img=11",
+                "email": "nguyenvanan@gmail.com",
+                "phoneNumber": "0987654321",
+                "isMale": true,
+                "birthdate": "1995-03-15",
+                "rating": null,
+                "vipLevel": null
+            },
+            "address": {
+                "addressId": "adrs0001-0000-0000-0000-000000000009",
+                "fullAddress": "45 Nguyễn Huệ, Phường Phú An, Thành phố Hồ Chí Minh",
+                "ward": "Phường Phú An",
+                "city": "Thành phố Hồ Chí Minh",
+                "latitude": 10.7743,
+                "longitude": 106.7043,
+                "isDefault": true
+            },
+            "recurrenceType": "WEEKLY",
+            "recurrenceTypeDisplay": "Hàng tuần",
+            "recurrenceDays": [
+                1,
+                2,
+                4
+            ],
+            "recurrenceDaysDisplay": "Thứ 2, Thứ 3, Thứ 5",
+            "bookingTime": "08:00:00",
+            "startDate": "2025-12-27",
+            "endDate": "2026-01-15",
+            "note": "Vệ sinh định kỳ căn hộ 2 phòng ngủ",
+            "title": "Dọn dẹp hàng tuần",
+            "promotion": null,
+            "recurringBookingDetails": [
+                {
+                    "bookingDetailId": "a0515373-973c-4626-89d4-da2687afeaf1",
+                    "service": {
+                        "serviceId": 1,
+                        "name": "Dọn dẹp theo giờ",
+                        "description": "Lau dọn, hút bụi, làm sạch các bề mặt cơ bản trong nhà. Phù hợp cho nhu cầu duy trì vệ sinh hàng tuần.",
+                        "basePrice": 50000.00,
+                        "unit": "Giờ",
+                        "estimatedDurationHours": 2.0,
+                        "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1764171235/Cleaning_Clock-removebg-preview_o0oevs.png",
+                        "categoryName": "Dọn dẹp nhà",
+                        "isActive": true
+                    },
+                    "quantity": 1,
+                    "pricePerUnit": 50000.00,
+                    "formattedPricePerUnit": "50,000 đ",
+                    "subTotal": 50000.00,
+                    "formattedSubTotal": "50,000 đ",
+                    "selectedChoices": [],
+                    "assignments": [],
+                    "duration": "2.0h",
+                    "formattedDuration": "2.0h"
+                }
+            ],
+            "assignedEmployee": {
+                "employeeId": "e1000001-0000-0000-0000-000000000020",
+                "fullName": "Phạm Thị Dung Em",
+                "avatar": "https://i.pravatar.cc/150?img=45",
+                "rating": "HIGH",
+                "employeeStatus": "AVAILABLE",
+                "skills": [
+                    "Vệ sinh sofa",
+                    "Giặt thảm"
+                ],
+                "bio": "Chuyên vệ sinh nội thất cao cấp."
+            },
+            "status": "ACTIVE",
+            "statusDisplay": "Đang hoạt động",
+            "cancelledAt": null,
+            "cancellationReason": null,
+            "createdAt": "2025-12-09T15:43:15",
+            "updatedAt": "2025-12-09T15:43:15",
+            "totalGeneratedBookings": 3,
+            "upcomingBookings": 3,
+            "expectedBookingsInWindow": 3,
+            "generatedBookingsInWindow": 3,
+            "generationWindowDays": 7,
+            "generationProgressPercent": 100.0
+        },
+        "generatedBookingIds": [
+            "e61dc6d8-cd73-4d04-8a46-558e2c54faae",
+            "bdb4dddb-2f17-45bc-993e-64c4ab2f9966",
+            "db204132-f90b-4650-9c10-7cd6b06b1f5a"
+        ],
+        "totalBookingsToBeCreated": 3,
+        "expectedBookingsInWindow": 3,
+        "generatedBookingsInWindow": 3,
+        "generationWindowDays": 7,
+        "generationProgressPercent": 100.0,
+        "conversation": {
+            "conversationId": "b9b4769e-2313-44bc-bff2-aab04e4442f5",
+            "customerId": "c1000001-0000-0000-0000-000000000004",
+            "customerName": "Nguyễn Văn An",
+            "customerAvatar": "https://i.pravatar.cc/150?img=11",
+            "employeeId": "e1000001-0000-0000-0000-000000000020",
+            "employeeName": "Phạm Thị Dung Em",
+            "employeeAvatar": "https://i.pravatar.cc/150?img=45",
+            "bookingId": null,
+            "recurringBookingId": "1ddc656e-f820-4b81-8c6d-15520d1d77f1",
+            "lastMessage": "Xin chào. Tôi là Phạm Thị Dung Em sẽ đồng hành cùng lịch sử dụng dịch vụ Dọn dẹp theo giờ định kỳ của bạn tại 45 Nguyễn Huệ, Phường Phú An, Thành phố Hồ Chí Minh vào lúc 08:00 Thứ 2, Thứ 3, Thứ 5 mỗi tuần. Nếu bạn có câu hỏi, hãy nhắn tin tại đây.",
+            "lastMessageTime": "2025-12-09T15:43:39.474681014",
+            "isActive": true,
+            "canChat": true,
+            "createdAt": null,
+            "updatedAt": null
         }
     }
 }
@@ -192,7 +308,7 @@ Tính năng đặt lịch định kỳ cho phép khách hàng tạo các booking
     "success": true,
     "message": "Đã hủy lịch định kỳ thành công",
     "data": {
-        "recurringBookingId": "6216b5fc-2e98-45ca-a692-af5a218c9448",
+        "recurringBookingId": "1ddc656e-f820-4b81-8c6d-15520d1d77f1",
         "customerId": "c1000001-0000-0000-0000-000000000004",
         "customerName": "Nguyễn Văn An",
         "customer": {
@@ -219,49 +335,65 @@ Tính năng đặt lịch định kỳ cho phép khách hàng tạo các booking
         "recurrenceTypeDisplay": "Hàng tuần",
         "recurrenceDays": [
             1,
-            3,
-            5
+            2,
+            4
         ],
-        "recurrenceDaysDisplay": "Thứ 2, Thứ 4, Thứ 6",
-        "bookingTime": "14:00:00",
-        "startDate": "2025-11-20",
-        "endDate": "2026-12-30",
+        "recurrenceDaysDisplay": "Thứ 2, Thứ 3, Thứ 5",
+        "bookingTime": "08:00:00",
+        "startDate": "2025-12-27",
+        "endDate": "2026-01-15",
         "note": "Vệ sinh định kỳ căn hộ 2 phòng ngủ",
         "title": "Dọn dẹp hàng tuần",
         "promotion": null,
         "recurringBookingDetails": [
             {
-                "bookingDetailId": "01105fbc-b4cc-4992-87c4-bf78dc45d2da",
+                "bookingDetailId": "a0515373-973c-4626-89d4-da2687afeaf1",
                 "service": {
-                    "serviceId": 2,
-                    "name": "Tổng vệ sinh",
-                    "description": "Làm sạch sâu toàn diện, bao gồm các khu vực khó tiếp cận, trần nhà, lau cửa kính. Thích hợp cho nhà mới hoặc dọn dẹp theo mùa.",
-                    "basePrice": 100000.00,
-                    "unit": "Gói",
+                    "serviceId": 1,
+                    "name": "Dọn dẹp theo giờ",
+                    "description": "Lau dọn, hút bụi, làm sạch các bề mặt cơ bản trong nhà. Phù hợp cho nhu cầu duy trì vệ sinh hàng tuần.",
+                    "basePrice": 50000.00,
+                    "unit": "Giờ",
                     "estimatedDurationHours": 2.0,
-                    "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599581/house_cleaning_nob_umewqf.png",
+                    "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1764171235/Cleaning_Clock-removebg-preview_o0oevs.png",
                     "categoryName": "Dọn dẹp nhà",
                     "isActive": true
                 },
                 "quantity": 1,
-                "pricePerUnit": 100000.00,
-                "formattedPricePerUnit": "100,000 đ",
-                "subTotal": 100000.00,
-                "formattedSubTotal": "100,000 đ",
+                "pricePerUnit": 50000.00,
+                "formattedPricePerUnit": "50,000 đ",
+                "subTotal": 50000.00,
+                "formattedSubTotal": "50,000 đ",
                 "selectedChoices": [],
                 "assignments": [],
                 "duration": "2.0h",
                 "formattedDuration": "2.0h"
             }
         ],
+        "assignedEmployee": {
+            "employeeId": "e1000001-0000-0000-0000-000000000020",
+            "fullName": "Phạm Thị Dung Em",
+            "avatar": "https://i.pravatar.cc/150?img=45",
+            "rating": "HIGH",
+            "employeeStatus": "AVAILABLE",
+            "skills": [
+                "Vệ sinh sofa",
+                "Giặt thảm"
+            ],
+            "bio": "Chuyên vệ sinh nội thất cao cấp."
+        },
         "status": "CANCELLED",
         "statusDisplay": "Đã hủy",
-        "cancelledAt": "2025-11-18T13:14:46",
+        "cancelledAt": "2025-12-09T15:56:58",
         "cancellationReason": "Không còn nhu cầu sử dụng dịch vụ",
-        "createdAt": "2025-11-18T13:12:23",
-        "updatedAt": "2025-11-18T13:12:23",
-        "totalGeneratedBookings": 12,
-        "upcomingBookings": null
+        "createdAt": "2025-12-09T15:43:15",
+        "updatedAt": "2025-12-09T15:43:15",
+        "totalGeneratedBookings": 0,
+        "upcomingBookings": null,
+        "expectedBookingsInWindow": null,
+        "generatedBookingsInWindow": null,
+        "generationWindowDays": null,
+        "generationProgressPercent": null
     }
 }
 ```
@@ -288,12 +420,9 @@ Tính năng đặt lịch định kỳ cho phép khách hàng tạo các booking
 **Response thành công (200):**
 ```json
 {
-    "currentPage": 0,
-    "totalItems": 2,
-    "totalPages": 1,
     "data": [
         {
-            "recurringBookingId": "6216b5fc-2e98-45ca-a692-af5a218c9448",
+            "recurringBookingId": "1ddc656e-f820-4b81-8c6d-15520d1d77f1",
             "customerId": "c1000001-0000-0000-0000-000000000004",
             "customerName": "Nguyễn Văn An",
             "customer": {
@@ -320,124 +449,71 @@ Tính năng đặt lịch định kỳ cho phép khách hàng tạo các booking
             "recurrenceTypeDisplay": "Hàng tuần",
             "recurrenceDays": [
                 1,
-                3,
-                5
+                2,
+                4
             ],
-            "recurrenceDaysDisplay": "Thứ 2, Thứ 4, Thứ 6",
-            "bookingTime": "14:00:00",
-            "startDate": "2025-11-20",
-            "endDate": "2026-12-30",
+            "recurrenceDaysDisplay": "Thứ 2, Thứ 3, Thứ 5",
+            "bookingTime": "08:00:00",
+            "startDate": "2025-12-27",
+            "endDate": "2026-01-15",
             "note": "Vệ sinh định kỳ căn hộ 2 phòng ngủ",
             "title": "Dọn dẹp hàng tuần",
             "promotion": null,
             "recurringBookingDetails": [
                 {
-                    "bookingDetailId": "01105fbc-b4cc-4992-87c4-bf78dc45d2da",
+                    "bookingDetailId": "a0515373-973c-4626-89d4-da2687afeaf1",
                     "service": {
-                        "serviceId": 2,
-                        "name": "Tổng vệ sinh",
-                        "description": "Làm sạch sâu toàn diện, bao gồm các khu vực khó tiếp cận, trần nhà, lau cửa kính. Thích hợp cho nhà mới hoặc dọn dẹp theo mùa.",
-                        "basePrice": 100000.00,
-                        "unit": "Gói",
+                        "serviceId": 1,
+                        "name": "Dọn dẹp theo giờ",
+                        "description": "Lau dọn, hút bụi, làm sạch các bề mặt cơ bản trong nhà. Phù hợp cho nhu cầu duy trì vệ sinh hàng tuần.",
+                        "basePrice": 50000.00,
+                        "unit": "Giờ",
                         "estimatedDurationHours": 2.0,
-                        "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599581/house_cleaning_nob_umewqf.png",
+                        "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1764171235/Cleaning_Clock-removebg-preview_o0oevs.png",
                         "categoryName": "Dọn dẹp nhà",
                         "isActive": true
                     },
                     "quantity": 1,
-                    "pricePerUnit": 100000.00,
-                    "formattedPricePerUnit": "100,000 đ",
-                    "subTotal": 100000.00,
-                    "formattedSubTotal": "100,000 đ",
+                    "pricePerUnit": 50000.00,
+                    "formattedPricePerUnit": "50,000 đ",
+                    "subTotal": 50000.00,
+                    "formattedSubTotal": "50,000 đ",
                     "selectedChoices": [],
                     "assignments": [],
                     "duration": "2.0h",
                     "formattedDuration": "2.0h"
                 }
             ],
+            "assignedEmployee": {
+                "employeeId": "e1000001-0000-0000-0000-000000000020",
+                "fullName": "Phạm Thị Dung Em",
+                "avatar": "https://i.pravatar.cc/150?img=45",
+                "rating": "HIGH",
+                "employeeStatus": "AVAILABLE",
+                "skills": [
+                    "Vệ sinh sofa",
+                    "Giặt thảm"
+                ],
+                "bio": "Chuyên vệ sinh nội thất cao cấp."
+            },
             "status": "ACTIVE",
             "statusDisplay": "Đang hoạt động",
             "cancelledAt": null,
             "cancellationReason": null,
-            "createdAt": "2025-11-18T13:12:23",
-            "updatedAt": "2025-11-18T13:12:23",
-            "totalGeneratedBookings": 12,
-            "upcomingBookings": 12
-        },
-        {
-            "recurringBookingId": "34f43915-ce77-499f-9db1-39b8545b9edb",
-            "customerId": "c1000001-0000-0000-0000-000000000004",
-            "customerName": "Nguyễn Văn An",
-            "customer": {
-                "customerId": "c1000001-0000-0000-0000-000000000004",
-                "fullName": "Nguyễn Văn An",
-                "avatar": "https://i.pravatar.cc/150?img=11",
-                "email": "nguyenvanan@gmail.com",
-                "phoneNumber": "0987654321",
-                "isMale": true,
-                "birthdate": "1995-03-15",
-                "rating": null,
-                "vipLevel": null
-            },
-            "address": {
-                "addressId": "adrs0001-0000-0000-0000-000000000009",
-                "fullAddress": "45 Nguyễn Huệ, Phường Phú An, Thành phố Hồ Chí Minh",
-                "ward": "Phường Phú An",
-                "city": "Thành phố Hồ Chí Minh",
-                "latitude": 10.7743,
-                "longitude": 106.7043,
-                "isDefault": true
-            },
-            "recurrenceType": "WEEKLY",
-            "recurrenceTypeDisplay": "Hàng tuần",
-            "recurrenceDays": [
-                1,
-                3,
-                5
-            ],
-            "recurrenceDaysDisplay": "Thứ 2, Thứ 4, Thứ 6",
-            "bookingTime": "14:00:00",
-            "startDate": "2025-11-20",
-            "endDate": "2026-12-30",
-            "note": "Vệ sinh định kỳ căn hộ 2 phòng ngủ",
-            "title": "Dọn dẹp hàng tuần",
-            "promotion": null,
-            "recurringBookingDetails": [
-                {
-                    "bookingDetailId": "089ac986-7863-43e6-862f-b8a65b4aed59",
-                    "service": {
-                        "serviceId": 2,
-                        "name": "Tổng vệ sinh",
-                        "description": "Làm sạch sâu toàn diện, bao gồm các khu vực khó tiếp cận, trần nhà, lau cửa kính. Thích hợp cho nhà mới hoặc dọn dẹp theo mùa.",
-                        "basePrice": 100000.00,
-                        "unit": "Gói",
-                        "estimatedDurationHours": 2.0,
-                        "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599581/house_cleaning_nob_umewqf.png",
-                        "categoryName": "Dọn dẹp nhà",
-                        "isActive": true
-                    },
-                    "quantity": 1,
-                    "pricePerUnit": 100000.00,
-                    "formattedPricePerUnit": "100,000 đ",
-                    "subTotal": 100000.00,
-                    "formattedSubTotal": "100,000 đ",
-                    "selectedChoices": [],
-                    "assignments": [],
-                    "duration": "2.0h",
-                    "formattedDuration": "2.0h"
-                }
-            ],
-            "status": "ACTIVE",
-            "statusDisplay": "Đang hoạt động",
-            "cancelledAt": null,
-            "cancellationReason": null,
-            "createdAt": "2025-11-18T13:11:31",
-            "updatedAt": "2025-11-18T13:11:31",
-            "totalGeneratedBookings": 12,
-            "upcomingBookings": 12
+            "createdAt": "2025-12-09T15:43:15",
+            "updatedAt": "2025-12-09T15:43:15",
+            "totalGeneratedBookings": 3,
+            "upcomingBookings": 3,
+            "expectedBookingsInWindow": 3,
+            "generatedBookingsInWindow": 3,
+            "generationWindowDays": 7,
+            "generationProgressPercent": 100.0
         }
     ],
-    "success": true
+    "success": true,
+    "currentPage": 0,
+    "totalItems": 1,
+    "totalPages": 1
 }
 ```
 
@@ -457,7 +533,7 @@ Tính năng đặt lịch định kỳ cho phép khách hàng tạo các booking
 ```json
 {
     "data": {
-        "recurringBookingId": "6216b5fc-2e98-45ca-a692-af5a218c9448",
+        "recurringBookingId": "1ddc656e-f820-4b81-8c6d-15520d1d77f1",
         "customerId": "c1000001-0000-0000-0000-000000000004",
         "customerName": "Nguyễn Văn An",
         "customer": {
@@ -484,49 +560,65 @@ Tính năng đặt lịch định kỳ cho phép khách hàng tạo các booking
         "recurrenceTypeDisplay": "Hàng tuần",
         "recurrenceDays": [
             1,
-            3,
-            5
+            2,
+            4
         ],
-        "recurrenceDaysDisplay": "Thứ 2, Thứ 4, Thứ 6",
-        "bookingTime": "14:00:00",
-        "startDate": "2025-11-20",
-        "endDate": "2026-12-30",
+        "recurrenceDaysDisplay": "Thứ 2, Thứ 3, Thứ 5",
+        "bookingTime": "08:00:00",
+        "startDate": "2025-12-27",
+        "endDate": "2026-01-15",
         "note": "Vệ sinh định kỳ căn hộ 2 phòng ngủ",
         "title": "Dọn dẹp hàng tuần",
         "promotion": null,
         "recurringBookingDetails": [
             {
-                "bookingDetailId": "01105fbc-b4cc-4992-87c4-bf78dc45d2da",
+                "bookingDetailId": "a0515373-973c-4626-89d4-da2687afeaf1",
                 "service": {
-                    "serviceId": 2,
-                    "name": "Tổng vệ sinh",
-                    "description": "Làm sạch sâu toàn diện, bao gồm các khu vực khó tiếp cận, trần nhà, lau cửa kính. Thích hợp cho nhà mới hoặc dọn dẹp theo mùa.",
-                    "basePrice": 100000.00,
-                    "unit": "Gói",
+                    "serviceId": 1,
+                    "name": "Dọn dẹp theo giờ",
+                    "description": "Lau dọn, hút bụi, làm sạch các bề mặt cơ bản trong nhà. Phù hợp cho nhu cầu duy trì vệ sinh hàng tuần.",
+                    "basePrice": 50000.00,
+                    "unit": "Giờ",
                     "estimatedDurationHours": 2.0,
-                    "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1757599581/house_cleaning_nob_umewqf.png",
+                    "iconUrl": "https://res.cloudinary.com/dkzemgit8/image/upload/v1764171235/Cleaning_Clock-removebg-preview_o0oevs.png",
                     "categoryName": "Dọn dẹp nhà",
                     "isActive": true
                 },
                 "quantity": 1,
-                "pricePerUnit": 100000.00,
-                "formattedPricePerUnit": "100,000 đ",
-                "subTotal": 100000.00,
-                "formattedSubTotal": "100,000 đ",
+                "pricePerUnit": 50000.00,
+                "formattedPricePerUnit": "50,000 đ",
+                "subTotal": 50000.00,
+                "formattedSubTotal": "50,000 đ",
                 "selectedChoices": [],
                 "assignments": [],
                 "duration": "2.0h",
                 "formattedDuration": "2.0h"
             }
         ],
+        "assignedEmployee": {
+            "employeeId": "e1000001-0000-0000-0000-000000000020",
+            "fullName": "Phạm Thị Dung Em",
+            "avatar": "https://i.pravatar.cc/150?img=45",
+            "rating": "HIGH",
+            "employeeStatus": "AVAILABLE",
+            "skills": [
+                "Vệ sinh sofa",
+                "Giặt thảm"
+            ],
+            "bio": "Chuyên vệ sinh nội thất cao cấp."
+        },
         "status": "ACTIVE",
         "statusDisplay": "Đang hoạt động",
         "cancelledAt": null,
         "cancellationReason": null,
-        "createdAt": "2025-11-18T13:12:23",
-        "updatedAt": "2025-11-18T13:12:23",
-        "totalGeneratedBookings": 12,
-        "upcomingBookings": 12
+        "createdAt": "2025-12-09T15:43:15",
+        "updatedAt": "2025-12-09T15:43:15",
+        "totalGeneratedBookings": 3,
+        "upcomingBookings": 3,
+        "expectedBookingsInWindow": 3,
+        "generatedBookingsInWindow": 3,
+        "generationWindowDays": 7,
+        "generationProgressPercent": 100.0
     },
     "success": true
 }

@@ -4,10 +4,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import iuh.house_keeping_service_be.config.JwtUtil;
 import iuh.house_keeping_service_be.dtos.Booking.internal.BookingValidationResult;
 import iuh.house_keeping_service_be.dtos.Booking.request.BookingCreateRequest;
+import iuh.house_keeping_service_be.dtos.Booking.request.BookingPreviewRequest;
 import iuh.house_keeping_service_be.dtos.Booking.request.MultipleBookingCreateRequest;
+import iuh.house_keeping_service_be.dtos.Booking.request.MultipleBookingPreviewRequest;
+import iuh.house_keeping_service_be.dtos.Booking.request.RecurringBookingPreviewRequest;
 import iuh.house_keeping_service_be.dtos.Booking.request.BookingCancelRequest;
 import iuh.house_keeping_service_be.dtos.Booking.request.ConvertBookingToPostRequest;
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingHistoryResponse;
+import iuh.house_keeping_service_be.dtos.Booking.response.BookingPreviewResponse;
+import iuh.house_keeping_service_be.dtos.Booking.response.MultipleBookingPreviewResponse;
+import iuh.house_keeping_service_be.dtos.Booking.response.RecurringBookingPreviewResponse;
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingResponse;
 import iuh.house_keeping_service_be.dtos.Booking.summary.BookingCreationSummary;
 import iuh.house_keeping_service_be.dtos.Booking.summary.MultipleBookingCreationSummary;
@@ -30,6 +36,9 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -99,7 +108,7 @@ public class BookingController {
         }
     }
 
-    @PostMapping(consumes = {"multipart/form-data"})
+    @PostMapping(value = "", consumes = {"multipart/form-data"})
     @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_ADMIN')")
     public ResponseEntity<?> createBooking(
             @RequestPart(value = "booking", required = true) String bookingJson,
@@ -354,6 +363,147 @@ public class BookingController {
         BookingValidationResult result = bookingService.validateBooking(request);
 
         return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Preview/Quote endpoint - Returns detailed pricing breakdown for a booking without creating it.
+     * This endpoint allows customers and admins to see a complete invoice-like preview of the booking
+     * including services, pricing, promotions, fees, and grand total.
+     * 
+     * Admin users can specify a customerId to preview on behalf of a customer.
+     * 
+     * Always returns HTTP 200 with validation status in the response body.
+     */
+    @PostMapping("/preview")
+    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_ADMIN')")
+    public ResponseEntity<BookingPreviewResponse> previewBooking(@Valid @RequestBody BookingPreviewRequest request) {
+        log.info("Generating booking preview");
+        
+        try {
+            // Get current user info from security context
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String currentUserId = authentication.getName();
+            
+            // Check if current user is admin
+            boolean isAdmin = authentication.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .anyMatch(auth -> auth.equals("ROLE_ADMIN"));
+            
+            // For customers, get their customerId from the repository
+            if (!isAdmin) {
+                Customer customer = customerRepository.findByAccount_Username(currentUserId).orElse(null);
+                if (customer != null) {
+                    currentUserId = customer.getCustomerId();
+                }
+            }
+            
+            log.info("Preview requested by user: {}, isAdmin: {}", currentUserId, isAdmin);
+            
+            BookingPreviewResponse preview = bookingService.previewBooking(request, currentUserId, isAdmin);
+            
+            // Always return HTTP 200 (validation errors are in the response body)
+            return ResponseEntity.ok(preview);
+            
+        } catch (Exception e) {
+            log.error("Error generating booking preview: {}", e.getMessage(), e);
+            return ResponseEntity.ok(BookingPreviewResponse.error(
+                    List.of("Error generating preview: " + e.getMessage())
+            ));
+        }
+    }
+
+    /**
+     * Preview multiple bookings with different time slots but same services.
+     * Promo code applies to ALL bookings.
+     * Returns individual preview for each time slot plus aggregated totals.
+     * 
+     * Admin users can specify a customerId to preview on behalf of a customer.
+     * 
+     * Always returns HTTP 200 with validation status in the response body.
+     */
+    @PostMapping("/preview/multiple")
+    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_ADMIN')")
+    public ResponseEntity<MultipleBookingPreviewResponse> previewMultipleBookings(
+            @Valid @RequestBody MultipleBookingPreviewRequest request) {
+        log.info("Generating multiple booking preview for {} time slots", request.bookingTimes().size());
+        
+        try {
+            // Get current user info from security context
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String currentUserId = authentication.getName();
+            
+            // Check if current user is admin
+            boolean isAdmin = authentication.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .anyMatch(auth -> auth.equals("ROLE_ADMIN"));
+            
+            // For customers, get their customerId from the repository
+            if (!isAdmin) {
+                Customer customer = customerRepository.findByAccount_Username(currentUserId).orElse(null);
+                if (customer != null) {
+                    currentUserId = customer.getCustomerId();
+                }
+            }
+            
+            log.info("Multiple preview requested by user: {}, isAdmin: {}", currentUserId, isAdmin);
+            
+            MultipleBookingPreviewResponse preview = bookingService.previewMultipleBookings(request, currentUserId, isAdmin);
+            
+            return ResponseEntity.ok(preview);
+            
+        } catch (Exception e) {
+            log.error("Error generating multiple booking preview: {}", e.getMessage(), e);
+            return ResponseEntity.ok(MultipleBookingPreviewResponse.error(
+                    List.of("Error generating preview: " + e.getMessage())
+            ));
+        }
+    }
+
+    /**
+     * Preview recurring booking with pricing for all planned occurrences.
+     * Shows pricing breakdown per occurrence and total across all occurrences.
+     * Limited to maxPreviewOccurrences (default 30, max 30).
+     * 
+     * Admin users can specify a customerId to preview on behalf of a customer.
+     * 
+     * Always returns HTTP 200 with validation status in the response body.
+     */
+    @PostMapping("/preview/recurring")
+    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_ADMIN')")
+    public ResponseEntity<RecurringBookingPreviewResponse> previewRecurringBooking(
+            @Valid @RequestBody RecurringBookingPreviewRequest request) {
+        log.info("Generating recurring booking preview, recurrenceType: {}", request.recurrenceType());
+        
+        try {
+            // Get current user info from security context
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String currentUserId = authentication.getName();
+            
+            // Check if current user is admin
+            boolean isAdmin = authentication.getAuthorities().stream()
+                    .map(GrantedAuthority::getAuthority)
+                    .anyMatch(auth -> auth.equals("ROLE_ADMIN"));
+            
+            // For customers, get their customerId from the repository
+            if (!isAdmin) {
+                Customer customer = customerRepository.findByAccount_Username(currentUserId).orElse(null);
+                if (customer != null) {
+                    currentUserId = customer.getCustomerId();
+                }
+            }
+            
+            log.info("Recurring preview requested by user: {}, isAdmin: {}", currentUserId, isAdmin);
+            
+            RecurringBookingPreviewResponse preview = bookingService.previewRecurringBooking(request, currentUserId, isAdmin);
+            
+            return ResponseEntity.ok(preview);
+            
+        } catch (Exception e) {
+            log.error("Error generating recurring booking preview: {}", e.getMessage(), e);
+            return ResponseEntity.ok(RecurringBookingPreviewResponse.error(
+                    List.of("Error generating preview: " + e.getMessage())
+            ));
+        }
     }
 
     @GetMapping("/customer/{customerId}")

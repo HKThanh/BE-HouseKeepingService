@@ -33,8 +33,8 @@ INSERT INTO service (category_id, name, description, base_price, unit, estimated
 
 -- Thêm các chương trình khuyến mãi
 INSERT INTO promotions (promo_code, description, discount_type, discount_value, max_discount_amount, start_date, end_date, is_active) VALUES
-('GIAM20K', 'Giảm giá 20,000đ cho mọi đơn hàng', 'FIXED_AMOUNT', 20000, NULL, '2025-08-01 00:00:00+07', '2025-09-30 23:59:59+07', TRUE),
-('KHAITRUONG10', 'Giảm 10% mừng khai trương', 'PERCENTAGE', 10, 50000, '2025-08-01 00:00:00+07', '2025-08-31 23:59:59+07', TRUE);
+('GIAM20K', 'Giảm giá 20,000đ cho mọi đơn hàng', 'FIXED_AMOUNT', 20000, NULL, '2025-11-01 00:00:00+07', '2025-12-30 23:59:59+07', TRUE),
+('KHAITRUONG10', 'Giảm 10% mừng khai trương', 'PERCENTAGE', 10, 50000, '2025-11-01 00:00:00+07', '2025-12-31 23:59:59+07', TRUE);
 
 -- Thêm các lịch đặt (bookings) mẫu
 -- Một lịch đã HOÀN THÀNH của khách hàng 'John Doe'

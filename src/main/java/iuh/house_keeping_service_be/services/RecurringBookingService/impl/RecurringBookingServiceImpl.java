@@ -72,6 +72,8 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
     private final EmployeeScheduleService employeeScheduleService;
     private final EmployeeRepository employeeRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final PaymentRepository paymentRepository;
+    private final ConversationRepository conversationRepository;
     @Lazy
     @Autowired
     private RecurringBookingServiceImpl self;
@@ -208,14 +210,8 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
 
             log.info("Recurring booking created successfully with ID: {}", savedRecurringBooking.getRecurringBookingId());
 
-            // Build response
+            // Build response (mapper handles assignedEmployee info)
             RecurringBookingResponse response = recurringBookingMapper.toResponse(savedRecurringBooking);
-            
-            // Update response with assigned employee info
-            if (assignedEmployee != null) {
-                response.setAssignedEmployeeId(assignedEmployee.getEmployeeId());
-                response.setAssignedEmployeeName(assignedEmployee.getFullName());
-            }
             
             // Không chờ sinh booking, chỉ tính nhanh kỳ vọng trong cửa sổ (không scan DB để tránh chậm)
             populateInitialExpectedStats(response, request, normalizedRecurrenceDays);
@@ -363,7 +359,7 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
             recurringBooking.setCancelledAt(LocalDateTime.now());
             recurringBooking.setCancellationReason(request.reason());
 
-            // Delete all future bookings (bookings with status PENDING or AWAITING_EMPLOYEE)
+            // Find all future bookings (bookings with status PENDING or AWAITING_EMPLOYEE)
             LocalDateTime now = LocalDateTime.now();
             List<BookingStatus> cancellableStatuses = List.of(BookingStatus.PENDING, BookingStatus.AWAITING_EMPLOYEE);
             List<Booking> futureBookings = bookingRepository.findFutureByRecurringAndStatuses(
@@ -372,8 +368,30 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
                     cancellableStatuses
             );
 
-            log.info("Deleting {} future bookings", futureBookings.size());
-            bookingRepository.deleteAllInBatch(futureBookings);
+            if (!futureBookings.isEmpty()) {
+                List<String> bookingIds = futureBookings.stream()
+                        .map(Booking::getBookingId)
+                        .collect(Collectors.toList());
+
+                log.info("Deleting {} future bookings and related records", futureBookings.size());
+
+                // Step 1: Delete related records in correct order to avoid FK constraint violations
+                // 1.1 Delete assignments (references booking_details)
+                assignmentRepository.deleteByBookingIds(bookingIds);
+                log.debug("Deleted assignments for bookings: {}", bookingIds);
+
+                // 1.2 Unlink conversations from bookings (set booking_id = null, don't delete conversations)
+                conversationRepository.unlinkBookingsByIds(bookingIds);
+                log.debug("Unlinked conversations for bookings: {}", bookingIds);
+
+                // 1.3 Delete payments (references bookings)
+                paymentRepository.deleteByBookingIds(bookingIds);
+                log.debug("Deleted payments for bookings: {}", bookingIds);
+
+                // Step 2: Delete bookings (cascade will delete booking_details, additional_fees, image_urls)
+                bookingRepository.deleteAllInBatch(futureBookings);
+                log.debug("Deleted bookings: {}", bookingIds);
+            }
 
             RecurringBooking saved = recurringBookingRepository.save(recurringBooking);
 
@@ -1364,10 +1382,6 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
                     List.of(BookingStatus.PENDING, BookingStatus.AWAITING_EMPLOYEE)
             );
             response.setUpcomingBookings((int) upcoming);
-            if (recurringBooking.getAssignedEmployee() != null) {
-                response.setAssignedEmployeeId(recurringBooking.getAssignedEmployee().getEmployeeId());
-                response.setAssignedEmployeeName(recurringBooking.getAssignedEmployee().getFullName());
-            }
 
             int windowDays = resolveGenerationWindowDays(recurringBooking);
             List<Integer> recurrenceDays = parseRecurrenceDays(recurringBooking.getRecurrenceDays());

@@ -4,6 +4,7 @@ import iuh.house_keeping_service_be.dtos.Review.ReviewCreateRequest;
 import iuh.house_keeping_service_be.dtos.Review.ReviewResponse;
 import iuh.house_keeping_service_be.dtos.Review.ReviewSummaryResponse;
 import iuh.house_keeping_service_be.dtos.Review.PendingReviewResponse;
+import iuh.house_keeping_service_be.dtos.Review.ReviewableEmployeeResponse;
 import iuh.house_keeping_service_be.models.ReviewCriteria;
 import iuh.house_keeping_service_be.services.ReviewService.ReviewService;
 import jakarta.validation.Valid;
@@ -18,7 +19,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/reviews")
@@ -37,7 +37,7 @@ public class ReviewController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @GetMapping("/reviews/criteria")
+    @GetMapping(value = "/criteria", produces = "application/json")
     public ResponseEntity<List<ReviewCriteria>> getReviewCriteria() {
         return ResponseEntity.ok(reviewService.getAllCriteria());
     }
@@ -55,21 +55,37 @@ public class ReviewController {
         return ResponseEntity.ok(reviews);
     }
 
-    @GetMapping("/employees/{employeeId}/reviews/summary")
+    @GetMapping("/employees/{employeeId}/summary")
     public ResponseEntity<ReviewSummaryResponse> getEmployeeReviewSummary(@PathVariable String employeeId) {
         return ResponseEntity.ok(reviewService.getEmployeeSummary(employeeId));
     }
 
     @GetMapping("/pending")
     @PreAuthorize("hasRole('ROLE_CUSTOMER')")
-    public ResponseEntity<?> getPendingReviewsForCustomer(
-            @RequestHeader("Authorization") String authorizationHeader
+    public ResponseEntity<Page<PendingReviewResponse>> getPendingReviewsForCustomer(
+            @RequestHeader("Authorization") String authorizationHeader,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
     ) {
-        List<PendingReviewResponse> pending = reviewService.getPendingReviewsForCustomer(authorizationHeader);
-        return ResponseEntity.ok(Map.of(
-                "success", true,
-                "data", pending,
-                "total", pending.size()
-        ));
+        int safePage = Math.max(page, 0);
+        int safeSize = size <= 0 ? 10 : Math.min(size, 50);
+        Pageable pageable = PageRequest.of(safePage, safeSize);
+        Page<PendingReviewResponse> pending = reviewService.getPendingReviewsForCustomer(authorizationHeader, pageable);
+        return ResponseEntity.ok(pending);
+    }
+
+    @GetMapping("/bookings/{bookingId}/reviewable-employees")
+    @PreAuthorize("hasRole('ROLE_CUSTOMER')")
+    public ResponseEntity<Page<ReviewableEmployeeResponse>> getReviewableEmployees(
+            @RequestHeader("Authorization") String authorizationHeader,
+            @PathVariable String bookingId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ) {
+        int safePage = Math.max(page, 0);
+        int safeSize = size <= 0 ? 10 : Math.min(size, 50);
+        Pageable pageable = PageRequest.of(safePage, safeSize);
+        Page<ReviewableEmployeeResponse> employees = reviewService.getReviewableEmployees(authorizationHeader, bookingId, pageable);
+        return ResponseEntity.ok(employees);
     }
 }

@@ -43,4 +43,14 @@ public interface ServiceOptionChoiceRepository extends JpaRepository<ServiceOpti
     // Count choices for an option
     @Query("SELECT COUNT(soc) FROM ServiceOptionChoice soc WHERE soc.option.id = :optionId")
     long countByServiceOptionId(@Param("optionId") Integer optionId);
+    
+    /**
+     * Find choices with option names for preview display.
+     * Returns choice details including the option name for displaying in booking preview.
+     */
+    @Query("SELECT soc FROM ServiceOptionChoice soc " +
+           "JOIN FETCH soc.option so " +
+           "WHERE soc.id IN :choiceIds " +
+           "ORDER BY so.displayOrder, soc.displayOrder")
+    List<ServiceOptionChoice> findChoicesWithOptionNames(@Param("choiceIds") List<Integer> choiceIds);
 }

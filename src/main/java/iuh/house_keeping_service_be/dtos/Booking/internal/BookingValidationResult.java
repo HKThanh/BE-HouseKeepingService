@@ -1,5 +1,6 @@
 package iuh.house_keeping_service_be.dtos.Booking.internal;
 
+import iuh.house_keeping_service_be.dtos.Booking.response.PromotionInfo;
 import iuh.house_keeping_service_be.models.Address;
 import iuh.house_keeping_service_be.models.Customer;
 import lombok.AllArgsConstructor;
@@ -29,6 +30,11 @@ public class BookingValidationResult {
     private Address address;
     private boolean usingNewAddress;
     
+    // New fields for promotion/discount info
+    private PromotionInfo promotionInfo;
+    private BigDecimal discountAmount;
+    private BigDecimal originalBaseAmount; // Base amount before discount
+    
     public static BookingValidationResult success(BigDecimal totalAmount,
                                                   BigDecimal baseAmount,
                                                   BigDecimal totalFees,
@@ -49,6 +55,41 @@ public class BookingValidationResult {
             .customer(customer)
             .address(address)
             .usingNewAddress(usingNewAddress)
+            .promotionInfo(null)
+            .discountAmount(BigDecimal.ZERO)
+            .originalBaseAmount(baseAmount)
+            .build();
+    }
+    
+    /**
+     * Create a successful validation result with promotion information.
+     */
+    public static BookingValidationResult successWithPromotion(BigDecimal totalAmount,
+                                                               BigDecimal baseAmountAfterDiscount,
+                                                               BigDecimal totalFees,
+                                                               List<FeeBreakdownInfo> feeBreakdowns,
+                                                               List<ServiceValidationInfo> validations,
+                                                               Customer customer,
+                                                               Address address,
+                                                               boolean usingNewAddress,
+                                                               PromotionInfo promotionInfo,
+                                                               BigDecimal discountAmount,
+                                                               BigDecimal originalBaseAmount) {
+        return BookingValidationResult.builder()
+            .valid(true)
+            .errors(List.of())
+            .conflicts(List.of())
+            .calculatedTotalAmount(totalAmount)
+            .baseAmount(baseAmountAfterDiscount)
+            .totalFees(totalFees)
+            .feeBreakdowns(feeBreakdowns)
+            .serviceValidations(validations)
+            .customer(customer)
+            .address(address)
+            .usingNewAddress(usingNewAddress)
+            .promotionInfo(promotionInfo)
+            .discountAmount(discountAmount)
+            .originalBaseAmount(originalBaseAmount)
             .build();
     }
     
@@ -65,6 +106,9 @@ public class BookingValidationResult {
             .customer(null)
             .address(null)
             .usingNewAddress(false)
+            .promotionInfo(null)
+            .discountAmount(BigDecimal.ZERO)
+            .originalBaseAmount(BigDecimal.ZERO)
             .build();
     }
     
@@ -81,6 +125,9 @@ public class BookingValidationResult {
             .customer(null)
             .address(null)
             .usingNewAddress(false)
+            .promotionInfo(null)
+            .discountAmount(BigDecimal.ZERO)
+            .originalBaseAmount(BigDecimal.ZERO)
             .build();
     }
 }

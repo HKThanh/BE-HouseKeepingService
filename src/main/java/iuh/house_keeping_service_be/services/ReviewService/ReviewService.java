@@ -4,6 +4,7 @@ import iuh.house_keeping_service_be.dtos.Review.ReviewCreateRequest;
 import iuh.house_keeping_service_be.dtos.Review.ReviewResponse;
 import iuh.house_keeping_service_be.dtos.Review.PendingReviewResponse;
 import iuh.house_keeping_service_be.dtos.Review.ReviewSummaryResponse;
+import iuh.house_keeping_service_be.dtos.Review.ReviewableEmployeeResponse;
 import iuh.house_keeping_service_be.models.ReviewCriteria;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,5 +20,7 @@ public interface ReviewService {
 
     ReviewSummaryResponse getEmployeeSummary(String employeeId);
 
-    List<PendingReviewResponse> getPendingReviewsForCustomer(String authorizationHeader);
+    Page<PendingReviewResponse> getPendingReviewsForCustomer(String authorizationHeader, Pageable pageable);
+
+    Page<ReviewableEmployeeResponse> getReviewableEmployees(String authorizationHeader, String bookingId, Pageable pageable);
 }

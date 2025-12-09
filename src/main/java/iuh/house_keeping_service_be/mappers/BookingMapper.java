@@ -235,6 +235,25 @@ public class BookingMapper {
         );
     }
 
+    /**
+     * Convert Employee to EmployeeInfoPublic DTO (without sensitive data like phone/email)
+     * Used for public-facing responses where sensitive data should not be exposed
+     */
+    public EmployeeInfoPublic toEmployeeInfoPublic(Employee employee) {
+        if (employee == null) {
+            return null;
+        }
+        return new EmployeeInfoPublic(
+            employee.getEmployeeId(),
+            employee.getFullName(),
+            employee.getAvatar(),
+            employee.getRating(),
+            employee.getEmployeeStatus(),
+            employee.getSkills() != null ? employee.getSkills() : List.of(),
+            employee.getBio()
+        );
+    }
+
     public PaymentInfo toPaymentInfo(Payment payment) {
         String paymentMethodName = paymentMethodRepository.findPaymentMethodNameByPaymentId(payment.getId());
 

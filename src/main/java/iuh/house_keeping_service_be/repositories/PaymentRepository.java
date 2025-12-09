@@ -61,4 +61,9 @@ public interface PaymentRepository extends JpaRepository<Payment, String> {
     List<Payment> findByPaymentMethod_MethodCode(PaymentMethodCode methodCode);
 
     List<Payment> findByCreatedAtBetween(LocalDateTime startDate, LocalDateTime endDate);
+
+    // Delete payments by booking IDs (for cascade delete when cancelling recurring bookings)
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM Payment p WHERE p.booking.bookingId IN :bookingIds")
+    void deleteByBookingIds(@Param("bookingIds") List<String> bookingIds);
 }

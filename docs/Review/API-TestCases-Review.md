@@ -169,7 +169,7 @@ Each test case includes:
   ```json
   {
     "success": false,
-    "message": "Bạn không thể đánh giá đặt chỗ của người khác"
+    "message": "Bạn không thể đánh giá đơn đặt của người khác"
   }
   ```
 - **Status Code**: 403 Forbidden
@@ -242,7 +242,7 @@ Each test case includes:
   ```json
   {
     "success": false,
-    "message": "Nhân viên không được phân công cho đơn đặt chỗ này"
+    "message": "Nhân viên không được phân công cho đơn đặt này"
   }
   ```
 - **Status Code**: 400 Bad Request
