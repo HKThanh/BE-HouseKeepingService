@@ -5,7 +5,8 @@ public record RegisterResponse (
     String email,
     String role,
     Boolean isEmailVerified,
-    Boolean isPhoneVerified
+    Boolean isPhoneVerified,
+    String addressId
 ) {
 
 }

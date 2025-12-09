@@ -1,15 +1,19 @@
 package iuh.house_keeping_service_be.services.AuthService.impl;
 
 import iuh.house_keeping_service_be.config.JwtUtil;
+import iuh.house_keeping_service_be.dtos.Authentication.RegisterAddressRequest;
+import iuh.house_keeping_service_be.dtos.Authentication.RegisterResult;
 import iuh.house_keeping_service_be.dtos.Authentication.TokenPair;
 import iuh.house_keeping_service_be.enums.AccountStatus;
 import iuh.house_keeping_service_be.enums.RoleName;
 import iuh.house_keeping_service_be.models.Account;
+import iuh.house_keeping_service_be.models.Address;
 import iuh.house_keeping_service_be.models.AdminProfile;
 import iuh.house_keeping_service_be.models.Customer;
 import iuh.house_keeping_service_be.models.Employee;
 import iuh.house_keeping_service_be.models.Role;
 import iuh.house_keeping_service_be.repositories.AccountRepository;
+import iuh.house_keeping_service_be.repositories.AddressRepository;
 import iuh.house_keeping_service_be.repositories.AdminProfileRepository;
 import iuh.house_keeping_service_be.repositories.CustomerRepository;
 import iuh.house_keeping_service_be.repositories.EmployeeRepository;
@@ -27,6 +31,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
@@ -67,6 +72,9 @@ public class AuthServiceImpl implements AuthService {
 
    @Autowired
    private AdminProfileRepository adminProfileRepository;
+
+   @Autowired
+   private AddressRepository addressRepository;
 
    @Autowired
    private CustomUserDetailsService customUserDetailsService;
@@ -128,7 +136,7 @@ public class AuthServiceImpl implements AuthService {
    }
 
    @Override
-   public Account register(String username, String password, String email, String phoneNumber, String role, String fullName) {
+   public RegisterResult register(String username, String password, String email, String phoneNumber, String role, String fullName, RegisterAddressRequest address) {
        log.info("Đăng ký tài khoản cho username: {}, email: {}, role: {}", username, email, role);
 
        // Validate input
@@ -175,20 +183,41 @@ public class AuthServiceImpl implements AuthService {
        // Save account
        account = accountRepository.save(account);
 
-       // Create profile based on role
-       createProfileForRole(account, roleName, fullName, email);
+       // Create profile based on role and optionally create address
+       String addressId = createProfileForRole(account, roleName, fullName, email, address);
 
-       return account;
+       return new RegisterResult(account, addressId);
    }
 
-   private void createProfileForRole(Account account, RoleName roleName, String fullName, String email) {
+   private String createProfileForRole(Account account, RoleName roleName, String fullName, String email, RegisterAddressRequest addressRequest) {
+       String addressId = null;
+       
        switch (roleName) {
            case CUSTOMER:
                Customer customer = new Customer();
                customer.setAccount(account);
                customer.setFullName(fullName);
                customer.setEmail(email.trim());
-               customerRepository.save(customer);
+               customer = customerRepository.save(customer);
+               
+               // Create address if provided
+               if (addressRequest != null) {
+                   Address newAddress = new Address();
+                   newAddress.setCustomer(customer);
+                   newAddress.setFullAddress(addressRequest.fullAddress());
+                   newAddress.setWard(addressRequest.ward());
+                   newAddress.setCity(addressRequest.city());
+                   if (addressRequest.latitude() != null) {
+                       newAddress.setLatitude(BigDecimal.valueOf(addressRequest.latitude()));
+                   }
+                   if (addressRequest.longitude() != null) {
+                       newAddress.setLongitude(BigDecimal.valueOf(addressRequest.longitude()));
+                   }
+                   newAddress.setIsDefault(true);
+                   newAddress = addressRepository.save(newAddress);
+                   addressId = newAddress.getAddressId();
+                   log.info("Created address {} for customer {}", addressId, customer.getCustomerId());
+               }
                break;
 
            case EMPLOYEE:
@@ -209,6 +238,8 @@ public class AuthServiceImpl implements AuthService {
                adminProfileRepository.save(adminProfile);
                break;
        }
+       
+       return addressId;
    }
 
    private void checkEmailUniqueness(String email, RoleName role) {

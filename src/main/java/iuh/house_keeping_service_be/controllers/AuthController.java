@@ -379,21 +379,23 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest registerRequest) {
         try {
-            Account account = authService.register(
+            var result = authService.register(
                     registerRequest.username(),
                     registerRequest.password(),
                     registerRequest.email(),
                     registerRequest.phoneNumber(),
                     registerRequest.role(),
-                    registerRequest.fullName()
+                    registerRequest.fullName(),
+                    registerRequest.address()
             );
 
             RegisterResponse response = new RegisterResponse(
-                    account.getUsername(),
+                    result.account().getUsername(),
                     registerRequest.email(),
                     registerRequest.role(),
                     false,
-                    account.getIsPhoneVerified()
+                    result.account().getIsPhoneVerified(),
+                    result.addressId()
             );
 
             return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(

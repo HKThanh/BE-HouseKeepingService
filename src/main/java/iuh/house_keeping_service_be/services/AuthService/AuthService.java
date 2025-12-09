@@ -1,5 +1,7 @@
 package iuh.house_keeping_service_be.services.AuthService;
 
+import iuh.house_keeping_service_be.dtos.Authentication.RegisterAddressRequest;
+import iuh.house_keeping_service_be.dtos.Authentication.RegisterResult;
 import iuh.house_keeping_service_be.dtos.Authentication.TokenPair;
 import iuh.house_keeping_service_be.models.Account;
 
@@ -8,7 +10,7 @@ import java.util.Map;
 public interface AuthService {
     TokenPair login(String username, String password, String role, String deviceType);
 
-    Account register(String username, String password, String email, String phoneNumber, String role, String fullName);
+    RegisterResult register(String username, String password, String email, String phoneNumber, String role, String fullName, RegisterAddressRequest address);
 
     boolean validateToken(String token);
 
