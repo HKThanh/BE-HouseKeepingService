@@ -1,5 +1,6 @@
 package iuh.house_keeping_service_be.services.BookingService.impl;
 
+import iuh.house_keeping_service_be.config.CacheConfig;
 import iuh.house_keeping_service_be.dtos.Booking.internal.*;
 import iuh.house_keeping_service_be.dtos.Booking.request.*;
 import iuh.house_keeping_service_be.dtos.Booking.response.*;
@@ -93,6 +94,11 @@ public class BookingServiceImpl implements BookingService {
 
     @Override
     @Transactional
+    @org.springframework.cache.annotation.CacheEvict(
+            value = CacheConfig.PROMOTION_VALIDATION_CACHE,
+            allEntries = true,
+            condition = "#request.promoCode() != null && !#request.promoCode().isEmpty()"
+    )
     public BookingCreationSummary createBooking(BookingCreateRequest request) {
         log.info("Creating booking for customer with {} services", request.bookingDetails().size());
 
@@ -286,6 +292,471 @@ public class BookingServiceImpl implements BookingService {
         log.info("Validating booking request");
 
         return performValidation(request).result();
+    }
+
+    @Override
+    public BookingPreviewResponse previewBooking(BookingPreviewRequest request, String currentUserId, boolean isAdmin) {
+        log.info("Generating booking preview for user: {}, isAdmin: {}", currentUserId, isAdmin);
+        
+        try {
+            // Determine which customer to use
+            String targetCustomerId = determineTargetCustomerId(request, currentUserId, isAdmin);
+            
+            // Convert preview request to internal format for validation
+            PreviewValidationOutcome validationOutcome = performPreviewValidation(request, targetCustomerId);
+            
+            // Check for critical errors (customer/address not found)
+            if (validationOutcome.hasCriticalError()) {
+                return BookingPreviewResponse.error(validationOutcome.errors());
+            }
+            
+            // Build the full preview response (includes any non-critical errors/warnings)
+            return buildPreviewResponse(validationOutcome, request);
+            
+        } catch (Exception e) {
+            log.error("Error generating booking preview: {}", e.getMessage(), e);
+            return BookingPreviewResponse.error(List.of("Error generating preview: " + e.getMessage()));
+        }
+    }
+    
+    private String determineTargetCustomerId(BookingPreviewRequest request, String currentUserId, boolean isAdmin) {
+        // Admin can specify customerId, otherwise use current user
+        if (isAdmin && request.customerId() != null && !request.customerId().isBlank()) {
+            return request.customerId();
+        }
+        return currentUserId;
+    }
+    
+    private PreviewValidationOutcome performPreviewValidation(BookingPreviewRequest request, String customerId) {
+        log.info("Performing preview validation for customer: {}", customerId);
+        
+        List<String> errors = new ArrayList<>();      // Critical errors
+        List<String> warnings = new ArrayList<>();    // Non-critical warnings (promotion issues, etc.)
+        
+        // Validate customer and address
+        CustomerAddressContext addressContext;
+        try {
+            addressContext = validateCustomerAndAddressForPreview(request, customerId);
+        } catch (AddressNotFoundException | CustomerNotFoundException | IllegalArgumentException e) {
+            log.error("Error validating preview address: {}", e.getMessage());
+            errors.add(e.getMessage());
+            return new PreviewValidationOutcome(errors, warnings, null, null, null, null, null, null, null, null, null, null, null);
+        } catch (Exception e) {
+            log.error("Unexpected error validating preview address: {}", e.getMessage(), e);
+            errors.add("Validation error: " + e.getMessage());
+            return new PreviewValidationOutcome(errors, warnings, null, null, null, null, null, null, null, null, null, null, null);
+        }
+        
+        Customer customer = addressContext.customer();
+        
+        // Validate services and calculate prices (skip booking time validation for preview)
+        List<ServiceValidationInfo> serviceValidations = validateServices(request.bookingDetails(), errors);
+        BigDecimal calculatedTotalAmount = serviceValidations.stream()
+                .map(ServiceValidationInfo::getCalculatedPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        // Apply promotion with full result (cached)
+        PromotionApplicationResult promotionResult = applyPromotionWithDetails(
+                request.promoCode(), calculatedTotalAmount, customer);
+        
+        // Promotion errors are warnings, not critical errors
+        if (promotionResult.hasError()) {
+            warnings.add(promotionResult.errorMessage());
+        }
+        
+        BigDecimal finalAmount = promotionResult.finalAmount();
+        
+        // Apply system surcharge + other fees
+        FeeCalculationResult feeResult = calculateFees(finalAmount, request.additionalFeeIds());
+        BigDecimal totalWithFees = finalAmount.add(feeResult.totalFees());
+        
+        // Get payment method info if provided
+        iuh.house_keeping_service_be.models.PaymentMethod paymentMethod = null;
+        if (request.paymentMethodId() > 0) {
+            paymentMethod = paymentMethodRepository.findById(request.paymentMethodId()).orElse(null);
+        }
+        
+        // Build choice details for display
+        Map<Integer, List<ChoicePreviewItem>> choicesByService = buildChoicePreviewItems(request.bookingDetails());
+        
+        return new PreviewValidationOutcome(
+                errors,
+                warnings,
+                addressContext,
+                customer,
+                serviceValidations,
+                calculatedTotalAmount,
+                promotionResult,
+                finalAmount,
+                feeResult,
+                totalWithFees,
+                paymentMethod,
+                choicesByService,
+                request.bookingTime()
+        );
+    }
+    
+    private CustomerAddressContext validateCustomerAndAddressForPreview(BookingPreviewRequest request, String customerId) {
+        boolean hasAddressId = request.addressId() != null && !request.addressId().isBlank();
+        boolean hasNewAddress = request.newAddress() != null;
+
+        if ((hasAddressId && hasNewAddress) || (!hasAddressId && !hasNewAddress)) {
+            throw new IllegalArgumentException("Either addressId or newAddress must be provided");
+        }
+
+        if (hasAddressId) {
+            Address address = addressRepository.findAddressWithCustomer(request.addressId())
+                    .orElseThrow(() -> AddressNotFoundException.withId(request.addressId()));
+
+            Customer customer = address.getCustomer();
+            if (customer == null) {
+                throw CustomerNotFoundException.forAddress(request.addressId());
+            }
+
+            return new CustomerAddressContext(customer, address, false);
+        }
+
+        NewAddressRequest newAddress = request.newAddress();
+        // For preview, use the customerId from the request or the determined target customer
+        String targetCustomerId = newAddress.customerId() != null ? newAddress.customerId() : customerId;
+        Customer customer = customerRepository.findById(targetCustomerId)
+                .orElseThrow(() -> CustomerNotFoundException.withId(targetCustomerId));
+
+        Address address = new Address();
+        address.setCustomer(customer);
+        address.setFullAddress(newAddress.fullAddress());
+        address.setWard(newAddress.ward());
+        address.setCity(newAddress.city());
+        address.setLatitude(newAddress.latitude() != null ? BigDecimal.valueOf(newAddress.latitude()) : null);
+        address.setLongitude(newAddress.longitude() != null ? BigDecimal.valueOf(newAddress.longitude()) : null);
+        address.setIsDefault(Boolean.FALSE);
+
+        return new CustomerAddressContext(customer, address, true);
+    }
+    
+    /**
+     * Apply promotion with full details for preview (cacheable).
+     * Unlike applyPromotion(), this method returns all promotion details needed for display.
+     */
+    @org.springframework.cache.annotation.Cacheable(
+            value = CacheConfig.PROMOTION_VALIDATION_CACHE,
+            key = "#promoCode + ':' + #amount.toString() + ':' + #customer.customerId",
+            unless = "#result.hasError()"
+    )
+    public PromotionApplicationResult applyPromotionWithDetails(String promoCode, BigDecimal amount, Customer customer) {
+        if (promoCode == null || promoCode.trim().isEmpty()) {
+            return PromotionApplicationResult.noPromotion(amount);
+        }
+
+        Optional<Promotion> promotionOpt = promotionRepository.findAvailablePromotion(promoCode, LocalDateTime.now());
+        if (promotionOpt.isEmpty()) {
+            return PromotionApplicationResult.error(amount, "Promotion code is invalid or expired: " + promoCode);
+        }
+
+        Promotion promotion = promotionOpt.get();
+
+        // Check customer usage limit (if applicable)
+        long customerUsage = promotionRepository.countPromoCodeUsageByCustomer(promoCode, customer.getCustomerId());
+        if (customerUsage > 0) { // Assuming one-time use per customer
+            return PromotionApplicationResult.error(amount, "Promotion code has already been used by this customer");
+        }
+
+        // Calculate discount
+        BigDecimal discount = BigDecimal.ZERO;
+        if (promotion.getDiscountType() == DiscountType.FIXED_AMOUNT) {
+            discount = promotion.getDiscountValue();
+        } else if (promotion.getDiscountType() == DiscountType.PERCENTAGE) {
+            discount = amount.multiply(promotion.getDiscountValue()).divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+
+            // Apply max discount limit
+            if (promotion.getMaxDiscountAmount() != null &&
+                    discount.compareTo(promotion.getMaxDiscountAmount()) > 0) {
+                discount = promotion.getMaxDiscountAmount();
+            }
+        }
+
+        BigDecimal finalAmount = amount.subtract(discount).max(BigDecimal.ZERO);
+        
+        // Build promotion info for display
+        PromotionInfo promotionInfo = new PromotionInfo(
+                promotion.getPromotionId(),
+                promotion.getPromoCode(),
+                promotion.getDescription(),
+                promotion.getDiscountType(),
+                promotion.getDiscountValue(),
+                promotion.getMaxDiscountAmount()
+        );
+
+        return PromotionApplicationResult.success(finalAmount, discount, promotion, promotionInfo);
+    }
+    
+    private Map<Integer, List<ChoicePreviewItem>> buildChoicePreviewItems(List<BookingDetailRequest> bookingDetails) {
+        // Collect all choice IDs across all booking details
+        List<Integer> allChoiceIds = bookingDetails.stream()
+                .filter(detail -> detail.selectedChoiceIds() != null)
+                .flatMap(detail -> detail.selectedChoiceIds().stream())
+                .distinct()
+                .collect(Collectors.toList());
+        
+        if (allChoiceIds.isEmpty()) {
+            return Map.of();
+        }
+        
+        // Fetch all choices with option names in a single query
+        List<ServiceOptionChoice> choices = serviceOptionChoiceRepository.findChoicesWithOptionNames(allChoiceIds);
+        
+        // Build a map of choiceId -> ChoicePreviewItem with price from PricingRule
+        Map<Integer, ChoicePreviewItem> choiceItemMap = choices.stream()
+                .collect(Collectors.toMap(
+                        ServiceOptionChoice::getId,
+                        choice -> {
+                            // Get price adjustment from PricingRule via RuleCondition
+                            BigDecimal priceAdjustment = BigDecimal.ZERO;
+                            try {
+                                RuleCondition ruleCondition = ruleConditionRepository.findByChoice_Id(choice.getId());
+                                if (ruleCondition != null && ruleCondition.getRule() != null 
+                                        && ruleCondition.getRule().getPriceAdjustment() != null) {
+                                    priceAdjustment = ruleCondition.getRule().getPriceAdjustment();
+                                }
+                            } catch (Exception e) {
+                                log.debug("No pricing rule found for choice {}", choice.getId());
+                            }
+                            
+                            return new ChoicePreviewItem(
+                                    choice.getId(),
+                                    choice.getLabel(),
+                                    choice.getOption() != null ? choice.getOption().getLabel() : null,
+                                    priceAdjustment,
+                                    BookingDTOFormatter.formatPrice(priceAdjustment)
+                            );
+                        }
+                ));
+        
+        // Group by service
+        Map<Integer, List<ChoicePreviewItem>> result = new HashMap<>();
+        for (BookingDetailRequest detail : bookingDetails) {
+            if (detail.selectedChoiceIds() != null && !detail.selectedChoiceIds().isEmpty()) {
+                List<ChoicePreviewItem> items = detail.selectedChoiceIds().stream()
+                        .map(choiceItemMap::get)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
+                result.put(detail.serviceId(), items);
+            }
+        }
+        
+        return result;
+    }
+    
+    private BookingPreviewResponse buildPreviewResponse(PreviewValidationOutcome outcome, BookingPreviewRequest request) {
+        Customer customer = outcome.customer();
+        CustomerAddressContext addressContext = outcome.addressContext();
+        
+        // Build service preview items
+        List<ServicePreviewItem> serviceItems = buildServicePreviewItems(
+                outcome.serviceValidations(),
+                request.bookingDetails(),
+                outcome.choicesByService()
+        );
+        
+        // Calculate totals
+        int totalServices = serviceItems.size();
+        int totalQuantity = request.bookingDetails().stream()
+                .mapToInt(d -> d.quantity() != null ? d.quantity() : 1)
+                .sum();
+        
+        // Estimated duration (sum of all service durations)
+        BigDecimal totalDurationHours = outcome.serviceValidations().stream()
+                .filter(ServiceValidationInfo::isValid)
+                .map(info -> {
+                    Optional<Service> serviceOpt = serviceRepository.findById(info.getServiceId());
+                    return serviceOpt.map(s -> s.getEstimatedDurationHours() != null ? 
+                            s.getEstimatedDurationHours() : BigDecimal.ZERO).orElse(BigDecimal.ZERO);
+                })
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        // Recommended staff (max of all services)
+        int recommendedStaff = outcome.serviceValidations().stream()
+                .filter(ServiceValidationInfo::isValid)
+                .mapToInt(info -> info.getRecommendedStaff() != null ? info.getRecommendedStaff() : 1)
+                .max()
+                .orElse(1);
+        
+        // Build fee breakdowns
+        List<FeeBreakdownResponse> feeBreakdowns = outcome.feeResult().breakdowns().stream()
+                .map(info -> FeeBreakdownResponse.builder()
+                        .name(info.getName())
+                        .type(info.getType())
+                        .value(info.getValue())
+                        .amount(info.getAmount())
+                        .systemSurcharge(info.isSystemSurcharge())
+                        .build())
+                .collect(Collectors.toList());
+        
+        PromotionApplicationResult promotionResult = outcome.promotionResult();
+        
+        // Get phone from customer's account
+        String customerPhone = customer.getAccount() != null ? customer.getAccount().getPhoneNumber() : null;
+        
+        // Combine errors and warnings for display
+        List<String> allMessages = outcome.allMessages();
+        
+        // valid = true only if no errors AND no warnings
+        boolean isValid = outcome.errors().isEmpty() && outcome.warnings().isEmpty();
+        
+        return BookingPreviewResponse.builder()
+                .valid(isValid)
+                .errors(allMessages)  // Contains both errors and warnings
+                // Customer info
+                .customerId(customer.getCustomerId())
+                .customerName(customer.getFullName())
+                .customerPhone(customerPhone)
+                .customerEmail(customer.getEmail())
+                // Address info
+                .addressInfo(buildAddressInfo(addressContext.address()))
+                .usingNewAddress(addressContext.isNewAddress())
+                // Booking time
+                .bookingTime(outcome.bookingTime())
+                // Service items
+                .serviceItems(serviceItems)
+                .totalServices(totalServices)
+                .totalQuantity(totalQuantity)
+                // Pricing
+                .subtotal(outcome.calculatedTotalAmount())
+                .formattedSubtotal(BookingDTOFormatter.formatPrice(outcome.calculatedTotalAmount()))
+                // Promotion
+                .promotionInfo(promotionResult.promotionInfo())
+                .discountAmount(promotionResult.discountAmount())
+                .formattedDiscountAmount(BookingDTOFormatter.formatPrice(promotionResult.discountAmount()))
+                // After discount
+                .totalAfterDiscount(outcome.finalAmount())
+                .formattedTotalAfterDiscount(BookingDTOFormatter.formatPrice(outcome.finalAmount()))
+                // Fees
+                .feeBreakdowns(feeBreakdowns)
+                .totalFees(outcome.feeResult().totalFees())
+                .formattedTotalFees(BookingDTOFormatter.formatPrice(outcome.feeResult().totalFees()))
+                // Grand total
+                .grandTotal(outcome.totalWithFees())
+                .formattedGrandTotal(BookingDTOFormatter.formatPrice(outcome.totalWithFees()))
+                // Additional info
+                .estimatedDuration(formatDuration(totalDurationHours))
+                .recommendedStaff(recommendedStaff)
+                .note(request.note())
+                // Payment method
+                .paymentMethodId(outcome.paymentMethod() != null ? outcome.paymentMethod().getMethodId() : null)
+                .paymentMethodName(outcome.paymentMethod() != null ? outcome.paymentMethod().getMethodName() : null)
+                .build();
+    }
+    
+    private List<ServicePreviewItem> buildServicePreviewItems(
+            List<ServiceValidationInfo> serviceValidations,
+            List<BookingDetailRequest> bookingDetails,
+            Map<Integer, List<ChoicePreviewItem>> choicesByService) {
+        
+        // Map service validations by serviceId
+        Map<Integer, ServiceValidationInfo> validationMap = serviceValidations.stream()
+                .collect(Collectors.toMap(ServiceValidationInfo::getServiceId, v -> v, (a, b) -> a));
+        
+        return bookingDetails.stream()
+                .map(detail -> {
+                    ServiceValidationInfo validation = validationMap.get(detail.serviceId());
+                    if (validation == null || !validation.isValid()) {
+                        return null;
+                    }
+                    
+                    // Get full service details
+                    Optional<Service> serviceOpt = serviceRepository.findById(detail.serviceId());
+                    Service service = serviceOpt.orElse(null);
+                    
+                    int quantity = detail.quantity() != null ? detail.quantity() : 1;
+                    BigDecimal unitPrice = validation.getCalculatedPrice()
+                            .divide(BigDecimal.valueOf(quantity), 2, RoundingMode.HALF_UP);
+                    
+                    return new ServicePreviewItem(
+                            detail.serviceId(),
+                            validation.getServiceName(),
+                            service != null ? service.getDescription() : null,
+                            service != null ? service.getIconUrl() : null,
+                            quantity,
+                            service != null ? service.getUnit() : null,
+                            unitPrice,
+                            BookingDTOFormatter.formatPrice(unitPrice),
+                            validation.getCalculatedPrice(),
+                            BookingDTOFormatter.formatPrice(validation.getCalculatedPrice()),
+                            choicesByService.getOrDefault(detail.serviceId(), List.of()),
+                            service != null ? formatDuration(service.getEstimatedDurationHours()) : null,
+                            validation.getRecommendedStaff()
+                    );
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+    
+    private CustomerAddressInfo buildAddressInfo(Address address) {
+        if (address == null) return null;
+        
+        return new CustomerAddressInfo(
+                address.getAddressId(),
+                address.getFullAddress(),
+                address.getWard(),
+                address.getCity(),
+                address.getLatitude() != null ? address.getLatitude().doubleValue() : null,
+                address.getLongitude() != null ? address.getLongitude().doubleValue() : null,
+                address.getIsDefault()
+        );
+    }
+    
+    private String formatDuration(BigDecimal hours) {
+        if (hours == null || hours.compareTo(BigDecimal.ZERO) <= 0) {
+            return null;
+        }
+        
+        int totalMinutes = hours.multiply(BigDecimal.valueOf(60)).intValue();
+        int h = totalMinutes / 60;
+        int m = totalMinutes % 60;
+        
+        if (h > 0 && m > 0) {
+            return h + " giờ " + m + " phút";
+        } else if (h > 0) {
+            return h + " giờ";
+        } else {
+            return m + " phút";
+        }
+    }
+    
+    /**
+     * Preview validation outcome containing all calculated values for building the response.
+     */
+    private record PreviewValidationOutcome(
+            List<String> errors,
+            List<String> warnings,
+            CustomerAddressContext addressContext,
+            Customer customer,
+            List<ServiceValidationInfo> serviceValidations,
+            BigDecimal calculatedTotalAmount,
+            PromotionApplicationResult promotionResult,
+            BigDecimal finalAmount,
+            FeeCalculationResult feeResult,
+            BigDecimal totalWithFees,
+            iuh.house_keeping_service_be.models.PaymentMethod paymentMethod,
+            Map<Integer, List<ChoicePreviewItem>> choicesByService,
+            LocalDateTime bookingTime
+    ) {
+        /**
+         * Check if there are critical errors that prevent building a full response.
+         * Critical errors: customer not found, address not found, no valid services.
+         */
+        public boolean hasCriticalError() {
+            return customer == null || addressContext == null;
+        }
+        
+        /**
+         * Get all messages (errors + warnings) for display.
+         */
+        public List<String> allMessages() {
+            List<String> all = new ArrayList<>(errors);
+            all.addAll(warnings);
+            return all;
+        }
     }
 
     private ValidationOutcome performValidation(BookingCreateRequest request) {

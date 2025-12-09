@@ -14,11 +14,9 @@ public record BookingDetailRequest(
         @Max(value = 10, message = "Quantity cannot exceed 10")
         Integer quantity,
 
-        @NotNull(message = "Expected price is required")
         @DecimalMin(value = "0.0", inclusive = false, message = "Expected price must be positive")
         BigDecimal expectedPrice,
 
-        @NotNull(message = "Expected price per unit is required")
         @DecimalMin(value = "0.0", inclusive = false, message = "Expected price per unit must be positive")
         BigDecimal expectedPricePerUnit,
 
