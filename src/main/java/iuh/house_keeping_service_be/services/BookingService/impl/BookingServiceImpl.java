@@ -319,6 +319,409 @@ public class BookingServiceImpl implements BookingService {
         }
     }
     
+    @Override
+    public MultipleBookingPreviewResponse previewMultipleBookings(MultipleBookingPreviewRequest request, String currentUserId, boolean isAdmin) {
+        log.info("Generating multiple booking preview for user: {}, isAdmin: {}, bookingTimes: {}", 
+                currentUserId, isAdmin, request.bookingTimes().size());
+        
+        try {
+            // Determine target customer
+            String targetCustomerId = determineTargetCustomerIdForMultiple(request, currentUserId, isAdmin);
+            
+            List<BookingPreviewResponse> bookingPreviews = new ArrayList<>();
+            List<LocalDateTime> validBookingTimes = new ArrayList<>();
+            List<LocalDateTime> invalidBookingTimes = new ArrayList<>();
+            List<String> allErrors = new ArrayList<>();
+            BookingPreviewResponse firstValidPreview = null;
+            
+            // Process each booking time
+            for (LocalDateTime bookingTime : request.bookingTimes()) {
+                // Convert to single preview request
+                BookingPreviewRequest singleRequest = new BookingPreviewRequest(
+                        request.customerId(),
+                        request.addressId(),
+                        request.newAddress(),
+                        bookingTime,
+                        request.note(),
+                        request.title(),
+                        request.promoCode(), // Promo applies to ALL bookings
+                        request.bookingDetails(),
+                        request.paymentMethodId(),
+                        request.additionalFeeIds()
+                );
+                
+                PreviewValidationOutcome validationOutcome = performPreviewValidation(singleRequest, targetCustomerId);
+                
+                if (validationOutcome.hasCriticalError()) {
+                    BookingPreviewResponse errorResponse = BookingPreviewResponse.error(validationOutcome.errors());
+                    errorResponse.setBookingTime(bookingTime);
+                    bookingPreviews.add(errorResponse);
+                    invalidBookingTimes.add(bookingTime);
+                    allErrors.addAll(validationOutcome.errors().stream()
+                            .map(e -> bookingTime + ": " + e)
+                            .toList());
+                } else {
+                    BookingPreviewResponse preview = buildPreviewResponse(validationOutcome, singleRequest);
+                    bookingPreviews.add(preview);
+                    if (preview.isValid()) {
+                        validBookingTimes.add(bookingTime);
+                        if (firstValidPreview == null) {
+                            firstValidPreview = preview;
+                        }
+                    } else {
+                        invalidBookingTimes.add(bookingTime);
+                        allErrors.addAll(preview.getErrors().stream()
+                                .map(e -> bookingTime + ": " + e)
+                                .toList());
+                    }
+                }
+            }
+            
+            // Calculate aggregated totals
+            BigDecimal totalEstimatedPrice = bookingPreviews.stream()
+                    .filter(BookingPreviewResponse::isValid)
+                    .map(BookingPreviewResponse::getGrandTotal)
+                    .filter(Objects::nonNull)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            
+            // Calculate total duration
+            int totalDurationMinutes = bookingPreviews.stream()
+                    .filter(BookingPreviewResponse::isValid)
+                    .map(BookingPreviewResponse::getEstimatedDuration)
+                    .filter(Objects::nonNull)
+                    .mapToInt(this::parseDurationToMinutes)
+                    .sum();
+            String totalDuration = formatMinutesToDuration(totalDurationMinutes);
+            
+            boolean allValid = invalidBookingTimes.isEmpty() && !validBookingTimes.isEmpty();
+            
+            // Build response with shared service info from first valid preview
+            MultipleBookingPreviewResponse.MultipleBookingPreviewResponseBuilder responseBuilder = MultipleBookingPreviewResponse.builder()
+                    .valid(allValid)
+                    .errors(allValid ? List.of() : allErrors)
+                    .bookingCount(request.bookingTimes().size())
+                    .bookingPreviews(bookingPreviews)
+                    .totalEstimatedPrice(totalEstimatedPrice)
+                    .formattedTotalEstimatedPrice(BookingDTOFormatter.formatPrice(totalEstimatedPrice))
+                    .totalEstimatedDuration(totalDuration)
+                    .promoCode(request.promoCode())
+                    .promoAppliedToAll(request.promoCode() != null && !request.promoCode().isBlank())
+                    .validBookingsCount(validBookingTimes.size())
+                    .invalidBookingsCount(invalidBookingTimes.size())
+                    .validBookingTimes(validBookingTimes)
+                    .invalidBookingTimes(invalidBookingTimes);
+            
+            // Add shared service info from first valid preview (same for all bookings)
+            if (firstValidPreview != null) {
+                responseBuilder
+                        // Service items (shared)
+                        .serviceItems(firstValidPreview.getServiceItems())
+                        .totalServices(firstValidPreview.getTotalServices())
+                        .totalQuantityPerBooking(firstValidPreview.getTotalQuantity())
+                        .subtotalPerBooking(firstValidPreview.getSubtotal())
+                        .formattedSubtotalPerBooking(firstValidPreview.getFormattedSubtotal())
+                        // Customer info (shared)
+                        .customerId(firstValidPreview.getCustomerId())
+                        .customerName(firstValidPreview.getCustomerName())
+                        .customerPhone(firstValidPreview.getCustomerPhone())
+                        .customerEmail(firstValidPreview.getCustomerEmail())
+                        .addressInfo(firstValidPreview.getAddressInfo())
+                        .usingNewAddress(firstValidPreview.isUsingNewAddress())
+                        // Payment method (shared)
+                        .paymentMethodId(firstValidPreview.getPaymentMethodId())
+                        .paymentMethodName(firstValidPreview.getPaymentMethodName())
+                        // Fees (shared)
+                        .feeBreakdowns(firstValidPreview.getFeeBreakdowns())
+                        .totalFeesPerBooking(firstValidPreview.getTotalFees())
+                        .formattedTotalFeesPerBooking(firstValidPreview.getFormattedTotalFees())
+                        // Promotion (shared)
+                        .promotionInfo(firstValidPreview.getPromotionInfo())
+                        .discountPerBooking(firstValidPreview.getDiscountAmount())
+                        .formattedDiscountPerBooking(firstValidPreview.getFormattedDiscountAmount())
+                        // Price per booking
+                        .pricePerBooking(firstValidPreview.getGrandTotal())
+                        .formattedPricePerBooking(firstValidPreview.getFormattedGrandTotal())
+                        // Duration per booking
+                        .estimatedDurationPerBooking(firstValidPreview.getEstimatedDuration())
+                        .recommendedStaff(firstValidPreview.getRecommendedStaff());
+            }
+            
+            return responseBuilder.build();
+            
+        } catch (Exception e) {
+            log.error("Error generating multiple booking preview: {}", e.getMessage(), e);
+            return MultipleBookingPreviewResponse.error(List.of("Error generating preview: " + e.getMessage()));
+        }
+    }
+    
+    @Override
+    public RecurringBookingPreviewResponse previewRecurringBooking(RecurringBookingPreviewRequest request, String currentUserId, boolean isAdmin) {
+        log.info("Generating recurring booking preview for user: {}, isAdmin: {}, recurrenceType: {}", 
+                currentUserId, isAdmin, request.recurrenceType());
+        
+        try {
+            // Determine target customer
+            String targetCustomerId = determineTargetCustomerIdForRecurring(request, currentUserId, isAdmin);
+            
+            // Normalize recurrence days
+            List<Integer> normalizedDays = normalizeRecurrenceDays(request.recurrenceType(), request.recurrenceDays());
+            
+            // Calculate planned booking times (limited by maxPreviewOccurrences)
+            int maxOccurrences = request.getEffectiveMaxPreviewOccurrences();
+            List<LocalDateTime> allPlannedTimes = calculatePlannedBookingTimesForPreview(
+                    request, normalizedDays, maxOccurrences + 1 // +1 to check if there are more
+            );
+            
+            boolean hasMoreOccurrences = allPlannedTimes.size() > maxOccurrences;
+            List<LocalDateTime> plannedTimes = allPlannedTimes.stream()
+                    .limit(maxOccurrences)
+                    .toList();
+            
+            if (plannedTimes.isEmpty()) {
+                return RecurringBookingPreviewResponse.error(
+                        List.of("Không có lịch đặt nào trong khoảng thời gian đã chọn")
+                );
+            }
+            
+            // Preview the first occurrence to get detailed pricing
+            LocalDateTime firstBookingTime = plannedTimes.get(0);
+            BookingPreviewRequest singleRequest = new BookingPreviewRequest(
+                    request.customerId(),
+                    request.addressId(),
+                    request.newAddress(),
+                    firstBookingTime,
+                    request.note(),
+                    request.title(),
+                    request.promoCode(),
+                    request.bookingDetails(),
+                    request.paymentMethodId(),
+                    request.additionalFeeIds()
+            );
+            
+            PreviewValidationOutcome validationOutcome = performPreviewValidation(singleRequest, targetCustomerId);
+            
+            if (validationOutcome.hasCriticalError()) {
+                return RecurringBookingPreviewResponse.error(validationOutcome.errors());
+            }
+            
+            BookingPreviewResponse singlePreview = buildPreviewResponse(validationOutcome, singleRequest);
+            
+            // Calculate totals
+            int occurrenceCount = plannedTimes.size();
+            BigDecimal pricePerOccurrence = singlePreview.getGrandTotal() != null ? 
+                    singlePreview.getGrandTotal() : BigDecimal.ZERO;
+            BigDecimal totalEstimatedPrice = pricePerOccurrence.multiply(BigDecimal.valueOf(occurrenceCount));
+            
+            // Generate recurrence description
+            String recurrenceDescription = RecurringBookingPreviewResponse.generateRecurrenceDescription(
+                    request.recurrenceType(), normalizedDays, request.bookingTime()
+            );
+            
+            return RecurringBookingPreviewResponse.builder()
+                    .valid(singlePreview.isValid())
+                    .errors(singlePreview.getErrors())
+                    // Shared service info (same for all occurrences)
+                    .serviceItems(singlePreview.getServiceItems())
+                    .totalServices(singlePreview.getTotalServices())
+                    .totalQuantityPerOccurrence(singlePreview.getTotalQuantity())
+                    .subtotalPerOccurrence(singlePreview.getSubtotal())
+                    .formattedSubtotalPerOccurrence(singlePreview.getFormattedSubtotal())
+                    // Fees (shared)
+                    .feeBreakdowns(singlePreview.getFeeBreakdowns())
+                    .totalFeesPerOccurrence(singlePreview.getTotalFees())
+                    .formattedTotalFeesPerOccurrence(singlePreview.getFormattedTotalFees())
+                    // Discount per occurrence
+                    .discountPerOccurrence(singlePreview.getDiscountAmount())
+                    .formattedDiscountPerOccurrence(singlePreview.getFormattedDiscountAmount())
+                    // Recurrence info
+                    .recurrenceType(request.recurrenceType())
+                    .recurrenceDays(normalizedDays)
+                    .recurrenceDescription(recurrenceDescription)
+                    .bookingTime(request.bookingTime())
+                    .startDate(request.startDate())
+                    .endDate(request.endDate())
+                    .plannedBookingTimes(plannedTimes)
+                    .occurrenceCount(occurrenceCount)
+                    .maxPreviewOccurrences(maxOccurrences)
+                    .hasMoreOccurrences(hasMoreOccurrences)
+                    .singleBookingPreview(singlePreview)
+                    .pricePerOccurrence(pricePerOccurrence)
+                    .formattedPricePerOccurrence(BookingDTOFormatter.formatPrice(pricePerOccurrence))
+                    .totalEstimatedPrice(totalEstimatedPrice)
+                    .formattedTotalEstimatedPrice(BookingDTOFormatter.formatPrice(totalEstimatedPrice))
+                    .estimatedDurationPerOccurrence(singlePreview.getEstimatedDuration())
+                    .recommendedStaff(singlePreview.getRecommendedStaff())
+                    // Customer and address info
+                    .customerId(singlePreview.getCustomerId())
+                    .customerName(singlePreview.getCustomerName())
+                    .customerPhone(singlePreview.getCustomerPhone())
+                    .customerEmail(singlePreview.getCustomerEmail())
+                    .addressInfo(singlePreview.getAddressInfo())
+                    .usingNewAddress(singlePreview.isUsingNewAddress())
+                    // Payment method
+                    .paymentMethodId(singlePreview.getPaymentMethodId())
+                    .paymentMethodName(singlePreview.getPaymentMethodName())
+                    // Promo info
+                    .promoCode(request.promoCode())
+                    .promoAppliedToAll(request.promoCode() != null && !request.promoCode().isBlank())
+                    .promotionInfo(singlePreview.getPromotionInfo())
+                    .build();
+            
+        } catch (Exception e) {
+            log.error("Error generating recurring booking preview: {}", e.getMessage(), e);
+            return RecurringBookingPreviewResponse.error(List.of("Error generating preview: " + e.getMessage()));
+        }
+    }
+    
+    private String determineTargetCustomerIdForMultiple(MultipleBookingPreviewRequest request, String currentUserId, boolean isAdmin) {
+        if (isAdmin && request.customerId() != null && !request.customerId().isBlank()) {
+            return request.customerId();
+        }
+        return currentUserId;
+    }
+    
+    private String determineTargetCustomerIdForRecurring(RecurringBookingPreviewRequest request, String currentUserId, boolean isAdmin) {
+        if (isAdmin && request.customerId() != null && !request.customerId().isBlank()) {
+            return request.customerId();
+        }
+        return currentUserId;
+    }
+    
+    /**
+     * Calculate planned booking times for preview based on recurrence pattern.
+     * Similar to RecurringBookingServiceImpl but simplified for preview purposes.
+     */
+    private List<LocalDateTime> calculatePlannedBookingTimesForPreview(
+            RecurringBookingPreviewRequest request,
+            List<Integer> normalizedRecurrenceDays,
+            int maxOccurrences
+    ) {
+        List<LocalDateTime> times = new ArrayList<>();
+        
+        java.time.LocalDate currentDate = request.startDate();
+        java.time.LocalDate effectiveEndDate = request.endDate();
+        
+        // If no end date, calculate up to 1 year from start
+        if (effectiveEndDate == null) {
+            effectiveEndDate = request.startDate().plusYears(1);
+        }
+        
+        while (!currentDate.isAfter(effectiveEndDate) && times.size() < maxOccurrences) {
+            if (shouldGenerateBookingForDatePreview(request.recurrenceType(), normalizedRecurrenceDays, currentDate)) {
+                LocalDateTime bookingDateTime = LocalDateTime.of(currentDate, request.bookingTime());
+                // Only include future times
+                if (bookingDateTime.isAfter(LocalDateTime.now())) {
+                    times.add(bookingDateTime);
+                }
+            }
+            currentDate = currentDate.plusDays(1);
+        }
+        
+        return times.stream().sorted().toList();
+    }
+    
+    /**
+     * Check if a booking should be generated for a specific date based on recurrence pattern.
+     */
+    private boolean shouldGenerateBookingForDatePreview(
+            RecurrenceType type,
+            List<Integer> recurrenceDays,
+            java.time.LocalDate date
+    ) {
+        if (type == RecurrenceType.WEEKLY) {
+            int dayOfWeek = date.getDayOfWeek().getValue(); // 1 = Monday, 7 = Sunday
+            return recurrenceDays.contains(dayOfWeek);
+        } else if (type == RecurrenceType.MONTHLY) {
+            int dayOfMonth = date.getDayOfMonth();
+            return recurrenceDays.contains(dayOfMonth);
+        }
+        return false;
+    }
+    
+    /**
+     * Normalize recurrence days based on recurrence type.
+     * For WEEKLY: ensure values are 1-7 (Mon-Sun)
+     * For MONTHLY: ensure values are 1-31
+     */
+    private List<Integer> normalizeRecurrenceDays(RecurrenceType type, List<Integer> days) {
+        if (days == null || days.isEmpty()) {
+            return List.of();
+        }
+        
+        if (type == RecurrenceType.WEEKLY) {
+            return days.stream()
+                    .filter(d -> d >= 1 && d <= 7)
+                    .distinct()
+                    .sorted()
+                    .toList();
+        } else if (type == RecurrenceType.MONTHLY) {
+            return days.stream()
+                    .filter(d -> d >= 1 && d <= 31)
+                    .distinct()
+                    .sorted()
+                    .toList();
+        }
+        return days;
+    }
+    
+    /**
+     * Parse duration string (e.g., "2 giờ 30 phút") to minutes.
+     */
+    private int parseDurationToMinutes(String duration) {
+        if (duration == null || duration.isBlank()) {
+            return 0;
+        }
+        
+        int totalMinutes = 0;
+        
+        // Parse hours
+        if (duration.contains("giờ")) {
+            String[] parts = duration.split("giờ");
+            try {
+                totalMinutes += Integer.parseInt(parts[0].trim()) * 60;
+            } catch (NumberFormatException ignored) {}
+            
+            // Parse remaining minutes if exists
+            if (parts.length > 1 && parts[1].contains("phút")) {
+                String minutePart = parts[1].replace("phút", "").trim();
+                try {
+                    totalMinutes += Integer.parseInt(minutePart);
+                } catch (NumberFormatException ignored) {}
+            }
+        } else if (duration.contains("phút")) {
+            String minutePart = duration.replace("phút", "").trim();
+            try {
+                totalMinutes = Integer.parseInt(minutePart);
+            } catch (NumberFormatException ignored) {}
+        }
+        
+        return totalMinutes;
+    }
+    
+    /**
+     * Format minutes to duration string (e.g., 150 -> "2 giờ 30 phút").
+     */
+    private String formatMinutesToDuration(int totalMinutes) {
+        if (totalMinutes <= 0) {
+            return "0 phút";
+        }
+        
+        int hours = totalMinutes / 60;
+        int minutes = totalMinutes % 60;
+        
+        StringBuilder sb = new StringBuilder();
+        if (hours > 0) {
+            sb.append(hours).append(" giờ");
+            if (minutes > 0) {
+                sb.append(" ").append(minutes).append(" phút");
+            }
+        } else {
+            sb.append(minutes).append(" phút");
+        }
+        
+        return sb.toString();
+    }
+    
     private String determineTargetCustomerId(BookingPreviewRequest request, String currentUserId, boolean isAdmin) {
         // Admin can specify customerId, otherwise use current user
         if (isAdmin && request.customerId() != null && !request.customerId().isBlank()) {

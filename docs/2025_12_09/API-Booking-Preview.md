@@ -533,12 +533,3 @@ POST /api/v1/customer/bookings/preview
 4. **User confirms** → Call actual booking creation endpoint
 
 ---
-
-## Related Endpoints
-
-| Endpoint | Description |
-|----------|-------------|
-| `POST /api/v1/customer/bookings` | Create actual booking |
-| `POST /api/v1/customer/bookings/validate` | Validate booking (without detailed pricing) |
-| `GET /api/v1/services` | List available services |
-| `GET /api/v1/promotions/active` | List active promotions |
