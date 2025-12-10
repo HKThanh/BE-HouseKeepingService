@@ -13,6 +13,8 @@ import iuh.house_keeping_service_be.dtos.EmployeeSchedule.SuitableEmployeeReques
 import iuh.house_keeping_service_be.dtos.EmployeeSchedule.SuitableEmployeeResponse;
 import iuh.house_keeping_service_be.dtos.EmployeeSchedule.ApiResponse;
 import iuh.house_keeping_service_be.dtos.Booking.request.AssignmentRequest;
+import iuh.house_keeping_service_be.dtos.Service.CalculatePriceRequest;
+import iuh.house_keeping_service_be.dtos.Service.CalculatePriceResponse;
 import iuh.house_keeping_service_be.events.RecurringBookingCreatedEvent;
 import iuh.house_keeping_service_be.enums.BookingStatus;
 import iuh.house_keeping_service_be.enums.RecurrenceType;
@@ -25,6 +27,7 @@ import iuh.house_keeping_service_be.services.BookingService.BookingService;
 import iuh.house_keeping_service_be.services.ChatService.ConversationService;
 import iuh.house_keeping_service_be.services.EmployeeScheduleService.EmployeeScheduleService;
 import iuh.house_keeping_service_be.services.RecurringBookingService.RecurringBookingService;
+import iuh.house_keeping_service_be.services.ServiceService.ServiceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -73,6 +76,7 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
     private final EmployeeRepository employeeRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final PaymentRepository paymentRepository;
+    private final ServiceService serviceService;
     private final ConversationRepository conversationRepository;
     @Lazy
     @Autowired
@@ -694,8 +698,14 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
             // Calculate price per unit if not provided
             BigDecimal pricePerUnit = detailRequest.expectedPricePerUnit();
             if (pricePerUnit == null) {
-                pricePerUnit = service.getBasePrice();
-                log.debug("Auto-calculated pricePerUnit for service {}: {}", service.getServiceId(), pricePerUnit);
+                // Use ServiceService to calculate price correctly based on selectedChoiceIds
+                pricePerUnit = calculatePricePerUnitForService(
+                        service,
+                        detailRequest.selectedChoiceIds(),
+                        detailRequest.quantity()
+                );
+                log.debug("Auto-calculated pricePerUnit for service {} with choices {}: {}", 
+                        service.getServiceId(), detailRequest.selectedChoiceIds(), pricePerUnit);
             }
             detail.setPricePerUnit(pricePerUnit);
 
@@ -711,6 +721,42 @@ public class RecurringBookingServiceImpl implements RecurringBookingService {
         }
 
         return details;
+    }
+
+    /**
+     * Calculate price per unit for a service using ServiceService.calculatePrice
+     * This properly accounts for selectedChoiceIds and pricing rules
+     */
+    private BigDecimal calculatePricePerUnitForService(
+            Service service,
+            List<Integer> selectedChoiceIds,
+            Integer quantity
+    ) {
+        try {
+            // Use quantity=1 to get the unit price
+            CalculatePriceRequest priceRequest = new CalculatePriceRequest(
+                    service.getServiceId(),
+                    selectedChoiceIds != null ? selectedChoiceIds : List.of(),
+                    1 // Calculate for 1 unit to get unit price
+            );
+            
+            CalculatePriceResponse priceResponse = serviceService.calculatePrice(priceRequest);
+            
+            if (Boolean.TRUE.equals(priceResponse.success()) && priceResponse.data() != null) {
+                BigDecimal calculatedUnitPrice = priceResponse.data().finalPrice();
+                log.debug("ServiceService calculated unit price for service {}: {}", 
+                        service.getServiceId(), calculatedUnitPrice);
+                return calculatedUnitPrice;
+            }
+            
+            log.warn("ServiceService.calculatePrice failed for service {}, falling back to basePrice. Message: {}",
+                    service.getServiceId(), priceResponse.message());
+        } catch (Exception e) {
+            log.error("Error calculating price for service {}: {}", service.getServiceId(), e.getMessage());
+        }
+        
+        // Fallback to base price if calculation fails
+        return service.getBasePrice() != null ? service.getBasePrice() : BigDecimal.ZERO;
     }
 
     private ConversationResponse createRecurringConversation(RecurringBooking recurringBooking, List<String> generatedBookingIds) {
