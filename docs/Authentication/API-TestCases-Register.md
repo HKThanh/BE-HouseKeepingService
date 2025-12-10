@@ -101,15 +101,19 @@ All fields are mandatory and cannot be left empty:
 - **Actual Output**:
   ```json
   {
-    "success": true,
-    "data": {
-        "username": "examplez",
-        "email": "thanhdavid18t@gmail.com",
-        "role": "CUSTOMER",
-        "isEmailVerified": false,
-        "isPhoneVerified": false
-    },
-    "message": "Đăng ký thành công"
+    "username": "newcustomer",
+    "password": "P@ssw0rd!",
+    "fullName": "New Customer",
+    "email": "customer@example.com",
+    "phoneNumber": "+84123456789",
+    "role": "CUSTOMER",
+    "address": {
+      "fullAddress": "123 Nguyen Van Cu, Phuong 1",
+      "ward": "Phường 1",
+      "city": "Hồ Chí Minh",
+      "latitude": 10.762622,
+      "longitude": 106.660172
+    }
   }
   ```
 - **Status Code**: 201 Created

@@ -14,6 +14,6 @@ public class AddressServiceImpl implements AddressService {
     @Override
     public Address findByCustomerId(String customerId) {
         return addressRepository.findByCustomer_CustomerIdAndIsDefaultTrue(customerId)
-                .orElseThrow(() -> new RuntimeException("No default address found for customer with ID: " + customerId));
+                .orElse(null);
     }
 }
