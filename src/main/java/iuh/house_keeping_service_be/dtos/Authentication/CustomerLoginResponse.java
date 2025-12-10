@@ -8,7 +8,7 @@ public record CustomerLoginResponse(
         String fullName,
         String email,
         String phoneNumber,
-        boolean isMale,
+        Boolean isMale,
         String status,
         String address,
         Boolean isEmailVerified,
