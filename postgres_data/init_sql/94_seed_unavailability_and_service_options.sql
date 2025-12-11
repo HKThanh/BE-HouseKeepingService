@@ -42,14 +42,6 @@ INSERT INTO service_option_choices (option_id, label, display_order) VALUES
 ((SELECT option_id FROM service_options WHERE service_id = 1 AND label = 'Bạn có yêu cầu thêm công việc nào?' LIMIT 1), 'Rửa chén', 2),
 ((SELECT option_id FROM service_options WHERE service_id = 1 AND label = 'Bạn có yêu cầu thêm công việc nào?' LIMIT 1), 'Lau cửa kính', 3);
 
--- Câu hỏi cho dịch vụ 'Vệ sinh Sofa - Nệm - Rèm'
-INSERT INTO service_options (service_id, label, option_type, display_order)
-VALUES (3, 'Hạng mục cần vệ sinh?', 'SINGLE_CHOICE_RADIO', 1);
-INSERT INTO service_option_choices (option_id, label, display_order) VALUES
-((SELECT option_id FROM service_options WHERE service_id = 3 AND label = 'Hạng mục cần vệ sinh?' LIMIT 1), 'Sofa', 1),
-((SELECT option_id FROM service_options WHERE service_id = 3 AND label = 'Hạng mục cần vệ sinh?' LIMIT 1), 'Nệm', 2),
-((SELECT option_id FROM service_options WHERE service_id = 3 AND label = 'Hạng mục cần vệ sinh?' LIMIT 1), 'Rèm', 3);
-
 -- Câu hỏi cho dịch vụ 'Vệ sinh máy lạnh'
 INSERT INTO service_options (service_id, label, option_type, display_order)
 VALUES (4, 'Loại máy lạnh?', 'SINGLE_CHOICE_DROPDOWN', 1);
@@ -89,8 +81,6 @@ INSERT INTO pricing_rules (service_id, rule_name, condition_logic, priority, pri
 (1, 'Giặt chăn ga', 'ALL', 5, 30000, 0, 0.5),
 (1, 'Rửa chén', 'ALL', 5, 15000, 0, 0.5),
 (1, 'Lau cửa kính', 'ALL', 5, 40000, 0, 1.0),
-(3, 'Vệ sinh nệm', 'ALL', 5, 150000, 0, 1.0),
-(3, 'Vệ sinh rèm', 'ALL', 5, 100000, 0, 1.0),
 (4, 'Máy lạnh âm trần', 'ALL', 5, 50000, 0, 0.5),
 (5, 'Gấp quần áo', 'ALL', 5, 10000, 0, 1.0),
 (7, 'Mua nguyên liệu nấu ăn', 'ALL', 5, 40000, 0, 0.5);
@@ -140,24 +130,6 @@ VALUES (
  AND label = 'Lau cửa kính' LIMIT 1)
 );
 
--- Vệ sinh nệm
-INSERT INTO rule_conditions (rule_id, choice_id)
-VALUES (
-(SELECT rule_id FROM pricing_rules WHERE rule_name = 'Vệ sinh nệm'),
-(SELECT choice_id FROM service_option_choices 
- WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 3 AND label = 'Hạng mục cần vệ sinh?' LIMIT 1) 
- AND label = 'Nệm' LIMIT 1)
-);
-
--- Vệ sinh rèm
-INSERT INTO rule_conditions (rule_id, choice_id)
-VALUES (
-(SELECT rule_id FROM pricing_rules WHERE rule_name = 'Vệ sinh rèm'),
-(SELECT choice_id FROM service_option_choices 
- WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 3 AND label = 'Hạng mục cần vệ sinh?' LIMIT 1) 
- AND label = 'Rèm' LIMIT 1)
-);
-
 -- Máy lạnh âm trần
 INSERT INTO rule_conditions (rule_id, choice_id)
 VALUES (
@@ -205,8 +177,6 @@ UPDATE pricing_rules SET price_adjustment = 200000 WHERE rule_name = 'Phụ thu 
 UPDATE pricing_rules SET price_adjustment = 25000 WHERE rule_name = 'Giặt chăn ga';
 UPDATE pricing_rules SET price_adjustment = 20000 WHERE rule_name = 'Rửa chén';
 UPDATE pricing_rules SET price_adjustment = 35000 WHERE rule_name = 'Lau cửa kính';
-UPDATE pricing_rules SET price_adjustment = 100000 WHERE rule_name = 'Vệ sinh nệm';
-UPDATE pricing_rules SET price_adjustment = 80000 WHERE rule_name = 'Vệ sinh rèm';
 UPDATE pricing_rules SET price_adjustment = 100000 WHERE rule_name = 'Máy lạnh âm trần';
 UPDATE pricing_rules SET price_adjustment = 15000 WHERE rule_name = 'Gấp quần áo';
 UPDATE pricing_rules SET price_adjustment = 40000 WHERE rule_name = 'Mua nguyên liệu nấu ăn';
@@ -306,3 +276,78 @@ INSERT INTO rule_conditions (rule_id, choice_id) VALUES
 (SELECT choice_id FROM service_option_choices 
  WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 6 AND label = 'Loại trang phục giặt hấp?' LIMIT 1) 
  AND label = 'Đầm' LIMIT 1));
+
+-- =================================================================================
+-- THÊM CÁC PRICING RULES VÀ RULE CONDITIONS CÒN THIẾU
+-- =================================================================================
+
+-- Pricing rules bổ sung cho Service 2 (Tổng vệ sinh)
+INSERT INTO pricing_rules (service_id, rule_name, condition_logic, priority, price_adjustment, staff_adjustment, duration_adjustment_hours) VALUES
+(2, 'Phụ thu căn hộ lớn', 'ALL', 8, 100000, 0, 1.0),
+(2, 'Phụ thu nhà phố nhỏ', 'ALL', 9, 150000, 0, 1.5);
+
+-- Rule condition: Căn hộ + Trên 80m²
+INSERT INTO rule_conditions (rule_id, choice_id) VALUES
+((SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu căn hộ lớn'),
+(SELECT choice_id FROM service_option_choices 
+ WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 2 AND label = 'Loại hình nhà ở?' LIMIT 1) 
+ AND label = 'Căn hộ' LIMIT 1));
+
+INSERT INTO rule_conditions (rule_id, choice_id) VALUES
+((SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu căn hộ lớn'),
+(SELECT choice_id FROM service_option_choices 
+ WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 2 AND label = 'Diện tích dọn dẹp?' LIMIT 1) 
+ AND label = 'Trên 80m²' LIMIT 1));
+
+-- Rule condition: Nhà phố + Dưới 80m²
+INSERT INTO rule_conditions (rule_id, choice_id) VALUES
+((SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu nhà phố nhỏ'),
+(SELECT choice_id FROM service_option_choices 
+ WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 2 AND label = 'Loại hình nhà ở?' LIMIT 1) 
+ AND label = 'Nhà phố' LIMIT 1));
+
+INSERT INTO rule_conditions (rule_id, choice_id) VALUES
+((SELECT rule_id FROM pricing_rules WHERE rule_name = 'Phụ thu nhà phố nhỏ'),
+(SELECT choice_id FROM service_option_choices 
+ WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 2 AND label = 'Diện tích dọn dẹp?' LIMIT 1) 
+ AND label = 'Dưới 80m²' LIMIT 1));
+
+-- Pricing rule cho Service 4 (Vệ sinh máy lạnh) - Treo tường là giá cơ bản, không phụ thu
+INSERT INTO pricing_rules (service_id, rule_name, condition_logic, priority, price_adjustment, staff_adjustment, duration_adjustment_hours) VALUES
+(4, 'Máy lạnh treo tường', 'ALL', 1, 0, 0, 0);
+
+INSERT INTO rule_conditions (rule_id, choice_id) VALUES
+((SELECT rule_id FROM pricing_rules WHERE rule_name = 'Máy lạnh treo tường'),
+(SELECT choice_id FROM service_option_choices 
+ WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 4 AND label = 'Loại máy lạnh?' LIMIT 1) 
+ AND label = 'Treo tường' LIMIT 1));
+
+-- Pricing rule cho Service 6 (Giặt hấp cao cấp) - Vest là giá cơ bản, không phụ thu
+INSERT INTO pricing_rules (service_id, rule_name, condition_logic, priority, price_adjustment, staff_adjustment, duration_adjustment_hours) VALUES
+(6, 'Giặt hấp vest', 'ALL', 1, 0, 0, 0);
+
+INSERT INTO rule_conditions (rule_id, choice_id) VALUES
+((SELECT rule_id FROM pricing_rules WHERE rule_name = 'Giặt hấp vest'),
+(SELECT choice_id FROM service_option_choices 
+ WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 6 AND label = 'Loại trang phục giặt hấp?' LIMIT 1) 
+ AND label = 'Vest' LIMIT 1));
+
+-- Pricing rule cho Service 5 (Giặt sấy theo kg) - Không gấp là giá cơ bản
+INSERT INTO pricing_rules (service_id, rule_name, condition_logic, priority, price_adjustment, staff_adjustment, duration_adjustment_hours) VALUES
+(5, 'Không gấp quần áo', 'ALL', 1, 0, 0, 0);
+
+INSERT INTO rule_conditions (rule_id, choice_id) VALUES
+((SELECT rule_id FROM pricing_rules WHERE rule_name = 'Không gấp quần áo'),
+(SELECT choice_id FROM service_option_choices 
+ WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 5 AND label = 'Có cần gấp quần áo sau khi giặt?' LIMIT 1) 
+ AND label = 'Không' LIMIT 1));
+
+-- Pricing rule cho Service 7 (Nấu ăn gia đình) - Không mua nguyên liệu là giá cơ bản
+INSERT INTO pricing_rules (service_id, rule_name, condition_logic, priority, price_adjustment, staff_adjustment, duration_adjustment_hours) VALUES
+(7, 'Không mua nguyên liệu', 'ALL', 1, 0, 0, 0);
+
+INSERT INTO rule_conditions (rule_id, choice_id) VALUES
+((SELECT rule_id FROM pricing_rules WHERE rule_name = 'Không mua nguyên liệu'),
+(SELECT choice_id FROM service_option_choices 
+ WHERE option_id = (SELECT option_id FROM service_options WHERE service_id = 7 AND label = 'Bạn có cần chúng tôi mua nguyên liệu?' LIMIT 1) 
+ AND label = 'Không' LIMIT 1));
