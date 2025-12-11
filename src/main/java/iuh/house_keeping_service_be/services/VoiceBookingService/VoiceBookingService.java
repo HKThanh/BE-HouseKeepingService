@@ -727,6 +727,7 @@ public class VoiceBookingService {
 
             Booking booking = new Booking();
             booking.setBookingId(bookingSummary.getBookingId());
+            booking.setIsVerified(true);
             voiceRequest.markAsCompleted(booking);
             voiceRequest = voiceBookingRequestRepository.save(voiceRequest);
             VoiceBookingResponse response = VoiceBookingResponse.completed(
