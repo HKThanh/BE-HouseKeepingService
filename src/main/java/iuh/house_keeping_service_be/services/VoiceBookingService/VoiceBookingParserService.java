@@ -635,6 +635,11 @@ public class VoiceBookingParserService {
             return hints.get("address").toString();
         }
 
+        // Service keywords that should stop address extraction
+        String[] serviceStopKeywords = {"dịch vụ", "dich vu", "đặt lịch", "dat lich", "booking", 
+                "dọn dẹp", "don dep", "lau dọn", "lau don", "vệ sinh", "ve sinh", 
+                "giúp việc", "giup viec", "lau nhà", "lau nha", "dọn nhà", "don nha"};
+
         // Look for address keywords
         String[] addressKeywords = {"địa chỉ", "tại", "ở", "đến"};
         String lowerTranscript = transcript.toLowerCase();
@@ -652,8 +657,69 @@ public class VoiceBookingParserService {
                     if (address.endsWith(".")) {
                         address = address.substring(0, address.length() - 1).trim();
                     }
+                    
+                    // Stop at service keywords to prevent concatenation
+                    address = truncateAtServiceKeywords(address, serviceStopKeywords);
+                    
                     return address;
                 }
+            }
+        }
+        
+        // Try to extract address without keywords (look for location patterns)
+        String extractedAddress = extractAddressFromLocationPatterns(transcript, serviceStopKeywords);
+        if (extractedAddress != null) {
+            return extractedAddress;
+        }
+        
+        return null;
+    }
+
+    /**
+     * Truncate address at service keywords to prevent address concatenation issues
+     */
+    private String truncateAtServiceKeywords(String address, String[] serviceKeywords) {
+        String lowerAddress = address.toLowerCase();
+        int earliestIndex = address.length();
+        
+        for (String keyword : serviceKeywords) {
+            int index = lowerAddress.indexOf(keyword);
+            if (index > 0 && index < earliestIndex) {
+                earliestIndex = index;
+            }
+        }
+        
+        if (earliestIndex < address.length()) {
+            String truncated = address.substring(0, earliestIndex).trim();
+            // Remove trailing punctuation
+            truncated = truncated.replaceAll("[.,;!?]+$", "").trim();
+            log.info("Address truncated at service keyword: '{}' -> '{}'", address, truncated);
+            return truncated;
+        }
+        
+        return address;
+    }
+
+    /**
+     * Extract address from location patterns (city names, district names)
+     */
+    private String extractAddressFromLocationPatterns(String transcript, String[] serviceStopKeywords) {
+        String lowerTranscript = transcript.toLowerCase();
+        
+        // Common Vietnamese location patterns
+        Pattern locationPattern = Pattern.compile(
+            "([^,;.!?]*(?:quận|huyện|phường|xã|tp\\.|thành phố|tỉnh|hcm|hồ chí minh|hà nội|đà nẵng)[^,;.!?]*)",
+            Pattern.CASE_INSENSITIVE
+        );
+        
+        Matcher matcher = locationPattern.matcher(transcript);
+        if (matcher.find()) {
+            String address = matcher.group(1).trim();
+            // Truncate at service keywords
+            address = truncateAtServiceKeywords(address, serviceStopKeywords);
+            if (!address.isBlank()) {
+                log.info("Extracted address from location pattern: {}", address);
+                return address;
             }
         }
         
@@ -662,6 +728,10 @@ public class VoiceBookingParserService {
 
     /**
      * Parse Vietnamese address into components
+     * Handles formats like:
+     * - "Gòi Dắp, HCM" (ward without prefix, city abbreviation)
+     * - "Phường 1, Quận Gò Vấp, TP. HCM"
+     * - "123 Nguyễn Văn A, Gò Vấp, Hồ Chí Minh"
      */
     private AddressComponents parseVietnameseAddress(String fullAddress) {
         if (fullAddress == null || fullAddress.isBlank()) {
@@ -672,20 +742,57 @@ public class VoiceBookingParserService {
         String city = null;
         String streetAddress = fullAddress;
 
-        // Extract city (Thành phố / TP. / Tỉnh)
-        // Match "TP. Hồ Chí Minh" or "Thành phố Hồ Chí Minh"
+        // Split by comma to analyze parts
+        String[] parts = fullAddress.split(",");
+        
+        // Extract city (Thành phố / TP. / Tỉnh) - check last parts first
+        // Match "TP. Hồ Chí Minh" or "Thành phố Hồ Chí Minh" or just "HCM"
         Pattern cityPattern = Pattern.compile(
-            "(?:thành phố|tp\\.?|tỉnh)\\s*([^,;]+?)\\s*$",
+            "(?:thành phố|tp\\.?|tỉnh)?\\s*([^,;]+?)\\s*$",
             Pattern.CASE_INSENSITIVE
         );
-        Matcher cityMatcher = cityPattern.matcher(fullAddress);
-        if (cityMatcher.find()) {
-            city = cityMatcher.group(1).trim();
-            // Remove trailing period if present
-            if (city.endsWith(".")) {
-                city = city.substring(0, city.length() - 1).trim();
+        
+        // Check from last part backwards for city
+        for (int i = parts.length - 1; i >= 0; i--) {
+            String part = parts[i].trim();
+            String normalizedPart = part.toLowerCase().replaceAll("\\s+", "");
+            
+            // Check for common city abbreviations/names
+            if (normalizedPart.equals("hcm") || normalizedPart.contains("hồchíminh") || 
+                normalizedPart.contains("hochíminh") || normalizedPart.contains("hochiminh") ||
+                part.toLowerCase().contains("tp.") || part.toLowerCase().contains("thành phố")) {
+                
+                Matcher cityMatcher = cityPattern.matcher(part);
+                if (cityMatcher.find()) {
+                    city = cityMatcher.group(1).trim();
+                }
+                if (city == null || city.isBlank()) {
+                    city = part.replaceAll("(?i)(tp\\.?|thành phố|tỉnh)\\s*", "").trim();
+                }
+                break;
+            } else if (normalizedPart.equals("hn") || normalizedPart.contains("hànội") || 
+                       normalizedPart.contains("hanoi")) {
+                city = "Hà Nội";
+                break;
+            } else if (normalizedPart.contains("đànẵng") || normalizedPart.contains("danang")) {
+                city = "Đà Nẵng";
+                break;
+            } else if (normalizedPart.contains("cầnthơ") || normalizedPart.contains("cantho")) {
+                city = "Cần Thơ";
+                break;
             }
-            // Handle common abbreviations and normalize
+        }
+        
+        // Fallback: Try original pattern matching
+        if (city == null) {
+            Matcher cityMatcher = cityPattern.matcher(fullAddress);
+            if (cityMatcher.find()) {
+                city = cityMatcher.group(1).trim();
+            }
+        }
+        
+        // Normalize common city abbreviations
+        if (city != null) {
             if (city.equalsIgnoreCase("HCM") || city.equalsIgnoreCase("Hồ Chí Minh")) {
                 city = "Hồ Chí Minh";
             } else if (city.equalsIgnoreCase("HN") || city.equalsIgnoreCase("Hà Nội")) {
@@ -695,19 +802,43 @@ public class VoiceBookingParserService {
             } else if (city.equalsIgnoreCase("Cần Thơ") || city.equalsIgnoreCase("Can Tho")) {
                 city = "Cần Thơ";
             }
+            // Remove trailing period if present
+            if (city.endsWith(".")) {
+                city = city.substring(0, city.length() - 1).trim();
+            }
         }
 
         // Extract ward (Phường / Xã / Thị trấn / Quận)
-        // Match patterns like "phường Thủ Dậu 1"
+        // First try: Match with prefix like "phường Thủ Dậu 1"
         Pattern wardPattern = Pattern.compile(
-            "(?:phường|xã|thị trấn|quận)\\s+([^,]+?)(?:,|(?=\\s*(?:tp\\.|thành phố|tỉnh|quận)))",
+            "(?:phường|xã|thị trấn|quận)\\s+([^,]+?)(?:,|(?=\\s*(?:tp\\.|thành phố|tỉnh|quận|$)))",
             Pattern.CASE_INSENSITIVE
         );
         Matcher wardMatcher = wardPattern.matcher(fullAddress);
         if (wardMatcher.find()) {
             ward = wardMatcher.group(1).trim();
         }
+        
+        // Second try: If no ward found with prefix, take the first part before city
+        // This handles cases like "Gòi Dắp, HCM" where "Gòi Dắp" is the ward without prefix
+        if (ward == null && parts.length >= 2 && city != null) {
+            // First part might be street address or ward
+            String firstPart = parts[0].trim();
+            // Check if first part looks like a ward/district name (not a street address with numbers)
+            if (!firstPart.matches(".*\\d+.*") || firstPart.toLowerCase().contains("phường") || 
+                firstPart.toLowerCase().contains("quận")) {
+                // Could be ward name
+                ward = firstPart.replaceAll("(?i)(phường|xã|thị trấn|quận)\\s*", "").trim();
+                log.info("Extracted ward without prefix: '{}'", ward);
+            } else if (parts.length >= 3) {
+                // If first part has numbers, second part might be ward
+                String secondPart = parts[1].trim();
+                ward = secondPart.replaceAll("(?i)(phường|xã|thị trấn|quận)\\s*", "").trim();
+                log.info("Extracted ward from second part: '{}'", ward);
+            }
+        }
 
+        log.info("Parsed address components - Full: '{}', Ward: '{}', City: '{}'", fullAddress, ward, city);
         return new AddressComponents(streetAddress, ward, city);
     }
 
@@ -816,11 +947,14 @@ public class VoiceBookingParserService {
                 null
         );
 
+        // Set default note for AI-created bookings
+        String aiNote = "Đơn này được tạo bởi HomeMate AI";
+
         return new BookingCreateRequest(
                 null, // addressId
                 addressRequest,
                 bookingTime,
-                note,
+                aiNote,
                 null, // title
                 List.of(), // imageUrls
                 null, // promoCode

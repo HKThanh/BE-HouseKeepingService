@@ -29,14 +29,21 @@ public class AddressNormalizationService {
      * Normalize city and ward names
      */
     public NormalizedAddress normalizeAddress(String city, String ward) {
-        log.info("Normalizing address - City: {}, Ward: {}", city, ward);
+        return normalizeAddress(city, ward, null);
+    }
+
+    /**
+     * Normalize city and ward names, and update fullAddress with normalized values
+     */
+    public NormalizedAddress normalizeAddress(String city, String ward, String fullAddress) {
+        log.info("Normalizing address - City: {}, Ward: {}, FullAddress: {}", city, ward, fullAddress);
 
         try {
             // Step 1: Normalize city
             ProvinceData normalizedProvince = normalizeCity(city);
             if (normalizedProvince == null) {
                 log.warn("Could not normalize city: {}", city);
-                return new NormalizedAddress(city, ward, null, null);
+                return new NormalizedAddress(city, ward, null, null, fullAddress);
             }
 
             log.info("City normalized: {} -> {} (code: {})", city, normalizedProvince.getName(), normalizedProvince.getCode());
@@ -56,17 +63,98 @@ public class AddressNormalizationService {
                 }
             }
 
+            // Step 3: Update fullAddress with normalized city and ward
+            String normalizedFullAddress = updateFullAddress(
+                    fullAddress,
+                    city,
+                    normalizedProvince.getName(),
+                    ward,
+                    normalizedWard != null ? normalizedWard : ward
+            );
+
             return new NormalizedAddress(
                     normalizedProvince.getName(),
                     normalizedWard != null ? normalizedWard : ward,
                     normalizedProvince.getCode(),
-                    wardCode
+                    wardCode,
+                    normalizedFullAddress
             );
 
         } catch (Exception e) {
             log.error("Error normalizing address: {}", e.getMessage(), e);
-            return new NormalizedAddress(city, ward, null, null);
+            return new NormalizedAddress(city, ward, null, null, fullAddress);
         }
+    }
+
+    /**
+     * Update fullAddress by replacing original city and ward with normalized values
+     */
+    private String updateFullAddress(String fullAddress, String originalCity, String normalizedCity,
+                                      String originalWard, String normalizedWard) {
+        if (fullAddress == null || fullAddress.isBlank()) {
+            return fullAddress;
+        }
+
+        String updatedAddress = fullAddress;
+
+        // Replace city in fullAddress
+        if (originalCity != null && !originalCity.isBlank() && normalizedCity != null) {
+            updatedAddress = replaceAddressPart(updatedAddress, originalCity, normalizedCity);
+            log.debug("Updated city in fullAddress: {} -> {}", originalCity, normalizedCity);
+        }
+
+        // Replace ward in fullAddress
+        if (originalWard != null && !originalWard.isBlank() && normalizedWard != null) {
+            updatedAddress = replaceAddressPart(updatedAddress, originalWard, normalizedWard);
+            log.debug("Updated ward in fullAddress: {} -> {}", originalWard, normalizedWard);
+        }
+
+        log.info("FullAddress updated: '{}' -> '{}'", fullAddress, updatedAddress);
+        return updatedAddress;
+    }
+
+    /**
+     * Replace address part using case-insensitive matching
+     */
+    private String replaceAddressPart(String fullAddress, String original, String replacement) {
+        if (fullAddress == null || original == null || replacement == null) {
+            return fullAddress;
+        }
+
+        // Skip if original and replacement are the same
+        if (original.equalsIgnoreCase(replacement)) {
+            return fullAddress;
+        }
+
+        // Try exact match first (case-insensitive)
+        String result = fullAddress.replaceAll("(?i)" + java.util.regex.Pattern.quote(original), replacement);
+        
+        // If no replacement happened, try matching with common prefixes removed
+        if (result.equals(fullAddress)) {
+            String cleanedOriginal = cleanAddressPart(original);
+            if (!cleanedOriginal.equals(original.toLowerCase().trim())) {
+                // Original had prefix, try to match without prefix
+                result = fullAddress.replaceAll("(?i)" + java.util.regex.Pattern.quote(cleanedOriginal), 
+                        cleanAddressPart(replacement));
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Clean address part by removing common prefixes
+     */
+    private String cleanAddressPart(String part) {
+        if (part == null) {
+            return "";
+        }
+        String cleaned = part.toLowerCase().trim();
+        // Remove common prefixes for city
+        cleaned = cleaned.replaceAll("^(thành phố|tp\\.?|tỉnh)\\s*", "");
+        // Remove common prefixes for ward
+        cleaned = cleaned.replaceAll("^(phường|xã|thị trấn|quận)\\s*", "");
+        return cleaned.trim();
     }
 
     /**
@@ -267,6 +355,7 @@ public class AddressNormalizationService {
 
     /**
      * Calculate similarity between two strings using Levenshtein distance
+     * Enhanced with phonetic normalization for Vietnamese
      */
     private double calculateSimilarity(String s1, String s2) {
         if (s1 == null || s2 == null) {
@@ -282,14 +371,67 @@ public class AddressNormalizationService {
             return 0.9;
         }
 
-        int distance = levenshteinDistance(s1, s2);
-        int maxLength = Math.max(s1.length(), s2.length());
-
-        if (maxLength == 0) {
-            return 1.0;
+        // Try phonetic normalization for Vietnamese
+        String phonetic1 = normalizeVietnamesePhonetic(s1);
+        String phonetic2 = normalizeVietnamesePhonetic(s2);
+        
+        if (phonetic1.equals(phonetic2)) {
+            return 0.95; // High confidence for phonetic match
         }
 
-        return 1.0 - ((double) distance / maxLength);
+        // Calculate distance on original strings
+        int distance = levenshteinDistance(s1, s2);
+        int maxLength = Math.max(s1.length(), s2.length());
+        double originalSimilarity = maxLength == 0 ? 1.0 : 1.0 - ((double) distance / maxLength);
+
+        // Calculate distance on phonetically normalized strings
+        int phoneticDistance = levenshteinDistance(phonetic1, phonetic2);
+        int phoneticMaxLength = Math.max(phonetic1.length(), phonetic2.length());
+        double phoneticSimilarity = phoneticMaxLength == 0 ? 1.0 : 1.0 - ((double) phoneticDistance / phoneticMaxLength);
+
+        // Return the higher similarity score
+        return Math.max(originalSimilarity, phoneticSimilarity);
+    }
+
+    /**
+     * Normalize Vietnamese phonetic variations
+     * Handles common speech-to-text errors like "Gòi Dắp" -> "Gò Vấp"
+     */
+    private String normalizeVietnamesePhonetic(String text) {
+        if (text == null) {
+            return "";
+        }
+        
+        String normalized = text.toLowerCase().trim();
+        
+        // Remove diacritics for base comparison
+        normalized = java.text.Normalizer.normalize(normalized, java.text.Normalizer.Form.NFD)
+                .replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
+        
+        // Common phonetic substitutions for Vietnamese speech-to-text errors
+        // "oi" often misheard as "o" (e.g., "goi" -> "go")
+        normalized = normalized.replaceAll("oi", "o");
+        // "ap" and "up" and "op" are often confused (e.g., "dap" -> "vap")
+        normalized = normalized.replaceAll("[aou]p", "ap");
+        // "d" and "v" are often confused in Vietnamese speech recognition
+        normalized = normalized.replaceAll("^d", "v"); // at start of word
+        normalized = normalized.replaceAll("\\bd", "v"); // at word boundary
+        // "gi" and "d" sounds similar
+        normalized = normalized.replaceAll("gi", "d");
+        // "ng" and "n" sometimes confused
+        normalized = normalized.replaceAll("ngh?", "n");
+        // "kh" and "k" or "c"
+        normalized = normalized.replaceAll("kh", "k");
+        // "tr" and "ch" confusion
+        normalized = normalized.replaceAll("tr", "ch");
+        // "s" and "x" confusion  
+        normalized = normalized.replaceAll("x", "s");
+        // Remove double consonants
+        normalized = normalized.replaceAll("(.)\\1+", "$1");
+        // Normalize spaces
+        normalized = normalized.replaceAll("\\s+", " ").trim();
+        
+        return normalized;
     }
 
     /**
@@ -354,6 +496,7 @@ public class AddressNormalizationService {
             String normalizedCity,
             String normalizedWard,
             String cityCode,
-            String wardCode
+            String wardCode,
+            String normalizedFullAddress
     ) {}
 }
