@@ -40,8 +40,9 @@ public class VoiceBookingParserService {
     );
 
     // Pattern for extracting date information
+    // Supports: dd/mm/yyyy, dd.mm.yyyy, ngày DD tháng MM (năm YYYY)
     private static final Pattern DATE_PATTERN = Pattern.compile(
-            "(hôm nay|ngày mai|ngày kia|ngày mốt|ngày này tuần sau|ngày mai tuần sau|ngày mốt tuần sau|(thứ\\s+[2-7]|thứ\\s+(hai|ba|tư|năm|sáu|bảy|bay)|chủ nhật|chu nhat)(\\s+tuần sau)?|(\\d{1,2})/(\\d{1,2})/(\\d{4}|\\d{2}))",
+            "(hôm nay|ngày mai|ngày kia|ngày mốt|ngày này tuần sau|ngày mai tuần sau|ngày mốt tuần sau|(thứ\\s+[2-7]|thứ\\s+(hai|ba|tư|năm|sáu|bảy|bay)|chủ nhật|chu nhat)(\\s+tuần sau)?|(\\d{1,2})[./](\\d{1,2})[./](\\d{4}|\\d{2})|ngày\\s+(\\d{1,2})\\s+tháng\\s+(\\d{1,2})(\\s+năm\\s+(\\d{4}|\\d{2}))?)",
             Pattern.CASE_INSENSITIVE
     );
 
@@ -527,7 +528,7 @@ public class VoiceBookingParserService {
                 return weekday;
             }
 
-            // Parse DD/MM/YYYY format (groups 6,7,8 in DATE_PATTERN)
+            // Parse DD/MM/YYYY or DD.MM.YYYY format (groups 6,7,8 in DATE_PATTERN)
             try {
                 String day = matcher.group(6);
                 String month = matcher.group(7);
@@ -540,7 +541,29 @@ public class VoiceBookingParserService {
                     return LocalDate.of(Integer.parseInt(year), Integer.parseInt(month), Integer.parseInt(day));
                 }
             } catch (Exception e) {
-                log.warn("Failed to parse date: {}", dateStr);
+                log.warn("Failed to parse date format dd/mm/yyyy: {}", dateStr);
+            }
+
+            // Parse Vietnamese format: ngày DD tháng MM (năm YYYY) - groups 9,10,12
+            try {
+                String day = matcher.group(9);
+                String month = matcher.group(10);
+                String year = matcher.group(12); // năm is optional, group 11 contains "năm YYYY", group 12 contains just YYYY
+
+                if (day != null && month != null) {
+                    int yearInt;
+                    if (year != null) {
+                        yearInt = year.length() == 2 ? 2000 + Integer.parseInt(year) : Integer.parseInt(year);
+                    } else {
+                        // Default to current year, or next year if date has passed
+                        LocalDate now = LocalDate.now();
+                        LocalDate candidate = LocalDate.of(now.getYear(), Integer.parseInt(month), Integer.parseInt(day));
+                        yearInt = candidate.isBefore(now) ? now.getYear() + 1 : now.getYear();
+                    }
+                    return LocalDate.of(yearInt, Integer.parseInt(month), Integer.parseInt(day));
+                }
+            } catch (Exception e) {
+                log.warn("Failed to parse Vietnamese date format: {}", dateStr);
             }
         }
 
