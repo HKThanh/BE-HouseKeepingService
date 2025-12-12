@@ -114,7 +114,7 @@ public class AddressNormalizationService {
     }
 
     /**
-     * Replace address part using case-insensitive matching
+     * Replace address part using case-insensitive matching with fuzzy support
      */
     private String replaceAddressPart(String fullAddress, String original, String replacement) {
         if (fullAddress == null || original == null || replacement == null) {
@@ -126,20 +126,132 @@ public class AddressNormalizationService {
             return fullAddress;
         }
 
-        // Try exact match first (case-insensitive)
-        String result = fullAddress.replaceAll("(?i)" + java.util.regex.Pattern.quote(original), replacement);
+        // Clean both original and replacement to get names without prefixes
+        String cleanedOriginal = cleanAddressPart(original);
+        String cleanedReplacement = cleanAddressPart(replacement);
         
-        // If no replacement happened, try matching with common prefixes removed
-        if (result.equals(fullAddress)) {
-            String cleanedOriginal = cleanAddressPart(original);
-            if (!cleanedOriginal.equals(original.toLowerCase().trim())) {
-                // Original had prefix, try to match without prefix
-                result = fullAddress.replaceAll("(?i)" + java.util.regex.Pattern.quote(cleanedOriginal), 
-                        cleanAddressPart(replacement));
+        // Check if replacement has prefix (like "Phường", "Thành phố")
+        boolean replacementHasWardPrefix = replacement.toLowerCase().matches("^(phường|xã|thị trấn)\\s+.*");
+        boolean replacementHasCityPrefix = replacement.toLowerCase().matches("^(thành phố|tp\\.?|tỉnh)\\s+.*");
+        
+        String result = fullAddress;
+        
+        // Strategy 1: If fullAddress already has prefix + name, replace with just the cleaned name
+        // e.g., "phường Gò Vấp" in fullAddress should become "Phường Gò Vấp" (not "phường Phường Gò Vấp")
+        if (replacementHasWardPrefix) {
+            // Pattern to match existing "phường + ward name" and replace with normalized version
+            java.util.regex.Pattern wardWithPrefixPattern = java.util.regex.Pattern.compile(
+                "(phường|Phường|PHƯỜNG|xã|Xã|thị trấn|Thị trấn)\\s+" + 
+                java.util.regex.Pattern.quote(cleanedOriginal),
+                java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.UNICODE_CASE
+            );
+            java.util.regex.Matcher wardMatcher = wardWithPrefixPattern.matcher(result);
+            if (wardMatcher.find()) {
+                result = wardMatcher.replaceAll(replacement);
+                log.debug("Replaced ward with prefix: {}", replacement);
+                return result;
+            }
+        }
+        
+        if (replacementHasCityPrefix) {
+            // Pattern to match existing "thành phố/tp + city name" and replace with normalized version
+            java.util.regex.Pattern cityWithPrefixPattern = java.util.regex.Pattern.compile(
+                "(thành phố|Thành phố|THÀNH PHỐ|tp\\.?|TP\\.?|tỉnh|Tỉnh)\\s+" + 
+                java.util.regex.Pattern.quote(cleanedOriginal),
+                java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.UNICODE_CASE
+            );
+            java.util.regex.Matcher cityMatcher = cityWithPrefixPattern.matcher(result);
+            if (cityMatcher.find()) {
+                result = cityMatcher.replaceAll(replacement);
+                log.debug("Replaced city with prefix: {}", replacement);
+                return result;
             }
         }
 
+        // Strategy 2: Try exact match (case-insensitive)
+        result = fullAddress.replaceAll("(?i)" + java.util.regex.Pattern.quote(original), replacement);
+        if (!result.equals(fullAddress)) {
+            return result;
+        }
+        
+        // Strategy 3: Match just the name without prefix and replace with cleaned replacement
+        // This avoids adding prefix when fullAddress already has one
+        if (!cleanedOriginal.equals(original.toLowerCase().trim())) {
+            // Original had prefix, try to match the cleaned name
+            result = fullAddress.replaceAll("(?i)" + java.util.regex.Pattern.quote(cleanedOriginal), 
+                    cleanedReplacement);
+            if (!result.equals(fullAddress)) {
+                return result;
+            }
+        }
+
+        // Strategy 4: Fuzzy ward replacement
+        if (result.equals(fullAddress) && (original.toLowerCase().contains("phường") || 
+                replacement.toLowerCase().contains("phường"))) {
+            result = fuzzyReplaceWard(fullAddress, original, replacement);
+        }
+
         return result;
+    }
+
+    /**
+     * Fuzzy replace ward in fullAddress by finding similar ward pattern
+     */
+    private String fuzzyReplaceWard(String fullAddress, String originalWard, String normalizedWard) {
+        if (fullAddress == null || normalizedWard == null) {
+            return fullAddress;
+        }
+
+        // Extract ward name without prefix
+        String normalizedWardName = cleanAddressPart(normalizedWard);
+        String originalWardName = cleanAddressPart(originalWard);
+        
+        // Pattern to match "phường/Phường + ward name" with flexible spacing
+        // This will find ward patterns like "phường Tây Thành", "Phường Tây Thạnh", etc.
+        java.util.regex.Pattern wardPattern = java.util.regex.Pattern.compile(
+            "(phường|Phường|PHƯỜNG)\\s+([^,]+?)(?=,|$)",
+            java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.UNICODE_CASE
+        );
+        
+        java.util.regex.Matcher matcher = wardPattern.matcher(fullAddress);
+        
+        while (matcher.find()) {
+            String foundWardName = matcher.group(2).trim();
+            // Calculate similarity between found ward and original ward name
+            double similarity = calculateSimilarity(
+                normalizeVietnamese(foundWardName.toLowerCase()),
+                normalizeVietnamese(originalWardName.toLowerCase())
+            );
+            
+            log.debug("Comparing ward in fullAddress: '{}' with original ward: '{}', similarity: {}", 
+                foundWardName, originalWardName, similarity);
+            
+            // If similarity is high enough, replace with normalized ward
+            if (similarity >= 0.6) {
+                String matchedPart = matcher.group(0);
+                String replacementPart = "Phường " + normalizedWardName.substring(0, 1).toUpperCase() + 
+                        normalizedWardName.substring(1);
+                
+                // Use the full normalized ward name if it has proper capitalization
+                if (normalizedWard.startsWith("Phường ")) {
+                    replacementPart = normalizedWard;
+                }
+                
+                log.info("Fuzzy replacing ward in fullAddress: '{}' -> '{}'", matchedPart, replacementPart);
+                return fullAddress.replace(matchedPart, replacementPart);
+            }
+        }
+        
+        return fullAddress;
+    }
+
+    /**
+     * Normalize Vietnamese text by removing diacritics for comparison
+     */
+    private String normalizeVietnamese(String text) {
+        if (text == null) return "";
+        String normalized = java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFD);
+        return normalized.replaceAll("\\p{InCombiningDiacriticalMarks}+", "").toLowerCase();
     }
 
     /**

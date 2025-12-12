@@ -367,5 +367,43 @@ INSERT INTO role_features (role_id, feature_id, is_enabled) VALUES
 (3, (SELECT feature_id FROM features WHERE feature_name = 'profile.employee.edit'), true);
 
 -- =================================================================================
+-- 4 NHÂN VIÊN LÀM VIỆC TẠI PHƯỜNG GÒ VẤP, TP.HCM
+-- =================================================================================
+
+-- Thêm 4 tài khoản nhân viên Gò Vấp
+INSERT INTO account (account_id, username, password, phone_number, status, is_phone_verified) VALUES
+('a1000001-0000-0000-0000-000000000060', 'nmtuan01', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0912100001', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000061', 'tthnhung', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0912100002', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000062', 'lvhung', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0912100003', 'ACTIVE', true),
+('a1000001-0000-0000-0000-000000000063', 'ptlanh', '$2a$12$dRX/zeerYun4LF16PRZuzuaaQDv673McBavp3xEciXKezLjSzyyiK', '0912100004', 'ACTIVE', true);
+
+-- Gán vai trò EMPLOYEE cho 4 tài khoản Gò Vấp
+INSERT INTO account_roles (account_id, role_id) VALUES
+('a1000001-0000-0000-0000-000000000060', 2),
+('a1000001-0000-0000-0000-000000000061', 2),
+('a1000001-0000-0000-0000-000000000062', 2),
+('a1000001-0000-0000-0000-000000000063', 2);
+
+-- Thêm hồ sơ nhân viên Gò Vấp
+INSERT INTO employee (employee_id, account_id, avatar, full_name, is_male, email, birthdate, hired_date, skills, bio, is_email_verified) VALUES
+('e1000001-0000-0000-0000-000000000047', 'a1000001-0000-0000-0000-000000000060', 'https://i.pravatar.cc/150?img=67', 'Nguyễn Minh Tuấn', TRUE, 'nguyenminhtuan.govap@gmail.com', '1993-05-15', '2024-01-10', ARRAY['Vệ sinh nhà cửa', 'Lau dọn', 'Dọn dẹp'], 'Nhân viên vệ sinh chuyên nghiệp tại Gò Vấp, có 3 năm kinh nghiệm.', true),
+('e1000001-0000-0000-0000-000000000048', 'a1000001-0000-0000-0000-000000000061', 'https://i.pravatar.cc/150?img=68', 'Trần Thị Hồng Nhung', FALSE, 'tranhongnhung.govap@gmail.com', '1995-08-22', '2024-02-15', ARRAY['Giặt ủi', 'Nấu ăn', 'Dọn dẹp'], 'Chuyên về công việc gia đình, giặt ủi và nấu ăn tại khu vực Gò Vấp.', true),
+('e1000001-0000-0000-0000-000000000049', 'a1000001-0000-0000-0000-000000000062', 'https://i.pravatar.cc/150?img=69', 'Lê Văn Hùng', TRUE, 'levanhung.govap@gmail.com', '1991-11-08', '2023-11-20', ARRAY['Vệ sinh máy lạnh', 'Sửa chữa nhỏ', 'Tổng vệ sinh'], 'Thợ kỹ thuật lành nghề, chuyên vệ sinh máy lạnh và sửa chữa tại Gò Vấp.', true),
+('e1000001-0000-0000-0000-000000000050', 'a1000001-0000-0000-0000-000000000063', 'https://i.pravatar.cc/150?img=70', 'Phạm Thị Lan Anh', FALSE, 'phamthilananh.govap@gmail.com', '1997-03-30', '2024-03-05', ARRAY['Vệ sinh sofa', 'Giặt thảm', 'Khử khuẩn'], 'Chuyên vệ sinh nội thất, sofa, thảm bằng máy móc chuyên dụng tại Gò Vấp.', true);
+
+-- Thiết lập vùng làm việc Gò Vấp cho 4 nhân viên
+INSERT INTO employee_working_zones (employee_id, ward, city) VALUES
+('e1000001-0000-0000-0000-000000000047', 'Phường Gò Vấp', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000048', 'Phường Gò Vấp', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000049', 'Phường Gò Vấp', 'Thành phố Hồ Chí Minh'),
+('e1000001-0000-0000-0000-000000000050', 'Phường Gò Vấp', 'Thành phố Hồ Chí Minh');
+
+-- Thiết lập rating cho nhân viên Gò Vấp
+UPDATE employee SET rating = 'HIGH' WHERE employee_id = 'e1000001-0000-0000-0000-000000000047';
+UPDATE employee SET rating = 'MEDIUM' WHERE employee_id = 'e1000001-0000-0000-0000-000000000048';
+UPDATE employee SET rating = 'HIGH' WHERE employee_id = 'e1000001-0000-0000-0000-000000000049';
+UPDATE employee SET rating = 'MEDIUM' WHERE employee_id = 'e1000001-0000-0000-0000-000000000050';
+
+-- =================================================================================
 -- THÊM DỮ LIỆU MẪU (TIẾNG VIỆT) VÀO CÁC KHỐI CÒN LẠI
 -- =================================================================================

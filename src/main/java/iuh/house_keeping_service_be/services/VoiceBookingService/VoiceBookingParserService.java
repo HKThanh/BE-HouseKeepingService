@@ -41,8 +41,13 @@ public class VoiceBookingParserService {
 
     // Pattern for extracting date information
     // Supports: dd/mm/yyyy, dd.mm.yyyy, ngày DD tháng MM (năm YYYY)
+    // Group structure:
+    // Group 1: full match
+    // Groups 2-4: weekday pattern (thứ X, tuần sau)
+    // Groups 5-7: dd/mm/yyyy or dd.mm.yyyy format (day, month, year)
+    // Groups 8-11: Vietnamese format "ngày DD tháng MM năm YYYY" (day, month, năm+year, year)
     private static final Pattern DATE_PATTERN = Pattern.compile(
-            "(hôm nay|ngày mai|ngày kia|ngày mốt|ngày này tuần sau|ngày mai tuần sau|ngày mốt tuần sau|(thứ\\s+[2-7]|thứ\\s+(hai|ba|tư|năm|sáu|bảy|bay)|chủ nhật|chu nhat)(\\s+tuần sau)?|(\\d{1,2})[./](\\d{1,2})[./](\\d{4}|\\d{2})|ngày\\s+(\\d{1,2})\\s+tháng\\s+(\\d{1,2})(\\s+năm\\s+(\\d{4}|\\d{2}))?)",
+            "(hôm nay|ngày mai|ngày kia|ngày mốt|ngày này tuần sau|ngày mai tuần sau|ngày mốt tuần sau|(thứ\\s+[2-7]|thứ\\s+(?:hai|ba|tư|năm|sáu|bảy|bay)|chủ nhật|chu nhat)(\\s+tuần sau)?|(\\d{1,2})[./](\\d{1,2})[./](\\d{4}|\\d{2})|ngày\\s+(\\d{1,2})\\s+tháng\\s+(\\d{1,2})(?:\\s+năm\\s+(\\d{4}|\\d{2}))?)",
             Pattern.CASE_INSENSITIVE
     );
 
@@ -528,27 +533,12 @@ public class VoiceBookingParserService {
                 return weekday;
             }
 
-            // Parse DD/MM/YYYY or DD.MM.YYYY format (groups 6,7,8 in DATE_PATTERN)
+            // Parse Vietnamese format: ngày DD tháng MM (năm YYYY) - groups 7,8,9
+            // Check this BEFORE dd/mm/yyyy to prioritize Vietnamese format
             try {
-                String day = matcher.group(6);
-                String month = matcher.group(7);
-                String year = matcher.group(8);
-
-                if (day != null && month != null && year != null) {
-                    if (year.length() == 2) {
-                        year = "20" + year;
-                    }
-                    return LocalDate.of(Integer.parseInt(year), Integer.parseInt(month), Integer.parseInt(day));
-                }
-            } catch (Exception e) {
-                log.warn("Failed to parse date format dd/mm/yyyy: {}", dateStr);
-            }
-
-            // Parse Vietnamese format: ngày DD tháng MM (năm YYYY) - groups 9,10,12
-            try {
-                String day = matcher.group(9);
-                String month = matcher.group(10);
-                String year = matcher.group(12); // năm is optional, group 11 contains "năm YYYY", group 12 contains just YYYY
+                String day = matcher.group(7);
+                String month = matcher.group(8);
+                String year = matcher.group(9); // năm is optional
 
                 if (day != null && month != null) {
                     int yearInt;
@@ -560,10 +550,28 @@ public class VoiceBookingParserService {
                         LocalDate candidate = LocalDate.of(now.getYear(), Integer.parseInt(month), Integer.parseInt(day));
                         yearInt = candidate.isBefore(now) ? now.getYear() + 1 : now.getYear();
                     }
+                    log.info("Parsed Vietnamese date format: ngày {} tháng {} năm {}", day, month, yearInt);
                     return LocalDate.of(yearInt, Integer.parseInt(month), Integer.parseInt(day));
                 }
             } catch (Exception e) {
                 log.warn("Failed to parse Vietnamese date format: {}", dateStr);
+            }
+
+            // Parse DD/MM/YYYY or DD.MM.YYYY format (groups 4,5,6 in DATE_PATTERN)
+            try {
+                String day = matcher.group(4);
+                String month = matcher.group(5);
+                String year = matcher.group(6);
+
+                if (day != null && month != null && year != null) {
+                    if (year.length() == 2) {
+                        year = "20" + year;
+                    }
+                    log.info("Parsed dd/mm/yyyy format: {}/{}/{}", day, month, year);
+                    return LocalDate.of(Integer.parseInt(year), Integer.parseInt(month), Integer.parseInt(day));
+                }
+            } catch (Exception e) {
+                log.warn("Failed to parse date format dd/mm/yyyy: {}", dateStr);
             }
         }
 
@@ -931,11 +939,13 @@ public class VoiceBookingParserService {
         // Normalize city and ward if they are not "Unknown"
         String normalizedCity = city;
         String normalizedWard = ward;
+        String normalizedFullAddress = addressComponents.fullAddress(); // Will be updated with normalized values
         
         if (!city.equals("Unknown") || !ward.equals("Unknown")) {
             try {
+                // Pass fullAddress to normalize and update it with normalized city/ward
                 AddressNormalizationService.NormalizedAddress normalizedAddress = 
-                        addressNormalizationService.normalizeAddress(city, ward);
+                        addressNormalizationService.normalizeAddress(city, ward, addressComponents.fullAddress());
                 
                 if (normalizedAddress != null) {
                     if (normalizedAddress.normalizedCity() != null && !normalizedAddress.normalizedCity().isBlank()) {
@@ -951,6 +961,12 @@ public class VoiceBookingParserService {
                     } else {
                         log.warn("Ward normalization returned null or blank for: {}", ward);
                     }
+                    
+                    // Update fullAddress with normalized values
+                    if (normalizedAddress.normalizedFullAddress() != null && !normalizedAddress.normalizedFullAddress().isBlank()) {
+                        normalizedFullAddress = normalizedAddress.normalizedFullAddress();
+                        log.debug("FullAddress normalized: {} -> {}", addressComponents.fullAddress(), normalizedFullAddress);
+                    }
                 } else {
                     log.warn("Address normalization returned null");
                 }
@@ -963,7 +979,7 @@ public class VoiceBookingParserService {
         // Build address request with normalized values
         NewAddressRequest addressRequest = new NewAddressRequest(
                 customerId,
-                addressComponents.fullAddress(),
+                normalizedFullAddress, // Use normalized fullAddress
                 normalizedWard,
                 normalizedCity,
                 null,
