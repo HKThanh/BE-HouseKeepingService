@@ -135,7 +135,6 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
       - GEMINI_PROMPT_PREFIX=${GEMINI_PROMPT_PREFIX}
-      - SPRING_APPLICATION_JSON={"logging":{"level":{"iuh.house_keeping_service_be":"DEBUG"}}}
     networks:
       - house_keeping_network
 
