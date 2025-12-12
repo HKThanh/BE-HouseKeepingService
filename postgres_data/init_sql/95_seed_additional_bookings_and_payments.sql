@@ -98,16 +98,16 @@ INSERT INTO bookings (
 
 -- Insert image URLs into booking_image_urls table
 INSERT INTO booking_image_urls (booking_id, image_url) VALUES
-('book0014-0000-0000-0000-000000000001', 'https://res.cloudinary.com/demo/image/upload/v1731000001/booking/saigon_balcony.jpg'),
-('book0015-0000-0000-0000-000000000001', 'https://res.cloudinary.com/demo/image/upload/v1731000002/booking/glass_cleaning.jpg'),
-('book0016-0000-0000-0000-000000000001', 'https://res.cloudinary.com/demo/image/upload/v1731000003/booking/wood_cleaning.jpg'),
-('book0017-0000-0000-0000-000000000001', 'https://res.cloudinary.com/demo/image/upload/v1731000004/booking/living_room.jpg'),
-('book0018-0000-0000-0000-000000000001', 'https://res.cloudinary.com/demo/image/upload/v1731000005/booking/bedroom_cleanup.jpg'),
-('book0019-0000-0000-0000-000000000001', 'https://res.cloudinary.com/demo/image/upload/v1731000006/booking/kids_room.jpg'),
-('book0020-0000-0000-0000-000000000001', 'https://res.cloudinary.com/demo/image/upload/v1731000007/booking/air_conditioner.jpg'),
-('book0021-0000-0000-0000-000000000001', 'https://res.cloudinary.com/demo/image/upload/v1731000008/booking/kitchen_cleaning.jpg'),
-('book0022-0000-0000-0000-000000000001', 'https://res.cloudinary.com/demo/image/upload/v1731000009/booking/party_prep.jpg'),
-('book0023-0000-0000-0000-000000000001', 'https://res.cloudinary.com/demo/image/upload/v1731000010/booking/master_bedroom.jpg');
+('book0014-0000-0000-0000-000000000001', 'https://picsum.photos/seed/picsum/200/300'),
+('book0015-0000-0000-0000-000000000001', 'https://picsum.photos/seed/picsum/200/300'),
+('book0016-0000-0000-0000-000000000001', 'https://picsum.photos/seed/picsum/200/300'),
+('book0017-0000-0000-0000-000000000001', 'https://picsum.photos/seed/picsum/200/300'),
+('book0018-0000-0000-0000-000000000001', 'https://picsum.photos/seed/picsum/200/300'),
+('book0019-0000-0000-0000-000000000001', 'https://picsum.photos/seed/picsum/200/300'),
+('book0020-0000-0000-0000-000000000001', 'https://picsum.photos/seed/picsum/200/300'),
+('book0021-0000-0000-0000-000000000001', 'https://picsum.photos/seed/picsum/200/300'),
+('book0022-0000-0000-0000-000000000001', 'https://picsum.photos/seed/picsum/200/300'),
+('book0023-0000-0000-0000-000000000001', 'https://picsum.photos/seed/picsum/200/300');
 
 INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
 ('bdva014-0000-0000-0000-000000000001', 'book0014-0000-0000-0000-000000000001', (SELECT service_id FROM service WHERE name = 'Dọn dẹp theo giờ'), 4, 105000, 420000),
@@ -126,7 +126,7 @@ INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking
 ('book0024-0000-0000-0000-000000000001', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000001', 'HKSVA024', '2025-11-12 09:00:00+07', 'Vệ sinh tổng quát nhà phố Tây Thạnh', 450000, 'AWAITING_EMPLOYEE', NULL, true, 'Tổng vệ sinh nhà phố Tây Thạnh');
 
 INSERT INTO booking_image_urls (booking_id, image_url) VALUES
-('book0024-0000-0000-0000-000000000001', 'https://res.cloudinary.com/demo/image/upload/v1731000011/booking/house_cleaning.jpg');
+('book0024-0000-0000-0000-000000000001', 'https://picsum.photos/seed/picsum/200/300');
 
 INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
 ('bdva024-0000-0000-0000-000000000001', 'book0024-0000-0000-0000-000000000001', (SELECT service_id FROM service WHERE name = 'Tổng vệ sinh'), 1, 450000, 450000);
