@@ -3,8 +3,10 @@ package iuh.house_keeping_service_be.mappers;
 import iuh.house_keeping_service_be.dtos.Booking.request.BookingCreateRequest;
 import iuh.house_keeping_service_be.dtos.Booking.response.*;
 import iuh.house_keeping_service_be.dtos.Booking.internal.BookingValidationResult;
+import iuh.house_keeping_service_be.enums.Rating;
 import iuh.house_keeping_service_be.models.*;
 import iuh.house_keeping_service_be.repositories.PaymentMethodRepository;
+import iuh.house_keeping_service_be.repositories.ReviewDetailRepository;
 import iuh.house_keeping_service_be.repositories.RuleConditionRepository;
 import iuh.house_keeping_service_be.repositories.ServiceOptionChoiceRepository;
 import iuh.house_keeping_service_be.utils.BookingDTOFormatter;
@@ -25,6 +27,7 @@ public class BookingMapper {
     private final ServiceOptionChoiceRepository serviceOptionChoiceRepository;
     private final RuleConditionRepository ruleConditionRepository;
     private final PaymentMethodRepository paymentMethodRepository;
+    private final ReviewDetailRepository reviewDetailRepository;
 
     public Booking toEntity(BookingCreateRequest request, BookingValidationResult validation) {
         Booking booking = new Booking();
@@ -222,13 +225,15 @@ public class BookingMapper {
     }
 
     public EmployeeInfo toEmployeeInfo(Employee employee) {
+        // Calculate rating tier from actual average rating to ensure consistency
+        Rating calculatedRating = calculateRatingTier(employee.getEmployeeId());
         return new EmployeeInfo(
             employee.getEmployeeId(),
             employee.getFullName(),
             employee.getEmail(),
             employee.getAccount().getPhoneNumber(),
             employee.getAvatar(),
-            employee.getRating(),
+            calculatedRating,
             employee.getEmployeeStatus(),
             employee.getSkills() != null ? employee.getSkills() : List.of(),
             employee.getBio()
@@ -243,15 +248,30 @@ public class BookingMapper {
         if (employee == null) {
             return null;
         }
+        // Calculate rating tier from actual average rating to ensure consistency
+        Rating calculatedRating = calculateRatingTier(employee.getEmployeeId());
         return new EmployeeInfoPublic(
             employee.getEmployeeId(),
             employee.getFullName(),
             employee.getAvatar(),
-            employee.getRating(),
+            calculatedRating,
             employee.getEmployeeStatus(),
             employee.getSkills() != null ? employee.getSkills() : List.of(),
             employee.getBio()
         );
+    }
+
+    /**
+     * Calculate rating tier from actual average rating in review_detail table.
+     * This ensures the rating tier always matches the real average rating.
+     */
+    private Rating calculateRatingTier(String employeeId) {
+        try {
+            Double averageRating = reviewDetailRepository.findAverageRatingByEmployeeId(employeeId);
+            return Rating.fromAverage(averageRating);
+        } catch (Exception e) {
+            return Rating.LOWEST;
+        }
     }
 
     public PaymentInfo toPaymentInfo(Payment payment) {
