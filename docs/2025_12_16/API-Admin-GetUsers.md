@@ -1,4 +1,8 @@
 GET api/v1/admin/users
+
+Related:
+- PUT api/v1/admin/users/{accountId}/status (see API-Admin-UpdateAccountStatus.md)
+
 ## Query Params (optional):
 - userType: CUSTOMER, EMPLOYEE and ALL (default = ALL).
 - status: ACTIVE/INACTIVE

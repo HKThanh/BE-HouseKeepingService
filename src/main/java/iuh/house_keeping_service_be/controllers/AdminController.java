@@ -1,5 +1,6 @@
 package iuh.house_keeping_service_be.controllers;
 
+import iuh.house_keeping_service_be.dtos.Admin.request.UpdateAccountStatusRequest;
 import iuh.house_keeping_service_be.dtos.Admin.response.UserAccountResponse;
 import iuh.house_keeping_service_be.dtos.Booking.request.BookingVerificationRequest;
 import iuh.house_keeping_service_be.dtos.Booking.request.UpdateBookingStatusRequest;
@@ -458,6 +459,48 @@ public class AdminController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                 "success", false,
                 "message", "Đã xảy ra lỗi khi lấy danh sách tài khoản người dùng"
+            ));
+        }
+    }
+
+    /**
+     * Update account status (activate/deactivate user accounts)
+     * 
+     * @param accountId The ID of the account to update
+     * @param request The request containing the new status and optional reason
+     * @return Updated user account information
+     */
+    @PutMapping("/users/{accountId}/status")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    public ResponseEntity<?> updateAccountStatus(
+            @PathVariable String accountId,
+            @Valid @RequestBody UpdateAccountStatusRequest request) {
+        
+        log.info("Admin updating account {} status to {}", accountId, request.getStatus());
+        
+        try {
+            UserAccountResponse response = adminService.updateAccountStatus(accountId, request);
+            
+            String statusMessage = request.getStatus() == AccountStatus.ACTIVE 
+                ? "Kích hoạt tài khoản thành công" 
+                : "Vô hiệu hóa tài khoản thành công";
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", statusMessage,
+                "data", response
+            ));
+        } catch (IllegalArgumentException e) {
+            log.error("Error updating account status: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            log.error("Unexpected error updating account status: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "success", false,
+                "message", "Đã xảy ra lỗi khi cập nhật trạng thái tài khoản"
             ));
         }
     }

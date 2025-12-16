@@ -1,5 +1,6 @@
 package iuh.house_keeping_service_be.services.AdminService.impl;
 
+import iuh.house_keeping_service_be.dtos.Admin.request.UpdateAccountStatusRequest;
 import iuh.house_keeping_service_be.dtos.Admin.response.AdminProfileResponse;
 import iuh.house_keeping_service_be.dtos.Admin.response.UserAccountResponse;
 import iuh.house_keeping_service_be.dtos.Statistics.RevenueStatisticsResponse;
@@ -7,10 +8,12 @@ import iuh.house_keeping_service_be.dtos.Statistics.ServiceBookingStatisticsResp
 import iuh.house_keeping_service_be.enums.AccountStatus;
 import iuh.house_keeping_service_be.enums.RoleName;
 import iuh.house_keeping_service_be.enums.UserType;
+import iuh.house_keeping_service_be.models.Account;
 import iuh.house_keeping_service_be.models.AdminProfile;
 import iuh.house_keeping_service_be.models.Customer;
 import iuh.house_keeping_service_be.models.Employee;
 import iuh.house_keeping_service_be.models.Role;
+import iuh.house_keeping_service_be.repositories.AccountRepository;
 import iuh.house_keeping_service_be.repositories.AdminProfileRepository;
 import iuh.house_keeping_service_be.repositories.BookingRepository;
 import iuh.house_keeping_service_be.repositories.CustomerRepository;
@@ -48,6 +51,9 @@ public class AdminServiceImpl implements AdminService {
 
     @Autowired
     private EmployeeRepository employeeRepository;
+
+    @Autowired
+    private AccountRepository accountRepository;
 
     @Override
     public AdminProfile findByAccountId(String accountId) {
@@ -405,6 +411,60 @@ public class AdminServiceImpl implements AdminService {
                         .skills(employee.getSkills())
                         .bio(employee.getBio())
                         .employeeStatus(employee.getEmployeeStatus())
+                        .build())
+                .build();
+    }
+
+    @Override
+    public UserAccountResponse updateAccountStatus(String accountId, UpdateAccountStatusRequest request) {
+        log.info("Updating account status for accountId: {} to status: {}", accountId, request.getStatus());
+
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy tài khoản với ID: " + accountId));
+
+        // Check if the account belongs to an admin - admins cannot have their status changed
+        boolean isAdmin = account.getRoles() != null && account.getRoles().stream()
+                .anyMatch(role -> role.getRoleName() == RoleName.ADMIN);
+        
+        if (isAdmin) {
+            throw new IllegalArgumentException("Không thể thay đổi trạng thái của tài khoản quản trị viên");
+        }
+
+        // Update the status
+        AccountStatus oldStatus = account.getStatus();
+        account.setStatus(request.getStatus());
+        accountRepository.save(account);
+
+        log.info("Account {} status updated from {} to {}. Reason: {}", 
+                 accountId, oldStatus, request.getStatus(), request.getReason());
+
+        // Return the updated user account response
+        // First, check if this is a customer or employee account
+        Customer customer = customerRepository.findByAccount_AccountId(accountId).orElse(null);
+        if (customer != null) {
+            return mapCustomerToUserAccountResponse(customer);
+        }
+
+        Employee employee = employeeRepository.findByAccount_AccountId(accountId).orElse(null);
+        if (employee != null) {
+            return mapEmployeeToUserAccountResponse(employee);
+        }
+
+        // If no profile found, return a basic response
+        return UserAccountResponse.builder()
+                .userType("UNKNOWN")
+                .account(UserAccountResponse.AccountInfo.builder()
+                        .accountId(account.getAccountId())
+                        .phoneNumber(account.getPhoneNumber())
+                        .status(account.getStatus())
+                        .isPhoneVerified(account.getIsPhoneVerified())
+                        .lastLogin(account.getLastLogin())
+                        .roles(account.getRoles() != null
+                                ? account.getRoles().stream()
+                                        .map(Role::getRoleName)
+                                        .map(Enum::name)
+                                        .collect(Collectors.toList())
+                                : new ArrayList<>())
                         .build())
                 .build();
     }
