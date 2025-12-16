@@ -3,8 +3,10 @@ package iuh.house_keeping_service_be.mappers;
 import iuh.house_keeping_service_be.dtos.Booking.request.BookingCreateRequest;
 import iuh.house_keeping_service_be.dtos.Booking.response.*;
 import iuh.house_keeping_service_be.dtos.Booking.internal.BookingValidationResult;
+import iuh.house_keeping_service_be.dtos.BookingMedia.response.BookingMediaResponse;
 import iuh.house_keeping_service_be.enums.Rating;
 import iuh.house_keeping_service_be.models.*;
+import iuh.house_keeping_service_be.repositories.BookingMediaRepository;
 import iuh.house_keeping_service_be.repositories.PaymentMethodRepository;
 import iuh.house_keeping_service_be.repositories.ReviewDetailRepository;
 import iuh.house_keeping_service_be.repositories.RuleConditionRepository;
@@ -28,6 +30,7 @@ public class BookingMapper {
     private final RuleConditionRepository ruleConditionRepository;
     private final PaymentMethodRepository paymentMethodRepository;
     private final ReviewDetailRepository reviewDetailRepository;
+    private final BookingMediaRepository bookingMediaRepository;
 
     public Booking toEntity(BookingCreateRequest request, BookingValidationResult validation) {
         Booking booking = new Booking();
@@ -213,6 +216,21 @@ public class BookingMapper {
     }
 
     public AssignmentInfo toAssignmentInfo(Assignment assignment) {
+        // Fetch media for this assignment
+        List<BookingMediaResponse> mediaResponses = bookingMediaRepository
+            .findByAssignment_AssignmentId(assignment.getAssignmentId())
+            .stream()
+            .map(media -> new BookingMediaResponse(
+                media.getMediaId(),
+                media.getAssignment().getAssignmentId(),
+                media.getMediaUrl(),
+                media.getPublicId(),
+                media.getMediaType(),
+                media.getDescription(),
+                media.getUploadedAt()
+            ))
+            .collect(Collectors.toList());
+        
         return new AssignmentInfo(
             assignment.getAssignmentId(),
             toEmployeeInfo(assignment.getEmployee()),
@@ -220,7 +238,12 @@ public class BookingMapper {
             assignment.getCheckInTime(), // Use calculated start time
             assignment.getCheckOutTime(),   // Use calculated end time
             null, // createdAt - timestamp field removed from Assignment
-            null  // updatedAt - timestamp field removed from Assignment
+            null, // updatedAt - timestamp field removed from Assignment
+            assignment.getCheckInLatitude(),
+            assignment.getCheckInLongitude(),
+            assignment.getCheckOutLatitude(),
+            assignment.getCheckOutLongitude(),
+            mediaResponses
         );
     }
 

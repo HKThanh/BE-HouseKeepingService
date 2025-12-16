@@ -250,7 +250,9 @@ public class EmployeeAssignmentController {
                     assignmentId, 
                     request.employeeId(), 
                     images, 
-                    request.imageDescription()
+                    request.imageDescription(),
+                    request.latitude(),
+                    request.longitude()
             );
 
             return ResponseEntity.ok(new AssignmentActionResponse(
@@ -337,7 +339,9 @@ public class EmployeeAssignmentController {
                     assignmentId, 
                     request.employeeId(), 
                     images, 
-                    request.imageDescription()
+                    request.imageDescription(),
+                    request.latitude(),
+                    request.longitude()
             );
 
             return ResponseEntity.ok(new AssignmentActionResponse(

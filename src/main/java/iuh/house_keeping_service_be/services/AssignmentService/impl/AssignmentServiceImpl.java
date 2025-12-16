@@ -5,6 +5,7 @@ import iuh.house_keeping_service_be.dtos.Assignment.request.AssignmentCancelRequ
 import iuh.house_keeping_service_be.dtos.Assignment.response.AssignmentDetailResponse;
 import iuh.house_keeping_service_be.dtos.Assignment.response.BookingSummary;
 import iuh.house_keeping_service_be.dtos.Booking.BookingStatusWebSocketEvent;
+import iuh.house_keeping_service_be.dtos.BookingMedia.response.BookingMediaResponse;
 import iuh.house_keeping_service_be.dtos.common.PageResponse;
 import iuh.house_keeping_service_be.enums.AssignmentStatus;
 import iuh.house_keeping_service_be.enums.BookingStatus;
@@ -45,6 +46,7 @@ public class AssignmentServiceImpl implements AssignmentService {
     private final EmployeeUnavailabilityRepository employeeUnavailabilityRepository;
     private final AddressRepository addressRepository;
     private final BookingMediaService bookingMediaService;
+    private final BookingMediaRepository bookingMediaRepository;
     private final NotificationService notificationService;
     private final BookingRealtimeEventPublisher bookingRealtimeEventPublisher;
 
@@ -264,7 +266,7 @@ public class AssignmentServiceImpl implements AssignmentService {
 
     @Override
     @Transactional
-    public AssignmentDetailResponse checkIn(String assignmentId, String employeeId, List<MultipartFile> images, String imageDescription) {
+    public AssignmentDetailResponse checkIn(String assignmentId, String employeeId, List<MultipartFile> images, String imageDescription, Double latitude, Double longitude) {
         Assignment assignment = assignmentRepository.findByIdWithDetails(assignmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy công việc"));
 
@@ -302,6 +304,13 @@ public class AssignmentServiceImpl implements AssignmentService {
 
         assignment.setCheckInTime(now);
         assignment.setStatus(AssignmentStatus.IN_PROGRESS);
+        
+        // Save check-in coordinates if provided
+        if (latitude != null && longitude != null) {
+            assignment.setCheckInLatitude(latitude);
+            assignment.setCheckInLongitude(longitude);
+        }
+        
         Assignment savedAssignment = assignmentRepository.save(assignment);
 
         // Upload check-in images if provided
@@ -333,7 +342,7 @@ public class AssignmentServiceImpl implements AssignmentService {
 
     @Override
     @Transactional
-    public AssignmentDetailResponse checkOut(String assignmentId, String employeeId, List<MultipartFile> images, String imageDescription) {
+    public AssignmentDetailResponse checkOut(String assignmentId, String employeeId, List<MultipartFile> images, String imageDescription, Double latitude, Double longitude) {
         Assignment assignment = assignmentRepository.findByIdWithDetails(assignmentId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy công việc"));
 
@@ -350,6 +359,12 @@ public class AssignmentServiceImpl implements AssignmentService {
         LocalDateTime now = LocalDateTime.now();
         assignment.setCheckOutTime(now);
         assignment.setStatus(AssignmentStatus.COMPLETED);
+        
+        // Save check-out coordinates if provided
+        if (latitude != null && longitude != null) {
+            assignment.setCheckOutLatitude(latitude);
+            assignment.setCheckOutLongitude(longitude);
+        }
 
         Assignment savedAssignment = assignmentRepository.save(assignment);
 
@@ -770,6 +785,21 @@ public class AssignmentServiceImpl implements AssignmentService {
         BookingDetail bookingDetail = assignment.getBookingDetail();
         Booking booking = bookingDetail.getBooking();
 
+        // Fetch media for this assignment
+        List<BookingMediaResponse> mediaResponses = bookingMediaRepository
+            .findByAssignment_AssignmentId(assignment.getAssignmentId())
+            .stream()
+            .map(media -> new BookingMediaResponse(
+                media.getMediaId(),
+                media.getAssignment().getAssignmentId(),
+                media.getMediaUrl(),
+                media.getPublicId(),
+                media.getMediaType(),
+                media.getDescription(),
+                media.getUploadedAt()
+            ))
+            .collect(Collectors.toList());
+
         return new AssignmentDetailResponse(
                 assignment.getAssignmentId(),
                 booking.getBookingCode(),
@@ -786,7 +816,12 @@ public class AssignmentServiceImpl implements AssignmentService {
                 null, // assignedAt - timestamp field removed from Assignment
                 assignment.getCheckInTime(),
                 assignment.getCheckOutTime(),
-                booking.getNote()
+                booking.getNote(),
+                assignment.getCheckInLatitude(),
+                assignment.getCheckInLongitude(),
+                assignment.getCheckOutLatitude(),
+                assignment.getCheckOutLongitude(),
+                mediaResponses
         );
     }
 

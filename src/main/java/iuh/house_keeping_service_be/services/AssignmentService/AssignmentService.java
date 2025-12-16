@@ -20,8 +20,8 @@ public interface AssignmentService {
     List<BookingSummary> getAvailableBookings(String employeeId, int page, int size);
     AssignmentDetailResponse acceptBookingDetail(String detailId, String employeeId);
 
-    AssignmentDetailResponse checkIn(String assignmentId, String employeeId, List<MultipartFile> images, String imageDescription);
-    AssignmentDetailResponse checkOut(String assignmentId, String employeeId, List<MultipartFile> images, String imageDescription);
+    AssignmentDetailResponse checkIn(String assignmentId, String employeeId, List<MultipartFile> images, String imageDescription, Double latitude, Double longitude);
+    AssignmentDetailResponse checkOut(String assignmentId, String employeeId, List<MultipartFile> images, String imageDescription, Double latitude, Double longitude);
     
     // Get assignment statistics by status and time unit for employee
     AssignmentStatisticsByStatusResponse getAssignmentStatisticsByStatus(String employeeId, String timeUnit, LocalDateTime startDate, LocalDateTime endDate);
