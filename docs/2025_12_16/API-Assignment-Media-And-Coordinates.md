@@ -484,4 +484,3 @@ Các endpoint sau trả về `BookingResponse` hoặc danh sách `BookingRespons
 - Lưu ý quan trọng cho Front End:
   - Mục tiêu thay đổi là bổ sung `media` và 4 trường tọa độ vào `assignments` trong booking.
   - Thứ tự phần tử trong `media` có thể không cố định; nếu cần hiển thị theo thời gian, Front End nên sắp xếp theo `uploadedAt`.
-
