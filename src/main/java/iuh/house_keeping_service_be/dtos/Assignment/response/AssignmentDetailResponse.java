@@ -1,9 +1,11 @@
 package iuh.house_keeping_service_be.dtos.Assignment.response;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import iuh.house_keeping_service_be.dtos.BookingMedia.response.BookingMediaResponse;
 import iuh.house_keeping_service_be.enums.AssignmentStatus;
 import java.time.LocalDateTime;
 import java.math.BigDecimal;
+import java.util.List;
 
 public record AssignmentDetailResponse(
         String assignmentId,
@@ -31,5 +33,12 @@ public record AssignmentDetailResponse(
         @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
         LocalDateTime checkOutTime,
 
-        String note
+        String note,
+        
+        Double checkInLatitude,
+        Double checkInLongitude,
+        Double checkOutLatitude,
+        Double checkOutLongitude,
+        
+        List<BookingMediaResponse> media
 ) {}
