@@ -1,11 +1,14 @@
 package iuh.house_keeping_service_be.controllers;
 
+import iuh.house_keeping_service_be.dtos.Admin.response.UserAccountResponse;
 import iuh.house_keeping_service_be.dtos.Booking.request.BookingVerificationRequest;
 import iuh.house_keeping_service_be.dtos.Booking.request.UpdateBookingStatusRequest;
 import iuh.house_keeping_service_be.dtos.Booking.response.BookingResponse;
 import iuh.house_keeping_service_be.dtos.Statistics.RevenueStatisticsResponse;
 import iuh.house_keeping_service_be.dtos.Statistics.ServiceBookingStatisticsResponse;
+import iuh.house_keeping_service_be.enums.AccountStatus;
 import iuh.house_keeping_service_be.enums.BookingStatus;
+import iuh.house_keeping_service_be.enums.UserType;
 import iuh.house_keeping_service_be.services.AdminService.AdminService;
 import iuh.house_keeping_service_be.services.AuthorizationService.AuthorizationService;
 import iuh.house_keeping_service_be.services.BookingService.BookingService;
@@ -413,5 +416,49 @@ public class AdminController {
         BookingResponse response = bookingService.getBookingDetails(bookingId);
 
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Get list of user accounts (customers and/or employees)
+     * 
+     * @param userType Type of users to retrieve: CUSTOMER, EMPLOYEE, or ALL (default: ALL)
+     * @param status Account status filter: ACTIVE or INACTIVE (optional)
+     * @param page Page number (default: 0)
+     * @param size Page size (default: 10, max: 100)
+     * @return Paginated list of user accounts with profile information
+     */
+    @GetMapping("/users")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    public ResponseEntity<?> getUserAccounts(
+            @RequestParam(required = false, defaultValue = "ALL") UserType userType,
+            @RequestParam(required = false) AccountStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        
+        log.info("Admin fetching user accounts - userType: {}, status: {}, page: {}, size: {}", 
+                 userType, status, page, size);
+        
+        try {
+            // Validate pagination parameters
+            if (page < 0) page = 0;
+            if (size <= 0 || size > 100) size = 10;
+            
+            Pageable pageable = PageRequest.of(page, size);
+            Page<UserAccountResponse> userAccounts = adminService.getUserAccounts(userType, status, pageable);
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "data", userAccounts.getContent(),
+                "currentPage", userAccounts.getNumber(),
+                "totalItems", userAccounts.getTotalElements(),
+                "totalPages", userAccounts.getTotalPages()
+            ));
+        } catch (Exception e) {
+            log.error("Error fetching user accounts: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "success", false,
+                "message", "Đã xảy ra lỗi khi lấy danh sách tài khoản người dùng"
+            ));
+        }
     }
 }

@@ -118,4 +118,12 @@ public interface EmployeeRepository extends JpaRepository<Employee, String> {
 
     // Search and filter employees with pagination
     Page<Employee> findAll(Pageable pageable);
+
+    @Query("SELECT e FROM Employee e " +
+           "LEFT JOIN FETCH e.account a " +
+           "WHERE (:status IS NULL OR a.status = :status)")
+    Page<Employee> findAllWithAccountByStatus(@Param("status") iuh.house_keeping_service_be.enums.AccountStatus status, Pageable pageable);
+
+    @Query("SELECT e FROM Employee e LEFT JOIN FETCH e.account")
+    Page<Employee> findAllWithAccount(Pageable pageable);
 }

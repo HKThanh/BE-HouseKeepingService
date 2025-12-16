@@ -1,16 +1,26 @@
 package iuh.house_keeping_service_be.services.AdminService.impl;
 
 import iuh.house_keeping_service_be.dtos.Admin.response.AdminProfileResponse;
+import iuh.house_keeping_service_be.dtos.Admin.response.UserAccountResponse;
 import iuh.house_keeping_service_be.dtos.Statistics.RevenueStatisticsResponse;
 import iuh.house_keeping_service_be.dtos.Statistics.ServiceBookingStatisticsResponse;
+import iuh.house_keeping_service_be.enums.AccountStatus;
 import iuh.house_keeping_service_be.enums.RoleName;
+import iuh.house_keeping_service_be.enums.UserType;
 import iuh.house_keeping_service_be.models.AdminProfile;
+import iuh.house_keeping_service_be.models.Customer;
+import iuh.house_keeping_service_be.models.Employee;
 import iuh.house_keeping_service_be.models.Role;
 import iuh.house_keeping_service_be.repositories.AdminProfileRepository;
 import iuh.house_keeping_service_be.repositories.BookingRepository;
+import iuh.house_keeping_service_be.repositories.CustomerRepository;
+import iuh.house_keeping_service_be.repositories.EmployeeRepository;
 import iuh.house_keeping_service_be.services.AdminService.AdminService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -32,6 +42,12 @@ public class AdminServiceImpl implements AdminService {
 
     @Autowired
     private BookingRepository bookingRepository;
+
+    @Autowired
+    private CustomerRepository customerRepository;
+
+    @Autowired
+    private EmployeeRepository employeeRepository;
 
     @Override
     public AdminProfile findByAccountId(String accountId) {
@@ -299,5 +315,97 @@ public class AdminServiceImpl implements AdminService {
             log.warn("Failed to convert value to BigDecimal: {}", value);
             return BigDecimal.ZERO;
         }
+    }
+
+    @Override
+    public Page<UserAccountResponse> getUserAccounts(UserType userType, AccountStatus status, Pageable pageable) {
+        log.info("Getting user accounts - userType: {}, status: {}, page: {}, size: {}", 
+                 userType, status, pageable.getPageNumber(), pageable.getPageSize());
+
+        List<UserAccountResponse> allUsers = new ArrayList<>();
+        long totalElements = 0;
+
+        if (userType == null || userType == UserType.ALL || userType == UserType.CUSTOMER) {
+            Page<Customer> customers = customerRepository.findAllWithAccountByStatus(status, pageable);
+            List<UserAccountResponse> customerResponses = customers.getContent().stream()
+                    .map(this::mapCustomerToUserAccountResponse)
+                    .collect(Collectors.toList());
+            allUsers.addAll(customerResponses);
+            totalElements += customers.getTotalElements();
+        }
+
+        if (userType == null || userType == UserType.ALL || userType == UserType.EMPLOYEE) {
+            Page<Employee> employees = employeeRepository.findAllWithAccountByStatus(status, pageable);
+            List<UserAccountResponse> employeeResponses = employees.getContent().stream()
+                    .map(this::mapEmployeeToUserAccountResponse)
+                    .collect(Collectors.toList());
+            allUsers.addAll(employeeResponses);
+            totalElements += employees.getTotalElements();
+        }
+
+        return new PageImpl<>(allUsers, pageable, totalElements);
+    }
+
+    private UserAccountResponse mapCustomerToUserAccountResponse(Customer customer) {
+        return UserAccountResponse.builder()
+                .userType("CUSTOMER")
+                .account(UserAccountResponse.AccountInfo.builder()
+                        .accountId(customer.getAccount().getAccountId())
+                        .phoneNumber(customer.getAccount().getPhoneNumber())
+                        .status(customer.getAccount().getStatus())
+                        .isPhoneVerified(customer.getAccount().getIsPhoneVerified())
+                        .lastLogin(customer.getAccount().getLastLogin())
+                        .roles(customer.getAccount().getRoles() != null
+                                ? customer.getAccount().getRoles().stream()
+                                        .map(Role::getRoleName)
+                                        .map(Enum::name)
+                                        .collect(Collectors.toList())
+                                : new ArrayList<>())
+                        .build())
+                .profile(UserAccountResponse.UserProfileInfo.builder()
+                        .id(customer.getCustomerId())
+                        .avatar(customer.getAvatar())
+                        .fullName(customer.getFullName())
+                        .isMale(customer.getIsMale())
+                        .email(customer.getEmail())
+                        .isEmailVerified(customer.getIsEmailVerified())
+                        .birthdate(customer.getBirthdate())
+                        .rating(customer.getRating())
+                        .vipLevel(customer.getVipLevel())
+                        .build())
+                .build();
+    }
+
+    private UserAccountResponse mapEmployeeToUserAccountResponse(Employee employee) {
+        return UserAccountResponse.builder()
+                .userType("EMPLOYEE")
+                .account(UserAccountResponse.AccountInfo.builder()
+                        .accountId(employee.getAccount().getAccountId())
+                        .phoneNumber(employee.getAccount().getPhoneNumber())
+                        .status(employee.getAccount().getStatus())
+                        .isPhoneVerified(employee.getAccount().getIsPhoneVerified())
+                        .lastLogin(employee.getAccount().getLastLogin())
+                        .roles(employee.getAccount().getRoles() != null
+                                ? employee.getAccount().getRoles().stream()
+                                        .map(Role::getRoleName)
+                                        .map(Enum::name)
+                                        .collect(Collectors.toList())
+                                : new ArrayList<>())
+                        .build())
+                .profile(UserAccountResponse.UserProfileInfo.builder()
+                        .id(employee.getEmployeeId())
+                        .avatar(employee.getAvatar())
+                        .fullName(employee.getFullName())
+                        .isMale(employee.getIsMale())
+                        .email(employee.getEmail())
+                        .isEmailVerified(employee.getIsEmailVerified())
+                        .birthdate(employee.getBirthdate())
+                        .rating(employee.getRating())
+                        .hiredDate(employee.getHiredDate())
+                        .skills(employee.getSkills())
+                        .bio(employee.getBio())
+                        .employeeStatus(employee.getEmployeeStatus())
+                        .build())
+                .build();
     }
 }
