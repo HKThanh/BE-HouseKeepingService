@@ -1,83 +1,192 @@
 -- Seed data: A01 - Dữ liệu assignments ASSIGNED để test check-in
 -- Cho employee: dangthir1 (e1000001-0000-0000-0000-000000000033) và jane_smith (e1000001-0000-0000-0000-000000000001)
--- Thời gian: 00h00 (12h đêm) đến 6h sáng ngày 13/12/2025
+-- Thời gian: 09h15 ngày 16/12/2025 đến 02h00 sáng ngày 17/12/2025
+
+-- Lưu ý: Schema dùng VARCHAR(36) cho các ID (không cast ::uuid)
+
+-- Tạo slot chung để bookings / booking_details / assignments luôn khớp nhau
+DROP TABLE IF EXISTS a01_slots;
+CREATE TEMP TABLE a01_slots AS
+SELECT
+	row_number() OVER (ORDER BY ts) AS i,
+	ts
+FROM generate_series(
+	'2025-12-19 07:30:00+07'::timestamptz,
+	'2025-12-19 11:00:00+07'::timestamptz,
+	interval '15 minutes'
+) ts;
 
 -- =================================================================================
 -- THÊM BOOKINGS VÀ ASSIGNMENTS ĐỂ TEST CHECK-IN
 -- =================================================================================
 
--- Các bookings từ 00:00 đến 06:00 ngày 13/12/2025
-INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status, promotion_id, is_verified) VALUES
--- Khung giờ 00:00 - 01:30 (dangthir1)
-('b0000001-0000-0000-0000-000000100001', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000001', 'BKCI00001', '2025-12-13 00:00:00+07', 'Check-in test 00h - Dọn dẹp đêm khuya (dangthir1)', 200000.00, 'CONFIRMED', NULL, true),
-('b0000001-0000-0000-0000-000000100002', 'c1000001-0000-0000-0000-000000000003', 'adrs0001-0000-0000-0000-000000000003', 'BKCI00002', '2025-12-13 00:15:00+07', 'Check-in test 00h15 - Vệ sinh máy lạnh (dangthir1)', 300000.00, 'CONFIRMED', NULL, true),
-('b0000001-0000-0000-0000-000000100003', 'c1000001-0000-0000-0000-000000000004', 'adrs0001-0000-0000-0000-000000000009', 'BKCI00003', '2025-12-13 00:30:00+07', 'Check-in test 00h30 - Tổng vệ sinh (dangthir1)', 500000.00, 'CONFIRMED', NULL, true),
-('b0000001-0000-0000-0000-000000100004', 'c1000001-0000-0000-0000-000000000005', 'adrs0001-0000-0000-0000-000000000010', 'BKCI00004', '2025-12-13 00:45:00+07', 'Check-in test 00h45 - Giặt sấy (dangthir1)', 240000.00, 'CONFIRMED', NULL, true),
-('b0000001-0000-0000-0000-000000100005', 'c1000001-0000-0000-0000-000000000006', 'adrs0001-0000-0000-0000-000000000011', 'BKCI00005', '2025-12-13 01:00:00+07', 'Check-in test 01h - Vệ sinh sofa (dangthir1)', 300000.00, 'CONFIRMED', NULL, true),
-('b0000001-0000-0000-0000-000000100006', 'c1000001-0000-0000-0000-000000000007', 'adrs0001-0000-0000-0000-000000000012', 'BKCI00006', '2025-12-13 01:15:00+07', 'Check-in test 01h15 - Nấu ăn (dangthir1)', 180000.00, 'CONFIRMED', NULL, true),
+-- Các bookings từ 09:15 ngày 16/12/2025 đến 02:00 ngày 17/12/2025 (mỗi 15 phút)
+WITH slots AS (
+	SELECT
+		i,
+		ts
+	FROM a01_slots
+),
+generated AS (
+	SELECT
+		i,
+		ts AS booking_time,
+		(
+			'b0000001-0000-0000-0000-' || lpad((100000 + i)::text, 12, '0')
+		) AS booking_id,
+		(
+			'bd000001-0000-0000-0000-' || lpad((100000 + i)::text, 12, '0')
+		) AS booking_detail_id,
+		(
+			'as000001-0000-0000-0000-' || lpad((100000 + i)::text, 12, '0')
+		) AS assignment_id,
+		('BKCI' || lpad(i::text, 5, '0')) AS booking_code,
 
--- Khung giờ 01:30 - 03:00 (jane_smith)
-('b0000001-0000-0000-0000-000000100007', 'c1000001-0000-0000-0000-000000000008', 'adrs0001-0000-0000-0000-000000000013', 'BKCI00007', '2025-12-13 01:30:00+07', 'Check-in test 01h30 - Dọn dẹp theo giờ (jane_smith)', 150000.00, 'CONFIRMED', NULL, true),
-('b0000001-0000-0000-0000-000000100008', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000001', 'BKCI00008', '2025-12-13 01:45:00+07', 'Check-in test 01h45 - Giặt hấp cao cấp (jane_smith)', 360000.00, 'CONFIRMED', NULL, true),
-('b0000001-0000-0000-0000-000000100009', 'c1000001-0000-0000-0000-000000000003', 'adrs0001-0000-0000-0000-000000000003', 'BKCI00009', '2025-12-13 02:00:00+07', 'Check-in test 02h - Đi chợ hộ (jane_smith)', 80000.00, 'CONFIRMED', NULL, true),
-('b0000001-0000-0000-0000-000000100010', 'c1000001-0000-0000-0000-000000000004', 'adrs0001-0000-0000-0000-000000000009', 'BKCI00010', '2025-12-13 02:15:00+07', 'Check-in test 02h15 - Tổng vệ sinh (jane_smith)', 200000.00, 'CONFIRMED', NULL, true),
-('b0000001-0000-0000-0000-000000100011', 'c1000001-0000-0000-0000-000000000005', 'adrs0001-0000-0000-0000-000000000010', 'BKCI00011', '2025-12-13 02:30:00+07', 'Check-in test 02h30 - Vệ sinh máy lạnh (jane_smith)', 300000.00, 'CONFIRMED', NULL, true),
-('b0000001-0000-0000-0000-000000100012', 'c1000001-0000-0000-0000-000000000006', 'adrs0001-0000-0000-0000-000000000011', 'BKCI00012', '2025-12-13 02:45:00+07', 'Check-in test 02h45 - Dọn dẹp căn hộ (jane_smith)', 150000.00, 'CONFIRMED', NULL, true),
+		-- Cycle customers/addresses from existing known IDs
+		CASE (i % 8)
+			WHEN 1 THEN 'c1000001-0000-0000-0000-000000000001'
+			WHEN 2 THEN 'c1000001-0000-0000-0000-000000000003'
+			WHEN 3 THEN 'c1000001-0000-0000-0000-000000000004'
+			WHEN 4 THEN 'c1000001-0000-0000-0000-000000000005'
+			WHEN 5 THEN 'c1000001-0000-0000-0000-000000000006'
+			WHEN 6 THEN 'c1000001-0000-0000-0000-000000000007'
+			WHEN 7 THEN 'c1000001-0000-0000-0000-000000000008'
+			ELSE       'c1000001-0000-0000-0000-000000000001'
+		END AS customer_id,
+		CASE (i % 8)
+			WHEN 1 THEN 'adrs0001-0000-0000-0000-000000000001'
+			WHEN 2 THEN 'adrs0001-0000-0000-0000-000000000003'
+			WHEN 3 THEN 'adrs0001-0000-0000-0000-000000000009'
+			WHEN 4 THEN 'adrs0001-0000-0000-0000-000000000010'
+			WHEN 5 THEN 'adrs0001-0000-0000-0000-000000000011'
+			WHEN 6 THEN 'adrs0001-0000-0000-0000-000000000012'
+			WHEN 7 THEN 'adrs0001-0000-0000-0000-000000000013'
+			ELSE       'adrs0001-0000-0000-0000-000000000001'
+		END AS address_id,
 
--- Khung giờ 03:00 - 04:30 (dangthir1)
-('b0000001-0000-0000-0000-000000100013', 'c1000001-0000-0000-0000-000000000007', 'adrs0001-0000-0000-0000-000000000012', 'BKCI00013', '2025-12-13 03:00:00+07', 'Check-in test 03h - Vệ sinh sofa (dangthir1)', 300000.00, 'CONFIRMED', NULL, true),
-('b0000001-0000-0000-0000-000000100014', 'c1000001-0000-0000-0000-000000000008', 'adrs0001-0000-0000-0000-000000000013', 'BKCI00014', '2025-12-13 03:15:00+07', 'Check-in test 03h15 - Nấu ăn (dangthir1)', 240000.00, 'CONFIRMED', NULL, true),
-('b0000001-0000-0000-0000-000000100015', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000001', 'BKCI00015', '2025-12-13 03:30:00+07', 'Check-in test 03h30 - Tổng vệ sinh (dangthir1)', 500000.00, 'CONFIRMED', NULL, true),
-('b0000001-0000-0000-0000-000000100016', 'c1000001-0000-0000-0000-000000000003', 'adrs0001-0000-0000-0000-000000000003', 'BKCI00016', '2025-12-13 03:45:00+07', 'Check-in test 03h45 - Giặt sấy (dangthir1)', 180000.00, 'CONFIRMED', NULL, true),
-('b0000001-0000-0000-0000-000000100017', 'c1000001-0000-0000-0000-000000000004', 'adrs0001-0000-0000-0000-000000000009', 'BKCI00017', '2025-12-13 04:00:00+07', 'Check-in test 04h - Dọn dẹp theo giờ (dangthir1)', 200000.00, 'CONFIRMED', NULL, true),
-('b0000001-0000-0000-0000-000000100018', 'c1000001-0000-0000-0000-000000000005', 'adrs0001-0000-0000-0000-000000000010', 'BKCI00018', '2025-12-13 04:15:00+07', 'Check-in test 04h15 - Vệ sinh máy lạnh (dangthir1)', 300000.00, 'CONFIRMED', NULL, true),
+		-- Rotate services; keep totals consistent (1 booking_detail per booking)
+		CASE ((i - 1) % 6)
+			WHEN 0 THEN 'Dọn dẹp theo giờ'
+			WHEN 1 THEN 'Vệ sinh máy lạnh'
+			WHEN 2 THEN 'Tổng vệ sinh'
+			WHEN 3 THEN 'Giặt sấy theo kg'
+			WHEN 4 THEN 'Vệ sinh Sofa - Nệm - Rèm'
+			ELSE       'Nấu ăn gia đình'
+		END AS service_name,
+		CASE ((i - 1) % 6)
+			WHEN 0 THEN 4
+			WHEN 1 THEN 2
+			WHEN 2 THEN 5
+			WHEN 3 THEN 8
+			WHEN 4 THEN 1
+			ELSE       3
+		END AS quantity,
+		CASE ((i - 1) % 6)
+			WHEN 0 THEN 50000.00
+			WHEN 1 THEN 150000.00
+			WHEN 2 THEN 100000.00
+			WHEN 3 THEN 30000.00
+			WHEN 4 THEN 300000.00
+			ELSE       60000.00
+		END AS price_per_unit,
+		(
+			CASE ((i - 1) % 6)
+				WHEN 0 THEN 4 * 50000.00
+				WHEN 1 THEN 2 * 150000.00
+				WHEN 2 THEN 5 * 100000.00
+				WHEN 3 THEN 8 * 30000.00
+				WHEN 4 THEN 1 * 300000.00
+				ELSE       3 * 60000.00
+			END
+		) AS sub_total,
 
--- Khung giờ 04:30 - 06:00 (jane_smith)
-('b0000001-0000-0000-0000-000000100019', 'c1000001-0000-0000-0000-000000000006', 'adrs0001-0000-0000-0000-000000000011', 'BKCI00019', '2025-12-13 04:30:00+07', 'Check-in test 04h30 - Giặt hấp cao cấp (jane_smith)', 240000.00, 'CONFIRMED', NULL, true),
-('b0000001-0000-0000-0000-000000100020', 'c1000001-0000-0000-0000-000000000007', 'adrs0001-0000-0000-0000-000000000012', 'BKCI00020', '2025-12-13 04:45:00+07', 'Check-in test 04h45 - Nấu ăn (jane_smith)', 180000.00, 'CONFIRMED', NULL, true),
-('b0000001-0000-0000-0000-000000100021', 'c1000001-0000-0000-0000-000000000008', 'adrs0001-0000-0000-0000-000000000013', 'BKCI00021', '2025-12-13 05:00:00+07', 'Check-in test 05h - Dọn dẹp căn hộ (jane_smith)', 200000.00, 'CONFIRMED', NULL, true),
-('b0000001-0000-0000-0000-000000100022', 'c1000001-0000-0000-0000-000000000001', 'adrs0001-0000-0000-0000-000000000001', 'BKCI00022', '2025-12-13 05:15:00+07', 'Check-in test 05h15 - Vệ sinh sofa (jane_smith)', 300000.00, 'CONFIRMED', NULL, true),
-('b0000001-0000-0000-0000-000000100023', 'c1000001-0000-0000-0000-000000000003', 'adrs0001-0000-0000-0000-000000000003', 'BKCI00023', '2025-12-13 05:30:00+07', 'Check-in test 05h30 - Tổng vệ sinh (jane_smith)', 400000.00, 'CONFIRMED', NULL, true),
-('b0000001-0000-0000-0000-000000100024', 'c1000001-0000-0000-0000-000000000004', 'adrs0001-0000-0000-0000-000000000009', 'BKCI00024', '2025-12-13 05:45:00+07', 'Check-in test 05h45 - Giặt sấy (jane_smith)', 150000.00, 'CONFIRMED', NULL, true),
-('b0000001-0000-0000-0000-000000100025', 'c1000001-0000-0000-0000-000000000005', 'adrs0001-0000-0000-0000-000000000010', 'BKCI00025', '2025-12-13 06:00:00+07', 'Check-in test 06h - Dọn dẹp sáng sớm (jane_smith)', 250000.00, 'CONFIRMED', NULL, true);
+		-- Alternate employee between 2 accounts
+		CASE (i % 2)
+			WHEN 1 THEN 'e1000001-0000-0000-0000-000000000033'
+			ELSE       'e1000001-0000-0000-0000-000000000017'
+		END AS employee_id
+	FROM slots
+)
+INSERT INTO bookings (booking_id, customer_id, address_id, booking_code, booking_time, note, total_amount, status, promotion_id, is_verified)
+SELECT
+	g.booking_id,
+	g.customer_id,
+	g.address_id,
+	g.booking_code,
+	g.booking_time,
+	(
+		'Check-in ' || to_char(g.booking_time AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24"h"MI') || ' - ' || g.service_name
+	) AS note,
+	g.sub_total AS total_amount,
+	'CONFIRMED' AS status,
+	NULL AS promotion_id,
+	true AS is_verified
+FROM generated g;
 
 -- =================================================================================
 -- CHI TIẾT DỊCH VỤ CHO CÁC BOOKINGS
 -- =================================================================================
 
-INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total) VALUES
--- Khung giờ 00:00 - 01:30 (dangthir1)
-('bd000001-0000-0000-0000-000000100001', 'b0000001-0000-0000-0000-000000100001', (SELECT service_id FROM service WHERE name = 'Dọn dẹp theo giờ'), 4, 50000.00, 200000.00),
-('bd000001-0000-0000-0000-000000100002', 'b0000001-0000-0000-0000-000000100002', (SELECT service_id FROM service WHERE name = 'Vệ sinh máy lạnh'), 2, 150000.00, 300000.00),
-('bd000001-0000-0000-0000-000000100003', 'b0000001-0000-0000-0000-000000100003', (SELECT service_id FROM service WHERE name = 'Tổng vệ sinh'), 5, 100000.00, 500000.00),
-('bd000001-0000-0000-0000-000000100004', 'b0000001-0000-0000-0000-000000100004', (SELECT service_id FROM service WHERE name = 'Giặt sấy theo kg'), 8, 30000.00, 240000.00),
-('bd000001-0000-0000-0000-000000100005', 'b0000001-0000-0000-0000-000000100005', (SELECT service_id FROM service WHERE name = 'Vệ sinh Sofa - Nệm - Rèm'), 1, 300000.00, 300000.00),
-('bd000001-0000-0000-0000-000000100006', 'b0000001-0000-0000-0000-000000100006', (SELECT service_id FROM service WHERE name = 'Nấu ăn gia đình'), 3, 60000.00, 180000.00),
-
--- Khung giờ 01:30 - 03:00 (jane_smith)
-('bd000001-0000-0000-0000-000000100007', 'b0000001-0000-0000-0000-000000100007', (SELECT service_id FROM service WHERE name = 'Dọn dẹp theo giờ'), 3, 50000.00, 150000.00),
-('bd000001-0000-0000-0000-000000100008', 'b0000001-0000-0000-0000-000000100008', (SELECT service_id FROM service WHERE name = 'Giặt hấp cao cấp'), 3, 120000.00, 360000.00),
-('bd000001-0000-0000-0000-000000100009', 'b0000001-0000-0000-0000-000000100009', (SELECT service_id FROM service WHERE name = 'Đi chợ hộ'), 2, 40000.00, 80000.00),
-('bd000001-0000-0000-0000-000000100010', 'b0000001-0000-0000-0000-000000100010', (SELECT service_id FROM service WHERE name = 'Tổng vệ sinh'), 2, 100000.00, 200000.00),
-('bd000001-0000-0000-0000-000000100011', 'b0000001-0000-0000-0000-000000100011', (SELECT service_id FROM service WHERE name = 'Vệ sinh máy lạnh'), 2, 150000.00, 300000.00),
-('bd000001-0000-0000-0000-000000100012', 'b0000001-0000-0000-0000-000000100012', (SELECT service_id FROM service WHERE name = 'Dọn dẹp theo giờ'), 3, 50000.00, 150000.00),
-
--- Khung giờ 03:00 - 04:30 (dangthir1)
-('bd000001-0000-0000-0000-000000100013', 'b0000001-0000-0000-0000-000000100013', (SELECT service_id FROM service WHERE name = 'Vệ sinh Sofa - Nệm - Rèm'), 1, 300000.00, 300000.00),
-('bd000001-0000-0000-0000-000000100014', 'b0000001-0000-0000-0000-000000100014', (SELECT service_id FROM service WHERE name = 'Nấu ăn gia đình'), 4, 60000.00, 240000.00),
-('bd000001-0000-0000-0000-000000100015', 'b0000001-0000-0000-0000-000000100015', (SELECT service_id FROM service WHERE name = 'Tổng vệ sinh'), 5, 100000.00, 500000.00),
-('bd000001-0000-0000-0000-000000100016', 'b0000001-0000-0000-0000-000000100016', (SELECT service_id FROM service WHERE name = 'Giặt sấy theo kg'), 6, 30000.00, 180000.00),
-('bd000001-0000-0000-0000-000000100017', 'b0000001-0000-0000-0000-000000100017', (SELECT service_id FROM service WHERE name = 'Dọn dẹp theo giờ'), 4, 50000.00, 200000.00),
-('bd000001-0000-0000-0000-000000100018', 'b0000001-0000-0000-0000-000000100018', (SELECT service_id FROM service WHERE name = 'Vệ sinh máy lạnh'), 2, 150000.00, 300000.00),
-
--- Khung giờ 04:30 - 06:00 (jane_smith)
-('bd000001-0000-0000-0000-000000100019', 'b0000001-0000-0000-0000-000000100019', (SELECT service_id FROM service WHERE name = 'Giặt hấp cao cấp'), 2, 120000.00, 240000.00),
-('bd000001-0000-0000-0000-000000100020', 'b0000001-0000-0000-0000-000000100020', (SELECT service_id FROM service WHERE name = 'Nấu ăn gia đình'), 3, 60000.00, 180000.00),
-('bd000001-0000-0000-0000-000000100021', 'b0000001-0000-0000-0000-000000100021', (SELECT service_id FROM service WHERE name = 'Dọn dẹp theo giờ'), 4, 50000.00, 200000.00),
-('bd000001-0000-0000-0000-000000100022', 'b0000001-0000-0000-0000-000000100022', (SELECT service_id FROM service WHERE name = 'Vệ sinh Sofa - Nệm - Rèm'), 1, 300000.00, 300000.00),
-('bd000001-0000-0000-0000-000000100023', 'b0000001-0000-0000-0000-000000100023', (SELECT service_id FROM service WHERE name = 'Tổng vệ sinh'), 4, 100000.00, 400000.00),
-('bd000001-0000-0000-0000-000000100024', 'b0000001-0000-0000-0000-000000100024', (SELECT service_id FROM service WHERE name = 'Giặt sấy theo kg'), 5, 30000.00, 150000.00),
-('bd000001-0000-0000-0000-000000100025', 'b0000001-0000-0000-0000-000000100025', (SELECT service_id FROM service WHERE name = 'Dọn dẹp theo giờ'), 5, 50000.00, 250000.00);
+WITH slots AS (
+	SELECT
+		i,
+		ts
+	FROM a01_slots
+),
+generated AS (
+	SELECT
+		i,
+		(
+			'b0000001-0000-0000-0000-' || lpad((100000 + i)::text, 12, '0')
+		) AS booking_id,
+		(
+			'bd000001-0000-0000-0000-' || lpad((100000 + i)::text, 12, '0')
+		) AS booking_detail_id,
+		CASE ((i - 1) % 6)
+			WHEN 0 THEN 'Dọn dẹp theo giờ'
+			WHEN 1 THEN 'Vệ sinh máy lạnh'
+			WHEN 2 THEN 'Tổng vệ sinh'
+			WHEN 3 THEN 'Giặt sấy theo kg'
+			WHEN 4 THEN 'Vệ sinh Sofa - Nệm - Rèm'
+			ELSE       'Nấu ăn gia đình'
+		END AS service_name,
+		CASE ((i - 1) % 6)
+			WHEN 0 THEN 4
+			WHEN 1 THEN 2
+			WHEN 2 THEN 5
+			WHEN 3 THEN 8
+			WHEN 4 THEN 1
+			ELSE       3
+		END AS quantity,
+		CASE ((i - 1) % 6)
+			WHEN 0 THEN 50000.00
+			WHEN 1 THEN 150000.00
+			WHEN 2 THEN 100000.00
+			WHEN 3 THEN 30000.00
+			WHEN 4 THEN 300000.00
+			ELSE       60000.00
+		END AS price_per_unit,
+		(
+			CASE ((i - 1) % 6)
+				WHEN 0 THEN 4 * 50000.00
+				WHEN 1 THEN 2 * 150000.00
+				WHEN 2 THEN 5 * 100000.00
+				WHEN 3 THEN 8 * 30000.00
+				WHEN 4 THEN 1 * 300000.00
+				ELSE       3 * 60000.00
+			END
+		) AS sub_total
+	FROM slots
+)
+INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity, price_per_unit, sub_total)
+SELECT
+	g.booking_detail_id,
+	g.booking_id,
+	(SELECT service_id FROM service WHERE name = g.service_name),
+	g.quantity,
+	g.price_per_unit,
+	g.sub_total
+FROM generated g;
 
 -- =================================================================================
 -- ASSIGNMENTS CHO CÁC BOOKINGS - TRẠNG THÁI ASSIGNED (sẵn sàng check-in)
@@ -86,45 +195,41 @@ INSERT INTO booking_details (booking_detail_id, booking_id, service_id, quantity
 -- Employee: dangthir1 -> e1000001-0000-0000-0000-000000000033
 -- Employee: jane_smith -> e1000001-0000-0000-0000-000000000001
 
-INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status, check_in_time, check_out_time) VALUES
--- Khung giờ 00:00 - 01:30 (dangthir1)
-('as000001-0000-0000-0000-000000100001', 'bd000001-0000-0000-0000-000000100001', 'e1000001-0000-0000-0000-000000000033', 'ASSIGNED', NULL, NULL),
-('as000001-0000-0000-0000-000000100002', 'bd000001-0000-0000-0000-000000100002', 'e1000001-0000-0000-0000-000000000033', 'ASSIGNED', NULL, NULL),
-('as000001-0000-0000-0000-000000100003', 'bd000001-0000-0000-0000-000000100003', 'e1000001-0000-0000-0000-000000000033', 'ASSIGNED', NULL, NULL),
-('as000001-0000-0000-0000-000000100004', 'bd000001-0000-0000-0000-000000100004', 'e1000001-0000-0000-0000-000000000033', 'ASSIGNED', NULL, NULL),
-('as000001-0000-0000-0000-000000100005', 'bd000001-0000-0000-0000-000000100005', 'e1000001-0000-0000-0000-000000000033', 'ASSIGNED', NULL, NULL),
-('as000001-0000-0000-0000-000000100006', 'bd000001-0000-0000-0000-000000100006', 'e1000001-0000-0000-0000-000000000033', 'ASSIGNED', NULL, NULL),
-
--- Khung giờ 01:30 - 03:00 (jane_smith)
-('as000001-0000-0000-0000-000000100007', 'bd000001-0000-0000-0000-000000100007', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED', NULL, NULL),
-('as000001-0000-0000-0000-000000100008', 'bd000001-0000-0000-0000-000000100008', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED', NULL, NULL),
-('as000001-0000-0000-0000-000000100009', 'bd000001-0000-0000-0000-000000100009', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED', NULL, NULL),
-('as000001-0000-0000-0000-000000100010', 'bd000001-0000-0000-0000-000000100010', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED', NULL, NULL),
-('as000001-0000-0000-0000-000000100011', 'bd000001-0000-0000-0000-000000100011', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED', NULL, NULL),
-('as000001-0000-0000-0000-000000100012', 'bd000001-0000-0000-0000-000000100012', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED', NULL, NULL),
-
--- Khung giờ 03:00 - 04:30 (dangthir1)
-('as000001-0000-0000-0000-000000100013', 'bd000001-0000-0000-0000-000000100013', 'e1000001-0000-0000-0000-000000000033', 'ASSIGNED', NULL, NULL),
-('as000001-0000-0000-0000-000000100014', 'bd000001-0000-0000-0000-000000100014', 'e1000001-0000-0000-0000-000000000033', 'ASSIGNED', NULL, NULL),
-('as000001-0000-0000-0000-000000100015', 'bd000001-0000-0000-0000-000000100015', 'e1000001-0000-0000-0000-000000000033', 'ASSIGNED', NULL, NULL),
-('as000001-0000-0000-0000-000000100016', 'bd000001-0000-0000-0000-000000100016', 'e1000001-0000-0000-0000-000000000033', 'ASSIGNED', NULL, NULL),
-('as000001-0000-0000-0000-000000100017', 'bd000001-0000-0000-0000-000000100017', 'e1000001-0000-0000-0000-000000000033', 'ASSIGNED', NULL, NULL),
-('as000001-0000-0000-0000-000000100018', 'bd000001-0000-0000-0000-000000100018', 'e1000001-0000-0000-0000-000000000033', 'ASSIGNED', NULL, NULL),
-
--- Khung giờ 04:30 - 06:00 (jane_smith)
-('as000001-0000-0000-0000-000000100019', 'bd000001-0000-0000-0000-000000100019', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED', NULL, NULL),
-('as000001-0000-0000-0000-000000100020', 'bd000001-0000-0000-0000-000000100020', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED', NULL, NULL),
-('as000001-0000-0000-0000-000000100021', 'bd000001-0000-0000-0000-000000100021', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED', NULL, NULL),
-('as000001-0000-0000-0000-000000100022', 'bd000001-0000-0000-0000-000000100022', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED', NULL, NULL),
-('as000001-0000-0000-0000-000000100023', 'bd000001-0000-0000-0000-000000100023', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED', NULL, NULL),
-('as000001-0000-0000-0000-000000100024', 'bd000001-0000-0000-0000-000000100024', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED', NULL, NULL),
-('as000001-0000-0000-0000-000000100025', 'bd000001-0000-0000-0000-000000100025', 'e1000001-0000-0000-0000-000000000001', 'ASSIGNED', NULL, NULL);
+WITH slots AS (
+	SELECT
+		i,
+		ts
+	FROM a01_slots
+),
+generated AS (
+	SELECT
+		i,
+		(
+			'bd000001-0000-0000-0000-' || lpad((100000 + i)::text, 12, '0')
+		) AS booking_detail_id,
+		(
+			'as000001-0000-0000-0000-' || lpad((100000 + i)::text, 12, '0')
+		) AS assignment_id,
+		CASE (i % 2)
+			WHEN 1 THEN 'e1000001-0000-0000-0000-000000000033'
+			ELSE       'e1000001-0000-0000-0000-000000000017'
+		END AS employee_id
+	FROM slots
+)
+INSERT INTO assignments (assignment_id, booking_detail_id, employee_id, status, check_in_time, check_out_time)
+SELECT
+	g.assignment_id,
+	g.booking_detail_id,
+	g.employee_id,
+	'ASSIGNED' AS status,
+	NULL AS check_in_time,
+	NULL AS check_out_time
+FROM generated g;
 
 -- =================================================================================
 -- SUMMARY
 -- =================================================================================
--- Tổng cộng: 25 bookings và 25 assignments (ASSIGNED status)
--- Thời gian: 00:00 (12h đêm) đến 06:00 (6h sáng) ngày 13/12/2025
--- Employee dangthir1: 12 assignments (00h-01h30, 03h-04h30)
--- Employee jane_smith: 13 assignments (01h30-03h, 04h30-06h)
+-- Tổng cộng: 68 bookings và 68 assignments (ASSIGNED status)
+-- Thời gian: 09:15 ngày 16/12/2025 đến 02:00 ngày 17/12/2025 (mỗi 15 phút)
+-- Employee dangthir1 và jane_smith được phân công luân phiên
 -- Tất cả đều ở trạng thái ASSIGNED, sẵn sàng để check-in trên FE
